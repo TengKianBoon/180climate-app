@@ -1,0 +1,27 @@
+{
+  "description": "HTI, 20 yr, small polygon (1,107 ha — below 20,000 ha minimum) → area gate fails → hard_no",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Small Concession",
+    "iup_address": "Kalimantan Timur, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[117.0,0.0],[117.03,0.0],[117.03,-0.03],[117.0,-0.03],[117.0,0.0]]]}"
+    }
+  },
+  "expected": {
+    "eligibility_verdict": "hard_no",
+    "gates": {
+      "permit_type": "pass",
+      "permit_years": "pass",
+      "area": "fail",
+      "inside_iup": "pass"
+    },
+    "methodology_baseline_class": "planned_clearfell",
+    "methodology_is_planned": true,
+    "additionality_basis": "legal harvest right foregone"
+  }
+}

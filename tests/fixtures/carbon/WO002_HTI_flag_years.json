@@ -1,0 +1,27 @@
+{
+  "description": "HTI, 3 yr remaining (< 5 yr minimum), large polygon → permit_years flagged → flagged",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Kalimantan Timber",
+    "iup_address": "Kalimantan Timur, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 3,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[117.0,1.0],[117.3,1.0],[117.3,0.8],[117.0,0.8],[117.0,1.0]]]}"
+    }
+  },
+  "expected": {
+    "eligibility_verdict": "flagged",
+    "gates": {
+      "permit_type": "pass",
+      "permit_years": "flag",
+      "area": "pass",
+      "inside_iup": "pass"
+    },
+    "methodology_baseline_class": "planned_clearfell",
+    "methodology_is_planned": true,
+    "additionality_basis": "legal harvest right foregone"
+  }
+}

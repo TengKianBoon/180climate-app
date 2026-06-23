@@ -1,0 +1,22 @@
+{
+  "description": "HA routing invariants — must route to IFM family, never VM0048 or VM0007 (ADR-0001)",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT HA Routing Test",
+    "iup_address": "Kalimantan, Indonesia",
+    "permit_type": "HA",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[117.0,1.0],[117.3,1.0],[117.3,0.8],[117.0,0.8],[117.0,1.0]]]}"
+    }
+  },
+  "expected_methodology": {
+    "baseline_class": "planned_selective",
+    "is_planned": true,
+    "additionality_basis": "legal harvest right foregone",
+    "verra_family_contains": ["IFM"],
+    "cited_methods_must_not_contain": ["VM0048", "VM0007"]
+  }
+}
