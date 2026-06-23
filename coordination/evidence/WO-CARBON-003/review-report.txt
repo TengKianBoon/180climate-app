@@ -1,0 +1,39 @@
+WO-CARBON-003 WHITE-BOX REVIEW — Opus Reviewer — 2026-06-24
+============================================================
+
+RESULT: APPROVED
+
+Invariants checked:
+1. PEAT routing (baseline=peat, VM0027, is_planned=True, additionality_basis correct)  PASS
+2. PEAT cited_methods free of VM0048/VM0007                                             PASS
+3. HTI routing (planned_clearfell, VM0009, no forbidden)                               PASS
+4. HA routing (planned_selective, VM0010/VM0045, no forbidden)                         PASS
+5. All routes is_planned=True + "legal harvest right foregone"                         PASS
+6. Eligibility fail logic (fail→hard_no, flag→flagged, all pass→eligible) unchanged   PASS
+7. Determinism — pure functions, no randomness, no LLM                                PASS
+8. Range invariant low < high (incl. PEAT)                                             PASS
+9. No "% accuracy"/"% confidence" strings                                              PASS
+
+Warnings (non-blocking):
+- Comment in _estimate_peat incorrectly stated peat_swamp=390.6; actual is 409.3.
+  FIXED before verifier run: AGB+BGB label corrected to 409.3 tCO2/ha.
+- forest.biomass_tco2_per_ha=657.1 carried on PEAT estimates (unused; _estimate_peat
+  pulls peat_swamp independently). Informational — WO-004 may clarify.
+- ADR-0001 note: "never *brand* to VM0027" — route cites VM0027 but heavily qualifies
+  as interim + advisor-confirm. Consistent with intent; flag for Gate M review.
+
+WO-CARBON-003 VERIFIER REPORT — Opus Verifier — 2026-06-24
+===========================================================
+
+RESULT: APPROVED
+
+AC1 — Eligibility gates all combos                     PASS (69/69 tests)
+AC2 — PEAT→VM0027, HTI→APD, HA→IFM                    PASS (live + golden)
+AC3 — Golden suite WO002_* + WO003_*                   PASS
+AC4 — Determinism                                      PASS
+AC5 — No forbidden phrases in output                   PASS
+AC6 — All 69 tests pass                                PASS
+
+PEAT live estimate: 12,277,761 < 19,605,702 tCO2e (valid range; 73,787 ha × 20yr)
+/health endpoint: {'status': 'ok'}
+No files edited.

@@ -1,14 +1,16 @@
 """tests/test_golden.py — parametrized golden-case suite for the carbon engine.
 
 Covers all eligibility gate combos, methodology routing, and ADR-0009 invariants.
-Numeric ranges (WO-CARBON-004) will extend these fixtures; structure is pinned now.
+WO-CARBON-003: adds PEAT routing fixture + forest-type-aware biomass assertions.
+WO-CARBON-004: numeric range assertions added to eligibility fixtures once frozen.
 
 Test categories:
-  test_eligibility_golden       — all gate combos: eligible / flagged / hard_no
-  test_methodology_routing_golden — HTI→APD, HA→IFM; never VM0048 / VM0007
-  test_no_forbidden_phrases_*   — lint: no "% accuracy", no "% confidence"
-  test_estimate_is_always_range — quantity_low < quantity_high (ADR-0009)
-  test_determinism              — same input → same output every time
+  test_eligibility_golden         — gate combos: eligible / flagged / hard_no
+  test_methodology_routing_golden — HTI→APD, HA→IFM, PEAT→VM0027; never VM0048/VM0007
+  test_no_forbidden_phrases_*     — lint: no "% accuracy", no "% confidence"
+  test_estimate_is_always_range   — quantity_low < quantity_high (ADR-0009)
+  test_determinism                — same input → same output every time
+  test_biomass_is_real_ipcc_value — forest-type-aware IPCC 2006 value check
 """
 from __future__ import annotations
 import json
@@ -103,6 +105,7 @@ def test_additionality_basis_for_all_elig_cases(fixture_name: str):
 ROUTING_FIXTURES = [
     "WO002_routing_HTI.json",
     "WO002_routing_HA.json",
+    "WO003_routing_PEAT.json",    # WO-CARBON-003: PEAT → VM0027 interim (ADR-0001)
 ]
 
 
@@ -198,13 +201,19 @@ def test_data_sources_labelled(fixture_name: str):
 
 @pytest.mark.parametrize("fixture_name", ELIG_FIXTURES)
 def test_biomass_is_real_ipcc_value(fixture_name: str):
-    """Acceptance (WO-CARBON-001): biomass_tco2_per_ha must use IPCC 2006 values (≥500 tCO2/ha
-    for SE-Asia lowland moist tropical; the old stub range was 150–250 tCO2/ha)."""
+    """Acceptance (WO-CARBON-001 / WO-CARBON-003): biomass_tco2_per_ha uses real IPCC 2006 values.
+
+    Forest-type-aware thresholds (IPCC 2006 Table 4.7 SE-Asia):
+      Non-peat projects: ≥500 tCO2/ha (lowland moist = 657.1; old stub range was 150–250)
+      PEAT projects:     ≥350 tCO2/ha (peat_swamp = 390.6 tCO2/ha for AGB+BGB)
+    """
     case = _load(fixture_name)
     inp = _make_input(case["input"])
     boundary = parse_geo(inp.geo)
     forest = query_forest_data(boundary)
-    assert forest.biomass_tco2_per_ha >= 500.0, (
-        f"biomass_tco2_per_ha={forest.biomass_tco2_per_ha} is below IPCC 2006 SE-Asia minimum "
-        f"(expected ≥500 tCO2/ha for lowland moist tropical; old stub range was 150–250)"
+    is_peat = inp.project_type == "PEAT"
+    threshold = 350.0 if is_peat else 500.0
+    assert forest.biomass_tco2_per_ha >= threshold, (
+        f"biomass_tco2_per_ha={forest.biomass_tco2_per_ha} is below IPCC 2006 SE-Asia threshold "
+        f"({'peat_swamp ≥350' if is_peat else 'lowland moist ≥500'}) for {fixture_name}"
     )

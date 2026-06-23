@@ -1,0 +1,22 @@
+{
+  "description": "PEAT project (HTI permit, 20 yr, large polygon) → routes to VM0027 interim; never VM0048/VM0007 (ADR-0001)",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Kalimantan Peat Conservation",
+    "iup_address": "Kalimantan Tengah, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "PEAT",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[117.0,1.0],[117.3,1.0],[117.3,0.8],[117.0,0.8],[117.0,1.0]]]}"
+    }
+  },
+  "expected_methodology": {
+    "baseline_class": "peat",
+    "is_planned": true,
+    "additionality_basis": "legal harvest right foregone",
+    "verra_family_contains": ["VM0027"],
+    "cited_methods_must_not_contain": ["VM0048", "VM0007"]
+  }
+}
