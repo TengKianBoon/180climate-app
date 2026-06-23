@@ -27,8 +27,8 @@
   "baseline_cover_pct": 80.3,
   "loss_after_2020_ha": 943.55,
   "data_sources": [
-    "GFW/Hansen annual loss (stub — offline/CI mode)",
-    "Biomass: IPCC (2006) Guidelines for National GHG Inventories, Vol. 4 AFOLU, Table 4.7 — Southeast Asia tropical forest defaults"
+    "GFW/Hansen annual loss (stub proxy — real pixel read failed: Point input — no pixel window to read)",
+    "Biomass: IPCC (2006) Guidelines for National GHG Inventories, Vol. 4 AFOLU, Table 4.7 — Southeast Asia tropical forest defaults — Tier-1 fallback (set DENSITY_COG_URL to enable ESA CCI / GEDI read)"
   ],
   "uncertainty_band": "±25 % — deterministic stub; Tier 1 indicative screening once real satellite data is wired",
   "peat_present": null,

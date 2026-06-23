@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 127742.0,
-    "quantity_high_tco2e": 182489.0,
+    "quantity_low_tco2e": 7914.0,
+    "quantity_high_tco2e": 11306.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "WO-CARBON-004 — frozen 2026-06-24. hard_no case; estimate uses actual 1,107 ha × normalised loss rate (denominator capped at 25,000 ha to avoid stub inflation)."
+    "freeze_note": "WO-CARBON-001b — re-frozen 2026-06-24 with real Hansen GFC-2022-v1.10 pixel loss data (stub replaced; methodology/framing unchanged). Small polygon 1,107 ha; real loss rate 0.097%/yr (tile 00N_110E). Was: 127742–182489 (stub proxy inflated)."
   }
 }
