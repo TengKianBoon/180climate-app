@@ -23,5 +23,11 @@
     "methodology_baseline_class": "planned_clearfell",
     "methodology_is_planned": true,
     "additionality_basis": "legal harvest right foregone"
+  },
+  "expected_range": {
+    "quantity_low_tco2e": 717762.0,
+    "quantity_high_tco2e": 1025374.0,
+    "ipcc_tier": "Tier 1",
+    "freeze_note": "WO-CARBON-004 — frozen 2026-06-24. 3-yr crediting period; same area + loss rate as HTI_eligible but project_years=3."
   }
 }
