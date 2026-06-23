@@ -1,6 +1,6 @@
-phase: P1
-active_wo: WO-001 · vertical slice spine
-status: GATE 1 READY
-last_commit: feat: WO-001 vertical slice — end-to-end carbon pre-FS pipe
-next_step: HOLDING — Cowork preparing WO-CARBON-001..005 + golden cases; John will paste the go-ahead
+phase: P2 · Carbon engine
+active_wo: WO-CARBON-001 + WO-CARBON-002 COMPLETE — stopped for Cowork review
+status: STOPPED — awaiting Cowork review of data layer + golden cases before WO-CARBON-003 (Opus)
+last_commit: merge WO-CARBON-001 (data adapters) + WO-CARBON-002 (golden cases)
+next_step: Cowork reviews OUTBOX → approves WO-CARBON-003 (eligibility + routing, Opus)
 updated: 2026-06-24

@@ -1,40 +1,28 @@
-# INBOX — the task right now   ·   written by: Cowork (planner)   ·   DISPATCHED 2026-06-24
+# INBOX — the task right now   ·   written by: Cowork (planner)   ·   PHASE 2 STAGED 2026-06-24
 
-## WO-001 — Vertical slice spine (end-to-end, ugly but real)
-**Phase:** P1 · **Depends on:** WO-000 (Gate 0 approved) · **Worktree:** feat/spine
-**Models:** Sonnet (wiring) · **Retry budget:** 2 → STOP + write QUESTIONS.md
+## Phase 2 — Carbon Engine batch (WO-CARBON-001 … 005)
+Full Work Orders + acceptance + golden-case spec: **docs/wo-carbon-batch.md** (read it).
 
-**Objective:** One sample concession flows end-to-end and produces a verdict + map + placeholder
-AI rationale, and a lead email is sent. Prove the whole pipe connects before widening.
+**Goal:** turn the placeholder slice into the real, defensible carbon engine — real data,
+eligibility gates, Verra methodology routing, avoided-emissions RANGE + quality + IPCC tier,
+and the Verra-family narrative. Determinism holds: the ONLY LLM call is the narrative.
 
-### In scope
-- `core/geo.py` — parse coord string + GeoJSON dict → Boundary (area_ha, centroid, within_indonesia)
-- `core/forest.py` — deterministic GFW-stub → ForestData (real integration is WO-CARBON-001)
-- `engines/carbon/engine.py` — eligibility gates + placeholder estimate range (labeled PLACEHOLDER)
-- `narrative/narrator.py` — template narrative (no LLM for the slice; LLM wired in WO-CARBON-005)
-- `api/main.py` — FastAPI: POST /api/carbon → EngineResult; POST /api/lead → email
-- `api/email.py` — SMTP via env vars; file-log fallback for CI
-- `frontend/index.html` — single HTML page: form → map (Leaflet CDN) + verdict + lead form
-- `tests/test_slice.py` — geo parsing, carbon engine, API route; one committed golden case
-- `tests/fixtures/carbon/WO001_golden.json` — golden case (input → expected output)
-- Update `requirements.txt` + `.github/workflows/ci.yml` with new deps
+**How to run (multi-agent showcase + budget):**
+- Parallel **git worktrees**, cap ~3 concurrent (this is the portfolio exhibit).
+- Tiered models: **Opus** for WO-CARBON-003 + 004 (number/methodology path) + their reviews;
+  **Sonnet** for 001 (data), 002 (golden cases), 005 (narrative templates).
+- Retry budget 2 → STOP + QUESTIONS.
 
-### Out of scope / do NOT touch
-- Real biomass/peat logic, real GFW API calls
-- Methodology routing detail (HTI→APD naming not needed for the slice)
-- EUDR engine, parallel modules
-- `core/contracts/*` (consume only — no changes)
+**Order:**
+1. WO-CARBON-001 (real data) ∥ WO-CARBON-002 (golden cases)  → **STOP for Cowork review**
+   (data + golden cases are the test oracle — planner checks before the Opus number work).
+2. → WO-CARBON-003 (eligibility + routing, Opus)
+3. → WO-CARBON-004 (estimate range + quality, Opus)
+4. → WO-CARBON-005 (narrative + Verra rationale)
+5. → **Gate M** (John + independent advisor: numbers + routing + disclaimers).
 
-### Acceptance criteria
-- [ ] Coords AND GeoJSON parse → Boundary + area_ha; malformed input → clear error
-- [ ] Forest stub returns ForestData; loss overlay renders on the Leaflet map
-- [ ] Placeholder carbon range + brief non-binding disclaimer render in the page
-- [ ] Lead form submits → email function called with correct payload (tested via mock)
-- [ ] One golden case committed; CI green end-to-end
-- [ ] Deterministic: same input → same output; no LLM in number path
+**Invariants:** consume contracts only (change = ADR + Gate C); range+band+IPCC tier, never a
+single number or "%"; HTI→APD, HA→IFM, Peat→interim; never VM0048 family for foregone-harvest;
+never VM0007; additionality = "legal harvest right foregone"; no secrets.
 
-### Evidence to return (coordination/evidence/WO-001/)
-- pytest output (all green) · screenshot/description of the rendered slice · email mock test output · golden case file
-
-### Gate
-Gate 1 — John: slice green end-to-end. Write coordination/GATE.md = "GATE 1 READY" + evidence pointers, push, and STOP.
+**Start condition:** John pastes the go-ahead to begin WO-CARBON-001 ∥ 002.
