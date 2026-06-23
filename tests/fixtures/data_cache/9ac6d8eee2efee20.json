@@ -1,0 +1,37 @@
+{
+  "annual_loss_ha": {
+    "2001": 279.11,
+    "2002": 302.35,
+    "2003": 303.5,
+    "2004": 306.27,
+    "2005": 300.8,
+    "2006": 290.66,
+    "2007": 293.72,
+    "2008": 297.51,
+    "2009": 294.26,
+    "2010": 295.91,
+    "2011": 304.29,
+    "2012": 311.5,
+    "2013": 305.51,
+    "2014": 305.92,
+    "2015": 304.61,
+    "2016": 311.11,
+    "2017": 302.3,
+    "2018": 301.02,
+    "2019": 308.09,
+    "2020": 312.3,
+    "2021": 327.66,
+    "2022": 307.32,
+    "2023": 308.57
+  },
+  "baseline_cover_pct": 80.3,
+  "loss_after_2020_ha": 943.55,
+  "data_sources": [
+    "GFW/Hansen annual loss (stub — offline/CI mode)",
+    "Biomass: IPCC (2006) Guidelines for National GHG Inventories, Vol. 4 AFOLU, Table 4.7 — Southeast Asia tropical forest defaults"
+  ],
+  "uncertainty_band": "±25 % — deterministic stub; Tier 1 indicative screening once real satellite data is wired",
+  "peat_present": null,
+  "peat_depth_proxy_m": null,
+  "biomass_tco2_per_ha": 657.1
+}

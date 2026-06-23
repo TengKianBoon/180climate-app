@@ -1,0 +1,27 @@
+{
+  "description": "HA, 15 yr remaining, large polygon (73,787 ha), within Indonesia → eligible; routes to IFM",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Kalimantan Selective",
+    "iup_address": "Kalimantan Tengah, Indonesia",
+    "permit_type": "HA",
+    "permit_years_remaining": 15,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[117.0,1.0],[117.3,1.0],[117.3,0.8],[117.0,0.8],[117.0,1.0]]]}"
+    }
+  },
+  "expected": {
+    "eligibility_verdict": "eligible",
+    "gates": {
+      "permit_type": "pass",
+      "permit_years": "pass",
+      "area": "pass",
+      "inside_iup": "pass"
+    },
+    "methodology_baseline_class": "planned_selective",
+    "methodology_is_planned": true,
+    "additionality_basis": "legal harvest right foregone"
+  }
+}
