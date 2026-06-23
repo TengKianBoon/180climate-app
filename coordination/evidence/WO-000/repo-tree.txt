@@ -1,0 +1,68 @@
+# WO-000 Evidence: Repo tree (git ls-files)
+# Generated: 2026-06-24
+
+.claude/CLAUDE.md
+.claude/agents/reviewer.md
+.claude/agents/test-writer.md
+.claude/agents/verifier.md
+.claude/agents/writer.md
+.claude/settings.json
+.claude/skills/brand-180climate.md
+.claude/skills/geospatial.md
+.claude/skills/golden-case.md
+.claude/skills/methodology.md
+.claude/skills/self-improving-code.md
+.github/workflows/ci.yml
+.gitignore
+180climate-MASTER-handover-spec.md
+180climate-app-docs.zip
+180climate-build-and-orchestration-plan.md
+180climate-carbon-confidence-report (1).docx
+180climate-carbon-confidence-report.pdf
+180climate-planning-batch-01.md
+LICENSE
+README.md
+api/__init__.py
+coordination/BOARD.md
+coordination/GATE.md
+coordination/INBOX.md
+coordination/OUTBOX.md
+coordination/QUESTIONS.md
+coordination/README.md
+coordination/START-HERE.md
+coordination/STATE.md
+coordination/board.html
+coordination/evidence/.gitkeep
+coordination/journal.md
+coordination/render_board.py
+core/__init__.py
+core/contracts/__init__.py
+docs/CLAUDE.md
+docs/adr/ADR-0001.md
+docs/adr/ADR-0002.md
+docs/adr/ADR-0003.md
+docs/adr/ADR-0004.md
+docs/adr/ADR-0005.md
+docs/adr/ADR-0006.md
+docs/adr/ADR-0007.md
+docs/adr/ADR-0008.md
+docs/adr/ADR-0009.md
+docs/adr/ADR-0010.md
+docs/adr/ADR-0011-orchestration-v2.md
+docs/application-plan.md
+docs/methodology.md
+docs/orchestration-v2.md
+docs/project-instructions.md
+engines/__init__.py
+engines/carbon/__init__.py
+engines/eudr/__init__.py
+frontend/.gitkeep
+narrative/__init__.py
+pyproject.toml
+requirements.txt
+tests/__init__.py
+tests/test_contracts.py
+
+# Tree matches spec §12:
+# core/ ✓   engines/carbon ✓   engines/eudr ✓   narrative/ ✓
+# frontend/ ✓   api/ ✓   tests/ ✓   docs/ ✓   coordination/ ✓ (pre-existing)

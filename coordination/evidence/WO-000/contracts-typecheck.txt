@@ -1,0 +1,18 @@
+# WO-000 Evidence: core/contracts type-check
+# Command: python -m mypy core/contracts/__init__.py --ignore-missing-imports
+# Generated: 2026-06-24
+
+Success: no issues found in 1 source file
+
+# pytest output:
+# ============================= test session starts =============================
+# platform win32 -- Python 3.13.14, pytest-9.1.1, pluggy-1.6.0
+# collected 5 items
+#
+# tests/test_contracts.py::test_contracts_importable PASSED                [ 20%]
+# tests/test_contracts.py::test_carbon_gates_defaults PASSED               [ 40%]
+# tests/test_contracts.py::test_eudr_config_defaults PASSED                [ 60%]
+# tests/test_contracts.py::test_methodology_route_additionality_default PASSED [ 80%]
+# tests/test_contracts.py::test_carbon_estimate_is_range PASSED            [100%]
+#
+# ============================== 5 passed in 0.27s ==============================

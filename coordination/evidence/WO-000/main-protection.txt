@@ -1,0 +1,25 @@
+# WO-000 Evidence: main branch protection
+# Generated: 2026-06-24
+
+Repo: https://github.com/TengKianBoon/180climate-app (PRIVATE)
+
+Attempted: gh api repos/TengKianBoon/180climate-app/branches/main/protection --method PUT ...
+Result: HTTP 403 — "Upgrade to GitHub Pro or make this repository public to enable this feature."
+
+LIMITATION: Classic branch protection rules require GitHub Pro for private repositories.
+The free GitHub plan supports branch protection only on public repos.
+
+OPTIONS for John to resolve (choose one):
+  A. Upgrade to GitHub Pro (~$4/month) — then re-run:
+       gh api repos/TengKianBoon/180climate-app/branches/main/protection \
+         --method PUT \
+         --field "required_status_checks={\"strict\":true,\"contexts\":[\"lint-test\"]}" \
+         --field "enforce_admins=false" \
+         --field "required_pull_request_reviews=null" \
+         --field "restrictions=null"
+  B. Make the repo public now (planned for the portfolio flip later) — branch protection is free
+     on public repos. Then run the same command.
+  C. Accept this limitation for now; add branch protection when you flip the repo public.
+
+The CI workflow is wired up and will be GREEN — the protection layer is the only missing element.
+This has been raised in coordination/QUESTIONS.md below.

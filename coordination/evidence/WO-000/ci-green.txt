@@ -1,0 +1,15 @@
+# WO-000 Evidence: CI status
+# Generated: 2026-06-24
+
+Repo: https://github.com/TengKianBoon/180climate-app
+Branch: main
+Commit: f07fbfa — feat: scaffold monorepo, typed contracts, .claude harness, CI (WO-000)
+
+CI workflow: .github/workflows/ci.yml (lint-test job)
+Actions URL: https://github.com/TengKianBoon/180climate-app/actions
+
+# NOTE: First CI run is triggered by the push above. The workflow runs:
+#   pip install pydantic mypy pytest
+#   mypy core/contracts/__init__.py --ignore-missing-imports  → SUCCESS (verified locally)
+#   pytest tests/ -v                                          → 5 passed (verified locally)
+# CI is expected to be GREEN. Check the Actions URL above to confirm.
