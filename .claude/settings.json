@@ -1,0 +1,45 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const i=process.env.CLAUDE_TOOL_INPUT||''; if(/core\\/contracts/.test(i)){process.stderr.write('contract-guard: core/contracts/* requires an ADR + Gate C. Blocked.\\n');process.exit(1)}\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=process.env.CLAUDE_TOOL_INPUT||''; if(/rm\\s+-rf\\s+\\/|format\\s+c:|DROP\\s+TABLE|DROP\\s+DATABASE/.test(c)){process.stderr.write('dangerous-bash veto: blocked.\\n');process.exit(1)}\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const o=process.env.CLAUDE_TOOL_OUTPUT||''; if(/AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|-----BEGIN .* KEY-----/.test(o)){process.stderr.write('secret-scan: possible secret in output. Review before committing.\\n');process.exit(1)}\""
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(mypy:*)",
+      "Bash(pytest:*)",
+      "Bash(gh:*)"
+    ]
+  }
+}
