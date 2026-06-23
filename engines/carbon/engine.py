@@ -2,16 +2,19 @@
 
 WO-CARBON-003: eligibility gates hardened + full methodology routing (HTI/HA/PEAT).
 WO-CARBON-004: estimate range (replaces placeholder multipliers).
+WO-CARBON-006 / ADR-0012: peat routing corrected — VM0027 removed (inactivated 2023,
+  rewetting method — wrong activity type). Peat labelled "no settled active Verra method."
 
 Determinism invariant: pure functions + typed models; NO LLM calls here.
 The only LLM call in the product is in narrative/.
 
-Methodology routing (ADR-0001):
-  project_type PEAT → VM0027 (peat drainage avoidance — interim)
-  permit_type HTI   → APD route (VM0009/legacy)
-  permit_type HA    → IFM (VM0010 / VM0045 v1.2)
+Methodology routing (ADR-0001 / ADR-0012):
+  project_type PEAT → No settled active Verra method (VM0027 inactivated 2023 — never cite)
+  permit_type HTI   → APD route (VM0009 — active but in transition)
+  permit_type HA    → IFM (VM0045 / VM0010) — advisor-confirm active version
   NEVER: VM0048 family for foregone-harvest baselines.
   NEVER: VM0007 (unrelated methodology).
+  NEVER: VM0027 (rewetting method, inactivated 2023; wrong activity type for peat avoided-conversion).
   additionality_basis = "legal harvest right foregone" for all three routes.
 """
 from __future__ import annotations
@@ -141,16 +144,17 @@ def run_eligibility(inp: CarbonInput, boundary: Boundary) -> EligibilityResult:
 
 
 def build_methodology_route(inp: CarbonInput) -> MethodologyRoute:
-    """Route to the correct Verra methodology family per ADR-0001.
+    """Route to the correct Verra methodology family per ADR-0001 / ADR-0012.
 
-    Routing table (spec §8, ADR-0001):
-      project_type == PEAT  → VM0027 (peat drainage avoidance, interim)
-      permit_type  == HTI   → APD route (VM0009/legacy) — planned clearfell foregone
-      permit_type  == HA    → IFM (VM0010 / VM0045 v1.2) — planned selective foregone
+    Routing table (spec §8, ADR-0001, corrected by ADR-0012):
+      project_type == PEAT  → No settled active Verra method (ADR-0012; VM0027 inactivated 2023)
+      permit_type  == HTI   → APD route (VM0009 — active but in transition)
+      permit_type  == HA    → IFM (VM0045 / VM0010) — advisor-confirm active version
 
-    Forbidden (ADR-0001):
+    Forbidden (ADR-0001 / ADR-0012):
       VM0048 family  — not applicable to foregone-harvest baselines.
       VM0007         — not applicable to this project type.
+      VM0027         — inactivated 2023; rewetting method, not avoided-conversion; NEVER cite.
     """
     # PEAT takes precedence over permit type:
     # both HTI and HA concessions can overlie peat-bearing land.
@@ -158,17 +162,19 @@ def build_methodology_route(inp: CarbonInput) -> MethodologyRoute:
         return MethodologyRoute(
             baseline_class="peat",
             verra_family=(
-                "VM0027 — Avoided Conversion of Peatlands and Drainage "
-                "(interim methodology — confirm currency with advisor before any crediting claim)"
+                "No settled active Verra method for avoided tropical-peat conversion as of 2026 — "
+                "route to be confirmed with methodology advisor; IPCC Tier-1 indicative screening only."
             ),
-            cited_methods=["VM0027"],
+            cited_methods=[],
             is_planned=True,
             additionality_basis="legal harvest right foregone",
             notes=(
-                "Peat project: avoided drainage oxidation is the dominant carbon term. "
-                "VM0027 is an interim methodology; advisor must confirm registry status. "
-                "Never VM0048 family. "
-                "AGB biomass term supplemented by peat-drainage EF (WO-CARBON-004)."
+                "ADR-0012: VM0027 was inactivated by Verra in 2023 and is a rewetting methodology — "
+                "incorrect activity type for avoided drainage/conversion of tropical peatland. "
+                "No active standalone Verra methodology for avoided tropical-peat conversion exists as of 2026. "
+                "Never VM0027 / VM0048 / VM0007. Methodology route must be confirmed with a "
+                "qualified methodology advisor before any crediting claim or registry submission. "
+                "Engine still computes IPCC Tier-1 avoided-drainage range — methodology-agnostic (ADR-0006)."
             ),
         )
 
@@ -176,7 +182,7 @@ def build_methodology_route(inp: CarbonInput) -> MethodologyRoute:
         return MethodologyRoute(
             baseline_class="planned_clearfell",
             verra_family=(
-                "APD route (VM0009/legacy — advisor confirmation required on current registry status)"
+                "APD route (VM0009 — active but in transition; advisor-confirm at deal time)"
             ),
             cited_methods=["VM0009"],
             is_planned=True,
@@ -190,7 +196,7 @@ def build_methodology_route(inp: CarbonInput) -> MethodologyRoute:
     # HA — Hak Alam (selective logging permit)
     return MethodologyRoute(
         baseline_class="planned_selective",
-        verra_family="IFM (VM0010 / VM0045 v1.2)",
+        verra_family="IFM (VM0045 / VM0010) — advisor-confirm active version",
         cited_methods=["VM0010", "VM0045"],
         is_planned=True,
         additionality_basis="legal harvest right foregone",
@@ -299,7 +305,7 @@ def _estimate_peat(
     forest: ForestData,
     loss_rate: float,
 ) -> tuple[float, float, str]:
-    """Avoided-emissions range for PEAT (VM0027).
+    """Avoided-emissions range for PEAT (IPCC Tier-1 avoided-drainage; no settled Verra method — ADR-0012).
 
     Two carbon terms:
       1. Peat drainage oxidation (dominant): area × IPCC EF [tCO2/ha/yr] × years × (1−buffer)
@@ -364,10 +370,12 @@ def _quality_factors(inp: CarbonInput, route: MethodologyRoute) -> QualityFactor
     )
     if inp.project_type == "PEAT":
         fit = (
-            f"VM0027 (peat drainage avoidance — interim methodology). "
-            "Strong conceptual fit: project prevents drainage oxidation of tropical peatland. "
-            "Methodology currency must be confirmed with advisor (VM0027 is older; check VCS registry status). "
-            "Peat depth survey required for registry-grade estimate."
+            "No settled active Verra methodology for avoided tropical-peat conversion as of 2026 "
+            "(ADR-0012: VM0027 inactivated 2023 — rewetting method, wrong activity type). "
+            "Strong conceptual fit with an avoided-drainage/conversion approach; methodology route "
+            "must be confirmed with a qualified advisor. "
+            "Peat depth survey required for registry-grade estimate. "
+            "Never VM0027 / VM0048 / VM0007."
         )
     else:
         fit = (

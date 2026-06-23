@@ -1,54 +1,79 @@
-"""narrative/narrator.py — Template-based narrative for the WO-001 slice.
+"""narrative/narrator.py — Template-based carbon narrative.
 
-PLACEHOLDER: no LLM call in the slice. Real Claude-powered narrative wired in WO-CARBON-005.
+WO-CARBON-005 / WO-CARBON-006:
+  - Corrected framing: observed-loss floor ≠ APD/IFM registry-grade planned baseline.
+  - Tonnage suppressed for hard_no / flagged verdicts.
+  - Peat routing note updated (ADR-0012: VM0027 removed — inactivated 2023).
+  - VM0009 labelled "active but in transition — advisor-confirm at deal time."
+  - HA labelled "IFM (VM0045 / VM0010) — advisor-confirm active version."
+  - Peat EF labelled conservative (deeply-drained plantation peat is often higher).
+  - Buffer labelled as placeholder for AFOLU non-permanence risk-tool output.
+  - Co-dominant REDD uncertainties: baseline AND carbon density.
+  - "Engage 180Climate" CTA at end.
+
 This module is the ONLY place where LLM calls will ever be made (determinism invariant).
-
-The template produces a defensible, non-binding narrative consistent with ADR-0001/0009.
 """
 from __future__ import annotations
 from core.contracts import (
-    NarrativeRequest, NarrativeResult, CarbonEstimate, EligibilityResult,
+    NarrativeRequest, NarrativeResult, CarbonEstimate,
 )
 
 
 _DISCLAIMER = (
-    "Indicative screening estimate only. Not registry-grade, not financial advice. "
-    "Confirm with a full feasibility study before any financial or crediting claim."
+    "Indicative Tier 1 screening only — not registry-grade, not financial advice. "
+    "This figure uses IPCC default values and a proxy loss rate; it is not a verified "
+    "avoided-emissions claim. Confirm with a full feasibility study, accredited methodology, "
+    "and independent third-party verification before any financial or crediting claim."
+)
+
+_ENGAGE_CTA = (
+    "**Engage 180Climate** — if this concession is a candidate for a carbon project, "
+    "the next step is a structured feasibility scoping with 180Climate. "
+    "Contact: info@180climate.net"
 )
 
 _METHODOLOGY_NOTE = {
     "planned_clearfell": (
-        "Based on the HTI permit, the applicable methodology family is the APD route "
-        "(VM0009/legacy — advisor-confirm). The additionality basis is the legal harvest right foregone: "
-        "the concession holder has a legal right to clear-fell but is choosing to forego it. "
-        "This is a planned deforestation baseline — not the unplanned-deforestation (AUD/VM0048) family."
+        "**Methodology basis (indicative):** Based on the HTI permit, the applicable methodology "
+        "family is APD (Avoided Planned Deforestation). The current active Verra methodology for this "
+        "route is VM0009 — active but in transition; confirm with your methodology advisor at deal time. "
+        "The additionality basis is the legal harvest right foregone: the concession holder has a legal "
+        "right to clear-fell but is choosing to forego it. This is a planned-deforestation baseline — "
+        "not the unplanned-deforestation (AUD / VM0048) family."
     ),
     "planned_selective": (
-        "Based on the HA permit, the applicable methodology family is IFM (VM0010 / VM0045 v1.2). "
+        "**Methodology basis (indicative):** Based on the HA permit, the applicable methodology "
+        "family is IFM (Improved Forest Management). Applicable Verra methodologies: "
+        "IFM (VM0045 / VM0010) — advisor-confirm active version at deal time. "
         "The additionality basis is the legal harvest right foregone: the concession holder has a legal "
-        "right to selectively log but is choosing to forego it. "
-        "This is a planned selective-logging baseline — not the unplanned-deforestation (AUD/VM0048) family."
+        "right to selectively log but is choosing to forego it. This is a planned selective-logging "
+        "baseline — not the unplanned-deforestation (AUD / VM0048) family."
     ),
     "peat": (
-        "Peat concessions require the avoided drainage/subsidence approach. "
-        "A standalone tropical peatland methodology is in development (VM0027 interim — advisor-confirm). "
-        "Confirm with a methodology advisor before any commercial application."
+        "**Methodology basis (indicative):** Peat avoided-conversion projects sit in an unsettled "
+        "methodology landscape as of 2026. VM0027 was inactivated by Verra in 2023 — it is a "
+        "rewetting methodology, not an avoided-drainage/conversion methodology, and must never be "
+        "cited for this activity type. No settled active Verra methodology for avoided tropical-peat "
+        "conversion currently exists. This screening uses IPCC Tier-1 default emission factors only "
+        "(IPCC 2013 Wetlands Supplement Table 2.1). Methodology route must be confirmed with a "
+        "qualified methodology advisor. Never VM0027 / VM0048 / VM0007."
     ),
 }
 
 
 def generate_narrative(request: NarrativeRequest) -> NarrativeResult:
-    """Generate a template narrative. Replace with LLM call in WO-CARBON-005."""
+    """Generate a defensible template narrative consistent with ADR-0001/0009/0012.
+
+    Tonnage is suppressed for hard_no / flagged verdicts to avoid presenting a
+    tempting number against an ineligible or uncertain concession.
+    """
     payload = request.payload
     estimate: CarbonEstimate | None = None
     try:
         estimate = CarbonEstimate(**payload)
     except Exception:
-        pass
-
-    if estimate is None:
         return NarrativeResult(
-            text="[PLACEHOLDER — narrative generation failed; LLM wired in WO-CARBON-005]",
+            text="[Narrative generation failed — malformed payload]",
             citations=[],
         )
 
@@ -58,42 +83,108 @@ def generate_narrative(request: NarrativeRequest) -> NarrativeResult:
     high = estimate.quantity_high_tco2e
     unc = estimate.uncertainty
 
-    verdict_text = {
-        "eligible": "The concession appears eligible for a carbon project under current screening criteria.",
-        "flagged": (
-            "The concession has one or more flags that require clarification: "
-            + "; ".join(elig.reasons) + "."
-        ),
-        "hard_no": (
-            "The concession does not meet minimum eligibility criteria for a v1 carbon project: "
-            + "; ".join(elig.reasons) + "."
-        ),
-    }[elig.verdict]
+    # ── Verdict block ─────────────────────────────────────────────────────────
+    if elig.verdict == "eligible":
+        verdict_text = (
+            "The concession appears eligible for a carbon project under current screening criteria."
+        )
+    elif elig.verdict == "flagged":
+        reasons_text = "; ".join(elig.reasons)
+        verdict_text = (
+            f"The concession has one or more flags that require clarification: {reasons_text}. "
+            "These flags do not automatically disqualify the project, but must be resolved before "
+            "any crediting claim or registry submission."
+        )
+    else:  # hard_no
+        reasons_text = "; ".join(elig.reasons)
+        verdict_text = (
+            f"The concession does not meet minimum eligibility criteria: {reasons_text}. "
+            "A carbon project under current v1 screening criteria is not viable without addressing "
+            "the above. Contact 180Climate to discuss what changes would alter this assessment."
+        )
+
+    # ── Carbon estimate block (eligible only — suppress for hard_no / flagged) ─
+    if elig.verdict == "eligible":
+        baseline_class = meth.baseline_class
+        if baseline_class == "peat":
+            basis_note = (
+                "This figure is a deliberately conservative floor derived from IPCC Tier-1 default "
+                "emission factors for tropical drained peatland (IPCC 2013 Wetlands Supplement "
+                "Table 2.1: 9–13 tCO₂-eq/ha/yr). The peat drainage emission factor used here is "
+                "conservative; deeply-drained plantation peat is often higher. "
+                "The buffer deduction (20–30%) is a placeholder for the AFOLU non-permanence "
+                "risk-tool output — the actual VCS buffer requires project-specific inputs. "
+                "Peat depth and drainage intensity are not measured at this screening stage."
+            )
+            unc_note = (
+                "Co-dominant uncertainties: (1) peat depth and drainage intensity — not measured; "
+                "deeply-drained plantation peat EFs can be 2–4× the IPCC default; "
+                "(2) peat layer extent — no spatial peat map applied at this screening stage."
+            )
+        else:
+            basis_note = (
+                "This figure is a deliberately conservative floor derived from OBSERVED forest loss "
+                "(8-year satellite average loss rate, 2016–2023) and IPCC 2006 Table 4.7 SE-Asia "
+                "default biomass (657.1 tCO₂/ha for lowland moist tropical forest). "
+                "It is NOT the APD/IFM (VM0009) planned-harvest baseline — the registry-grade "
+                "baseline is established and independently justified only at registry grade, "
+                "based on the documented planned harvest rate from the IUP permit, "
+                "which may be higher or may be constrained by additionality, leakage, or "
+                "conservative-baseline rules. "
+                "The buffer deduction (20–30%) is a placeholder for the AFOLU non-permanence "
+                "risk-tool output — the actual VCS buffer requires project-specific inputs."
+            )
+            unc_note = (
+                "Co-dominant uncertainties: (1) baseline harvest rate — the legally-permitted "
+                "extraction rate from the IUP permit has not yet been verified from permit documents; "
+                "(2) carbon density — IPCC 2006 default biomass is unverified against field "
+                "measurements or satellite-derived AGB (ESA CCI / GEDI grounding deferred to "
+                "WO-CARBON-001b)."
+            )
+
+        estimate_block = f"""
+**Indicative Carbon Range**
+Estimated avoided emissions: {low:,.0f} – {high:,.0f} tCO₂e (project lifetime).
+Uncertainty: {unc}
+
+**Basis for this figure**
+{basis_note}
+
+**Dominant uncertainties**
+{unc_note}
+"""
+    else:
+        # Suppress tonnage for hard_no / flagged — do not present a tempting number
+        estimate_block = (
+            "\n*(Indicative tonnage not shown for flagged or ineligible concessions — "
+            "resolve the eligibility issues above before proceeding to a carbon estimate.)*\n"
+        )
 
     meth_note = _METHODOLOGY_NOTE.get(meth.baseline_class, "")
 
     text = f"""{verdict_text}
-
-**Preliminary Carbon Estimate (PLACEHOLDER — WO-CARBON-004 will refine)**
-Estimated avoided emissions: {low:,.0f} – {high:,.0f} tCO₂e over the project crediting period.
-Uncertainty: {unc}
-
-**Methodology (indicative)**
+{estimate_block}
 {meth_note}
 
-**Important:** The baseline/counterfactual — not satellite resolution — is the dominant uncertainty. \
-Field validation, an accredited methodology, and independent third-party verification are required \
-before any creditable or financial claim.
+**Important:** Field validation, an accredited methodology selection, and independent third-party verification are required before any creditable or financial claim. The baseline / counterfactual and carbon density are co-dominant uncertainties for REDD projects; peat depth and drainage intensity are co-dominant for PEAT projects.
 
 {_DISCLAIMER}
 
-[PLACEHOLDER narrative — real AI rationale in WO-CARBON-005]"""
+---
+
+{_ENGAGE_CTA}"""
+
+    citations = [
+        "ADR-0001 — Carbon methodology stance",
+        "ADR-0009 — Uncertainty & confidence communication",
+        "ADR-0012 — Peat routing correction (VM0027 inactivated 2023)",
+        "IPCC (2006) Guidelines for National GHG Inventories, Table 4.7 — SE-Asia biomass",
+        "IPCC (2013) Wetlands Supplement, Table 2.1 — Tropical drained peat EF",
+    ]
+    if meth.baseline_class != "peat" and meth.verra_family:
+        citations.append(meth.verra_family)
 
     return NarrativeResult(
         text=text,
-        citations=[
-            "ADR-0001 — Carbon methodology stance",
-            "ADR-0009 — Uncertainty & confidence communication",
-            meth.verra_family,
-        ],
+        citations=citations,
     )

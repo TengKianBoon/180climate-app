@@ -13,8 +13,8 @@ using this routing table. The routing is enforced by golden-case tests and the c
 | Permit / project type | Baseline class | Verra family cited in narrative |
 |---|---|---|
 | **HTI** (industrial timber plantation; legal right to clear-fell) | Planned clear-fell foregone | **APD route** (VM0009/legacy — advisor-confirm) |
-| **HA** (natural-forest logging; legal right to selectively log) | Planned selective-logging foregone | **IFM** (VM0010 / VM0045 v1.2) |
-| **Peat** | Avoided drainage/subsidence | **VM0027 (interim)** — advisor-confirm; standalone peat method pending |
+| **HA** (natural-forest logging; legal right to selectively log) | Planned selective-logging foregone | **IFM (VM0045 / VM0010)** — advisor-confirm active version |
+| **Peat** | Avoided drainage/subsidence | **No settled active Verra method** for avoided tropical-peat conversion as of 2026 — route to be confirmed with advisor; IPCC Tier-1 indicative only. VM0027 inactivated 2023 (rewetting method — wrong activity). Never VM0027 / VM0048 / VM0007. |
 | *(reference only)* Unplanned / illegal loss (AUD) | — | VM0048 + VMD0055 + VT0007 — **NEVER used for foregone-harvest** |
 
 ---
@@ -25,7 +25,7 @@ using this routing table. The routing is enforced by golden-case tests and the c
 2. **`additionality_basis` MUST be `"legal harvest right foregone"`** for HTI and HA.
 3. **Never cite VM0007** (deprecated; excluded from ICVCM Core Carbon Principles) or the VM0048 family
    for a foregone-legal-harvest baseline.
-4. **Peat** is always "advisor-confirm" — present as a transparent range; never brand to VM0027.
+4. **Peat routing is unresolved** — VM0027 was inactivated by Verra in 2023 (it is a rewetting method, not avoided conversion). **Never VM0027 / VM0048 / VM0007** for a peat avoided-conversion project. Label as "No settled active Verra method as of 2026 — route to be confirmed; IPCC Tier-1 indicative." The engine computes a transparent IPCC Tier-1 avoided-drainage range; cite no Verra method. (ADR-0012.)
 5. The narrative **always states** the additionality basis explicitly.
 
 ---
