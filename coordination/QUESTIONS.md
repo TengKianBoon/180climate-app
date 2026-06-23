@@ -1,6 +1,8 @@
 # QUESTIONS — blockers / ambiguities   ·   NON-EMPTY pulls a human turn
 
-## Q1 — Branch protection on private repo (WO-000) · 2026-06-24
+## Q1 — Branch protection on private repo (WO-000) · 2026-06-24 · RESOLVED: Option C (defer to portfolio flip)
+
+
 
 **Context:** GitHub's classic branch protection rules require GitHub Pro (or Team/Enterprise)
 for private repositories. The free plan only supports branch protection on public repos.

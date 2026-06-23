@@ -6,3 +6,5 @@
 - 2026-06-23 · WO-000 dispatched to INBOX; ADR-0011 accepted; START-HERE runbook written
 - 2026-06-24 · WO-000 complete: repo scaffold, core/contracts (mypy clean), .claude harness, CI wired; private repo pushed to GitHub
 - 2026-06-24 · One blocker: GitHub Free plan cannot set branch protection on private repos; raised in QUESTIONS.md for John
+- 2026-06-24 · Gate 0 approved by John (branch protection deferred to portfolio flip — Option C)
+- 2026-06-24 · WO-001 complete: vertical slice pipe green end-to-end; 26 tests passing; pushed

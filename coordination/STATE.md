@@ -1,6 +1,6 @@
-phase: P0 → P1
-active_wo: WO-000 · scaffold + contracts + harness + CI
-status: GATE 0 READY
-last_commit: feat: scaffold monorepo, typed contracts, .claude harness, CI (WO-000)
-next_step: John approves Gate 0 (one question: branch-protection option A/B/C); then WO-001 begins
+phase: P1
+active_wo: WO-001 · vertical slice spine
+status: GATE 1 READY
+last_commit: feat: WO-001 vertical slice — end-to-end carbon pre-FS pipe
+next_step: John approves Gate 1; then Phase 2 (carbon engine) begins with WO-CARBON-001..005
 updated: 2026-06-24

@@ -1,5 +1,31 @@
 # OUTBOX — last result   ·   written by: VS Code (builder)
 
+**WO-001 complete — 2026-06-24**
+
+Vertical slice: end-to-end carbon pre-FS pipe. Geometry → forest stub → eligibility + placeholder estimate → template narrative → API → frontend map → lead email.
+
+## What was built
+- `core/geo.py` — parse coords + GeoJSON → Boundary (shapely/pyproj)
+- `core/forest.py` — deterministic GFW stub → ForestData (real: WO-CARBON-001)
+- `engines/carbon/engine.py` — eligibility gates + placeholder estimate range (ADR-0001 routing)
+- `narrative/narrator.py` — template narrative (LLM: WO-CARBON-005)
+- `api/main.py` — FastAPI: POST /api/carbon + POST /api/lead
+- `api/email.py` — SMTP (env vars) + file-log fallback for CI
+- `frontend/index.html` — single-page HTML + Leaflet CDN
+- `tests/test_slice.py` — 21 tests; `tests/fixtures/carbon/WO001_golden.json`
+
+## Verification
+- `pytest tests/ -v` → **26 passed** (5 contract + 21 slice)
+- `mypy core/contracts/__init__.py` → **Success: no issues**
+- All acceptance criteria met (see evidence/WO-001/slice-description.txt)
+- Pushed: https://github.com/TengKianBoon/180climate-app/commit/0ad2722
+
+## Evidence
+- `coordination/evidence/WO-001/pytest-output.txt`
+- `coordination/evidence/WO-001/slice-description.txt`
+
+---
+
 **WO-000 complete — 2026-06-24**
 
 Monorepo scaffold, typed contracts, `.claude/` harness, and CI are in place.

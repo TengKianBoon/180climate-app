@@ -1,3 +1,34 @@
+# GATE 1 READY
+
+**Date:** 2026-06-24
+**WO:** WO-001 — vertical slice spine (end-to-end, ugly but real)
+**Written by:** VS Code (builder)
+
+## Acceptance criteria status
+
+- [x] Coords AND GeoJSON parse → Boundary + area_ha; malformed input → clear 422 error
+- [x] GFW forest stub returns ForestData; annual_loss_ha series in map overlay
+- [x] Placeholder carbon range + non-binding disclaimer in EngineResult
+- [x] Lead form submits → email function called with correct payload (file-log mode for CI)
+- [x] One golden case committed (`tests/fixtures/carbon/WO001_golden.json`); CI green
+- [x] Deterministic: same input → same output; no LLM in number path
+
+## Evidence pointers
+- `coordination/evidence/WO-001/pytest-output.txt` — 26 passed, 0 failed
+- `coordination/evidence/WO-001/slice-description.txt` — pipe walk-through + per-criterion status
+- GitHub commit: https://github.com/TengKianBoon/180climate-app/commit/0ad2722
+
+## What to review
+Open `frontend/index.html` via `uvicorn api.main:app --reload` at localhost:8000 to see the slice running.
+Enter any coordinates (e.g. `-0.5,117.5`) or paste a GeoJSON polygon to see the full flow.
+
+## Next
+John approves Gate 1 → Phase 2 opens: WO-CARBON-001 (real GFW data integration),
+WO-CARBON-002 (golden cases), WO-CARBON-003 (eligibility + methodology routing — Opus),
+WO-CARBON-004 (estimate range + quality), WO-CARBON-005 (narrative + Verra rationale).
+
+---
+
 # GATE 0 READY
 
 **Date:** 2026-06-24

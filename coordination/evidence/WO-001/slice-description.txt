@@ -1,0 +1,64 @@
+# WO-001 Evidence: Vertical slice description
+# Generated: 2026-06-24
+
+## What the slice does (end-to-end pipe)
+
+1. User opens frontend/index.html (served at GET /)
+   - Single HTML page with Leaflet map (CDN)
+   - Input form: name, email, IUP name, permit type (HTI/HA), permit years,
+     project type (REDD/PEAT), and geometry (coords or GeoJSON paste)
+
+2. POST /api/carbon receives CarbonInput JSON
+   - core/geo.py parses geometry → Boundary (area_ha, centroid, within_indonesia)
+   - core/forest.py queries deterministic GFW stub → ForestData (annual_loss_ha 2001-2023)
+   - engines/carbon/engine.py runs eligibility gates + placeholder estimate range
+   - narrative/narrator.py generates template narrative (no LLM — WO-CARBON-005 wires it)
+   - Returns EngineResult with verdict, summary, map overlay data, narrative, disclaimer, carrot
+
+3. Frontend renders:
+   - Verdict badge (eligible / flagged / not eligible)
+   - Placeholder estimate range + disclaimer
+   - Leaflet map with centroid marker or polygon boundary
+   - Forest loss legend (stub label — real tiles in WO-CARBON-001)
+   - Full template narrative
+   - Lead capture form
+
+4. POST /api/lead receives lead details
+   - api/email.py sends email to info@180climate.net via SMTP (env vars)
+   - Falls back to coordination/evidence/email.log when SMTP not configured (CI/dev)
+   - Returns {status: "emailed"|"failed", timestamp}
+
+## Acceptance criteria verification
+
+[x] Coords AND GeoJSON parse → Boundary + area_ha; malformed input → 422 with clear error
+    - test_parse_coords_basic, test_parse_coords_space_separated: PASS
+    - test_parse_geojson_polygon: PASS
+    - test_parse_malformed_coords_raises, test_parse_missing_coords_raises: PASS
+    - test_parse_invalid_geojson_raises: PASS
+    - test_carbon_api_bad_geo_422: PASS
+
+[x] GFW stub returns ForestData; loss overlay in EngineResult map field
+    - test_forest_stub_deterministic, test_forest_stub_has_loss_data: PASS
+    - loss_overlay rendered as {type, data, note} in API response
+
+[x] Placeholder range + non-binding disclaimer in EngineResult
+    - estimate range returned in summary field; disclaimer.kind = "carbon_non_binding"
+    - test_carbon_api_coords, test_carbon_api_geojson: PASS
+
+[x] Lead form submits → email function called with correct payload
+    - test_email_called_with_correct_to: PASS (file-log mode, no SMTP needed for CI)
+
+[x] One golden case committed (tests/fixtures/carbon/WO001_golden.json)
+    - test_golden_case: PASS
+
+[x] Deterministic: same input → same output; no LLM in number path
+    - test_carbon_engine_deterministic: PASS
+    - test_forest_stub_deterministic: PASS
+    - All engine functions are pure (no randomness, no LLM calls)
+
+## Test summary
+pytest tests/ -v → 26 passed (5 contract tests + 21 slice tests), 0 failed
+
+## GitHub Actions
+Commit 0ad2722 pushed; CI triggered — same deps install + same test commands.
+URL: https://github.com/TengKianBoon/180climate-app/actions
