@@ -1,110 +1,98 @@
 # OUTBOX — written by: Builder (VS Code) · Date: 2026-06-24
 
-## Status: STOPPED — awaiting Cowork review before WO-CARBON-003
+## Status: STOPPED — awaiting Cowork number review before WO-CARBON-005 + Gate M
 
-WO-CARBON-001 (data adapters) and WO-CARBON-002 (golden cases) complete and merged to main.
-68 tests pass. Stopping for Cowork to review data + golden cases before the Opus
-number-path work (WO-CARBON-003 eligibility gates + WO-CARBON-004 estimate range).
-
----
-
-## WO-CARBON-001 — Data Adapter Layer · COMPLETE
-
-**Branches:** `feat/carbon-data` → merged to `main` · commit `c3c1698`
-
-### What was built
-- `core/data/adapter.py` — `DataAdapter` Protocol + `register()` + `get_adapter()`.
-  Swap via `CARBON_DATA_ADAPTER` env var: `stub` | `gfw_http` (auto = `gfw_http` with disk cache).
-- `core/data/biomass.py` — **Real IPCC 2006 Table 4.7 SE-Asia defaults.**
-  - Lowland moist tropical: AGB 310 tDM/ha × CF 0.47 × 44/12 × (1 + BGB 0.23) = **657.1 tCO2/ha**
-  - Full table: submontane, montane, peat_swamp, dryland all from published IPCC values.
-  - Citation embedded in every `ForestData.data_sources` label.
-- `core/data/stub.py` — `StubAdapter` (registered `"stub"`). Same deterministic logic as
-  old `core/forest.py`; now a proper `DataAdapter` registered via decorator.
-- `core/data/gfw.py` — `GFWHTTPAdapter` (registered `"gfw_http"`).
-  - HTTP HEAD-checks the Hansen GFC-2022 COG tile (public GCS; no auth).
-  - Uses IPCC 2006 biomass (real data). Loss-year series: stub-proxy pending rasterio (WO-CARBON-001b).
-  - GEE non-commercial caveat documented inline (ADR-0007).
-- `core/data/cache.py` — `CachedAdapter` (SHA-256 keyed on centroid + area).
-  5 committed cache files in `tests/fixtures/data_cache/` cover all golden concessions → CI is offline-safe.
-- `core/forest.py` — thin facade to `CachedAdapter(get_adapter())`. Public API unchanged.
-
-### Adapter swap test (both satisfy DataAdapter Protocol)
-```
-CARBON_DATA_ADAPTER=stub     → StubAdapter (deterministic, no network)
-CARBON_DATA_ADAPTER=gfw_http → GFWHTTPAdapter (IPCC biomass + Hansen HEAD check)
-```
-
-### Sample ForestData — golden concession (-0.5, 117.5)
-```
-biomass_tco2_per_ha: 657.1 tCO2/ha
-data_sources:
-  - "GFW/Hansen annual loss (stub — offline/CI mode)"
-  - "Biomass: IPCC (2006) NGHGI Guidelines, Vol. 4 AFOLU, Table 4.7 — SE-Asia"
-uncertainty_band: "±25 % — deterministic stub; Tier 1 indicative screening"
-```
-
-### What remains (WO-CARBON-001b — NOT in this WO)
-- rasterio pixel-level read from Hansen COG tiles (GDAL vsicurl, no auth required).
-- Adapter interface is ready; only the inner adapter body changes.
+WO-CARBON-003 (routing + eligibility hardening) and WO-CARBON-004 (real estimate range) complete.
+81 tests pass. Opus Reviewer + Verifier APPROVED on both WOs.
+Stopping here for Cowork to review the ACTUAL NUMBERS before the narrative (WO-005) + Gate M.
 
 ---
 
-## WO-CARBON-002 — Golden Cases · COMPLETE
+## THE NUMBERS (the primary review payload)
 
-**Branches:** `feat/carbon-golden` → merged to `main` · commit `c75c77b`
+### Formula (REDD — APD / IFM)
+```
+quantity = eligible_area [ha]
+         × baseline_loss_rate [ha/ha/yr]     ← 8-yr avg annual loss (2016–2023) / max(area, 25,000)
+         × project_duration [yr]              ← min(permit_years_remaining, 30)
+         × carbon_density [tCO2/ha]           ← IPCC 2006 Table 4.7 SE-Asia (657.1 tCO2/ha lowland moist)
+         × (1 − buffer_deduction)             ← 20% optimistic / 30% conservative
 
-### Fixtures (`tests/fixtures/carbon/`)
-| Fixture | Permit | Yrs | Geo | Verdict | Gate statuses |
-|---|---|---|---|---|---|
-| WO002_HTI_eligible | HTI | 20 | 73,787 ha polygon | `eligible` | all pass |
-| WO002_HTI_flag_years | HTI | 3 | 73,787 ha polygon | `flagged` | permit_years=flag |
-| WO002_HTI_fail_area | HTI | 20 | 1,107 ha polygon | `hard_no` | area=fail |
-| WO002_HA_eligible | HA | 15 | 73,787 ha polygon | `eligible` | all pass |
-| WO002_HTI_flag_outside | HTI | 20 | Point 40°N,10°E (Europe) | `flagged` | area=flag, inside_iup=flag |
-| WO002_routing_HTI | HTI | 20 | 73,787 ha polygon | routing | HTI→APD; never VM0048/VM0007 |
-| WO002_routing_HA | HA | 20 | 73,787 ha polygon | routing | HA→IFM; never VM0048/VM0007 |
+Low estimate:  loss_rate × 0.8, buffer 30%.
+High estimate: loss_rate × 1.0, buffer 20%.
+```
 
-### `tests/test_golden.py` — 42 parametrized tests
-| Test function | Invariant |
-|---|---|
-| `test_eligibility_golden` | Gate status + overall verdict |
-| `test_methodology_is_planned_for_all_elig_cases` | `is_planned=True` (ADR-0001) |
-| `test_additionality_basis_for_all_elig_cases` | `additionality_basis="legal harvest right foregone"` |
-| `test_methodology_routing_golden` | `baseline_class`, `verra_family_contains`, `cited_methods_must_not_contain` |
-| `test_no_forbidden_phrases_in_output` | No `"% accuracy"` or `"% confidence"` in full JSON (ADR-0009 lint) |
-| `test_estimate_is_always_a_range` | `quantity_low < quantity_high` always (ADR-0009) |
-| `test_determinism` | Same input → same outputs (no randomness in number path) |
-| `test_data_sources_labelled` | Non-empty `data_sources` + `uncertainty_band` (WO-CARBON-001 acceptance) |
-| `test_biomass_is_real_ipcc_value` | `biomass_tco2_per_ha ≥ 500` (IPCC 2006; old stub was 150–250) |
+### Formula (PEAT — VM0027)
+```
+Dominant term: area × EF_peat [tCO2/ha/yr] × years × (1 − buffer)
+  EF range: 9.0–13.0 tCO2/ha/yr
+  Source: IPCC 2013 Wetlands Supplement Table 2.1 — tropical drained peatlands
 
-### Numeric ranges
-Not committed yet. Structure/routing/gates/format are pinned now.
-WO-CARBON-004 produces `quantity_low / quantity_high` expected values; those freeze these fixtures.
+Secondary term: at_risk_ha × peat_swamp_AGB_BGB × (1 − buffer)
+  AGB+BGB: 409.3 tCO2/ha (IPCC 2006 Table 4.7 peat_swamp)
 
----
+Note: peat SOIL carbon (drainage oxidation) is the dominant term (~76% of total estimate).
+```
 
-## Questions for Cowork before approving WO-CARBON-003
+### Golden concession results (Tier 1 indicative screening — not registry-grade)
 
-**Q1 (biomass default):** 657.1 tCO2/ha (IPCC 2006 lowland moist tropical) is used for all
-Kalimantan concessions. Should peat-bearing concessions default to `peat_swamp` (390.6 tCO2/ha)
-when the peat flag is set? WO-CARBON-003/004 will need this distinction.
+| Fixture | Permit | Yrs | Area (ha) | Verdict | Low (tCO2e) | High (tCO2e) |
+|---|---|---|---|---|---|---|
+| HTI eligible | HTI | 20 | 73,787 | eligible | **4,785,077** | **6,835,824** |
+| HTI flag years | HTI | 3 | 73,787 | flagged | **717,762** | **1,025,374** |
+| HTI fail area | HTI | 20 | 1,107 | hard_no | **127,742** | **182,489** |
+| HA eligible | HA | 15 | 73,787 | eligible | **3,588,808** | **5,126,868** |
+| HTI point/outside | HTI | 20 | proxy 25k | flagged | **2,279,952** | **3,257,074** |
+| PEAT (73k ha) | HTI | 20 | 73,787 | eligible | **12,277,761** | **19,605,702** |
 
-**Q2 (pixel read):** Hansen rasterio pixel-read is deferred to WO-CARBON-001b.
-Is that acceptable, or should it be in the 001/004 scope? The adapter layer is ready.
-
-**Q3 (PEAT golden case):** ADR-0001 has a PEAT routing rule (→ VM0027 interim). No PEAT
-golden fixture exists. Should it be added before WO-CARBON-003, or in scope for 003?
-
-**Q4 (WO-003 scope):** The eligibility gate logic already exists in `engines/carbon/engine.py`
-(working, tested). Should WO-003 HARDEN/EXTEND it (preferred), or rewrite from spec?
+### Key parameters behind the numbers
+- Baseline loss rate (golden concession, centroid 0.9°N 117.15°E): **0.8812 %/yr**
+  (8-yr average from StubAdapter deterministic data; real Hansen pixel read deferred to WO-CARBON-001b)
+- Biomass density: **657.1 tCO2/ha** (IPCC 2006 Table 4.7, lowland moist tropical, SE-Asia)
+- Peat biomass: **409.3 tCO2/ha** (peat_swamp AGB+BGB)
+- Peat drainage EF: **9.0–13.0 tCO2/ha/yr** (IPCC 2013 Wetlands Table 2.1, tropical drained)
+- Buffer: **20–30%** (VCS non-permanence buffer pool proxy)
+- IPCC Tier: **Tier 1** throughout (default values; no field measurement)
 
 ---
 
-## Test summary
-- Total: **68 tests** (26 original slice + 42 golden)
-- Status: all green locally; pushed to main
-- CI: will run on GitHub Actions on push
+## WO-CARBON-003 summary
+
+### Routing table (ADR-0001 — now fully implemented)
+| project_type | permit_type | baseline_class | verra_family | cited_methods |
+|---|---|---|---|---|
+| PEAT | any | peat | VM0027 interim (advisor-confirm) | [VM0027] |
+| REDD | HTI | planned_clearfell | APD (VM0009/legacy) | [VM0009] |
+| REDD | HA | planned_selective | IFM (VM0010 / VM0045 v1.2) | [VM0010, VM0045] |
+
+All routes: `is_planned=True`, `additionality_basis="legal harvest right foregone"`.
+Never VM0048 family. Never VM0007. Enforced by golden lint tests.
+
+### Eligibility gates (spec §10 — hardened)
+All 4 gates (permit_type / permit_years / area / inside_iup) tested across all combos.
+69 tests pass; Opus Reviewer + Verifier APPROVED.
+
+---
+
+## Items for Cowork number review
+
+**N1 (biomass proxy — primary number risk):** The 0.8812%/yr loss rate comes from the deterministic stub, NOT real Hansen pixels. This is the dominant uncertainty — the real rate for a specific concession will differ significantly. The estimate is honestly labelled Tier 1 / screening, but Cowork should confirm this proxy magnitude is reasonable for the narrative framing.
+
+**N2 (buffer range):** 20–30% is a conservative proxy for the VCS non-permanence buffer. Real VCS buffer calculation is project-specific. Cowork to confirm this range is defensible for the screening disclaimer.
+
+**N3 (PEAT drainage EF):** 9–13 tCO2/ha/yr is the IPCC 2013 default range. Specific peat projects can vary widely by depth and drainage intensity (5–40 tCO2/ha/yr). The estimate is honest about this as the dominant uncertainty. Cowork to confirm the range is appropriate for a screening tool.
+
+**N4 (stale spec note — peat_swamp biomass):** Spec doc says 390.6; actual IPCC computation = 409.3. Code and fixtures use 409.3 (correct). No action needed in code — noting for Cowork awareness.
+
+**N5 (PEAT dominant-uncertainty wording):** PEAT uncertainty band states "peat depth and drainage intensity" as dominant rather than "baseline harvest rate". Methodologically accurate (drainage term = 76% of estimate). Flag for John at Gate M whether to re-align with the invariant-5 wording or update the invariant.
+
+---
+
+## Counts
+- Total tests: **81** (26 original + 43 WO-002 + 1 WO-003 routing + 11 WO-004 range/tier)
+- Golden fixtures: **8** (WO001 × 1, WO002 × 7, WO003 × 1 with range)
+- Branches: feat/carbon-003, feat/carbon-004 — both merged to main
 
 ## Next step (awaiting Cowork go-ahead)
-→ WO-CARBON-003 (eligibility gates + Verra routing hardening, **Opus**) when approved.
+→ WO-CARBON-005 (narrative + Verra rationale, **Sonnet**) when numbers are approved.
+→ Then Gate M (John + independent advisor review of numbers + routing + disclaimers).
