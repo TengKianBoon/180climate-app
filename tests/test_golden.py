@@ -105,7 +105,7 @@ def test_additionality_basis_for_all_elig_cases(fixture_name: str):
 ROUTING_FIXTURES = [
     "WO002_routing_HTI.json",
     "WO002_routing_HA.json",
-    "WO003_routing_PEAT.json",    # WO-CARBON-003: PEAT → VM0027 interim (ADR-0001)
+    "WO003_routing_PEAT.json",    # WO-CARBON-006/ADR-0012: PEAT → no settled method (VM0027 inactivated 2023)
 ]
 
 
@@ -131,12 +131,22 @@ def test_methodology_routing_golden(fixture_name: str):
             f"{fixture_name}: expected verra_family to contain {frag!r}, "
             f"got {route.verra_family!r}"
         )
+    for bad in exp.get("verra_family_must_not_contain", []):
+        assert bad not in route.verra_family, (
+            f"INVARIANT VIOLATION (ADR-0012): {bad!r} must NEVER appear in verra_family "
+            f"(got {route.verra_family!r})"
+        )
     for bad in exp.get("cited_methods_must_not_contain", []):
         for m in route.cited_methods:
             assert bad not in m, (
-                f"INVARIANT VIOLATION (ADR-0001): {bad!r} must NEVER appear in cited_methods "
+                f"INVARIANT VIOLATION (ADR-0001/0012): {bad!r} must NEVER appear in cited_methods "
                 f"for foregone-harvest baselines (got {route.cited_methods})"
             )
+    if exp.get("cited_methods_must_be_empty"):
+        assert route.cited_methods == [], (
+            f"INVARIANT VIOLATION (ADR-0012): cited_methods must be empty for peat route "
+            f"(no settled active Verra method); got {route.cited_methods}"
+        )
 
 
 # ── ADR-0009 invariants: no single number, no %, always a range ──────────────

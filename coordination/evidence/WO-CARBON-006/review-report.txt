@@ -1,0 +1,57 @@
+WO-CARBON-006 — Opus White-Box Review Report
+Reviewer: Opus (white-box, read-only)
+Date: 2026-06-24
+Scope: Peat routing fix (ADR-0012) + narrative corrected framing (WO-CARBON-005)
+
+INITIAL VERDICT: CONDITIONAL
+Issue found: `_estimate_peat()` docstring (engine.py line 308) still said "(VM0027)" — stale attachment of VM0027 to the peat route as the governing method.
+
+FIX APPLIED: docstring updated to "(IPCC Tier-1 avoided-drainage; no settled Verra method — ADR-0012)"
+
+FINAL VERDICT: APPROVED
+
+== Checklist results ==
+
+Methodology correctness (engine.py):
+  PASS — PEAT branch cited_methods=[] (no method cited)
+  PASS — verra_family does NOT contain VM0027 / VM0048 / VM0007
+  PASS — verra_family = "No settled active Verra method for avoided tropical-peat conversion as of 2026..."
+  PASS — _quality_factors() peat branch: no VM0027 as method; only in "never cite" context
+  PASS — module docstring updated; peat route described as "VM0027 inactivated 2023 — never cite"
+  PASS — _estimate_peat() docstring corrected after CONDITIONAL finding
+
+docs/methodology.md:
+  PASS — Peat row: "No settled active Verra method"; VM0027 absent as cited method; "Never VM0027/VM0048/VM0007"
+  PASS — Hard rule #4: VM0027 inactivated 2023 + NEVER VM0027/VM0048/VM0007; ADR-0012 referenced
+
+Golden fixture WO003_routing_PEAT.json:
+  PASS — verra_family_contains: ["VM0027"] removed
+  PASS — verra_family_must_not_contain: ["VM0027","VM0048","VM0007"] present
+  PASS — cited_methods_must_not_contain includes VM0027
+  PASS — cited_methods_must_be_empty: true present
+  PASS — estimate numbers unchanged: low=12,277,761 / high=19,605,702
+
+test_golden.py:
+  PASS — verra_family_must_not_contain assertion supported
+  PASS — cited_methods_must_be_empty assertion supported
+
+narrative/narrator.py:
+  PASS — peat methodology note: no VM0027; "No settled active Verra methodology...currently exists"; "Never VM0027/VM0048/VM0007"
+  PASS — tonnage suppressed for hard_no / flagged
+  PASS — eligible verdict: corrected framing (observed-loss floor ≠ planned baseline)
+  PASS — no "% accuracy" / "% confidence" strings anywhere
+  PASS — "Engage 180Climate" CTA + info@180climate.net present
+  PASS — buffer labelled "placeholder for the AFOLU non-permanence risk-tool output"
+  PASS — peat EF labelled "conservative; deeply-drained plantation peat is often higher"
+  PASS — co-dominant REDD uncertainties: baseline AND carbon density
+
+Invariants:
+  PASS — always a range (low/high); never single number
+  PASS — no "% accuracy" / "% confidence"
+  PASS — additionality_basis = "legal harvest right foregone" unchanged for all routes
+  PASS — is_planned = True for all routes unchanged
+  PASS — cited_methods=[] is contract-valid (list[str] accepts empty)
+
+Test suite: 81/81 green after docstring fix.
+
+APPROVED — all ADR-0012 conditions satisfied; narrative corrected per INBOX B/C; Gate M package ready.

@@ -1,3 +1,51 @@
+# GATE M READY
+
+**Date:** 2026-06-24
+**WO:** WO-CARBON-006 (Gate-M fixes — peat routing correction + narrative rewrite)
+**Phase:** P2 · Carbon engine → Phase 3 boundary
+
+## What happened at Gate M
+
+Independent methodology advisor returned CONDITIONAL GO on the carbon engine (WO-CARBON-003/004). All conditions resolved in WO-CARBON-006:
+
+1. **Peat routing corrected (ADR-0012):** VM0027 removed everywhere (engine, fixture, narrative, docs). Peat route now labelled "No settled active Verra method for avoided tropical-peat conversion as of 2026 — route to be confirmed; IPCC Tier-1 indicative." `cited_methods=[]` for peat. Never VM0027 / VM0048 / VM0007.
+
+2. **Narrative rewritten (WO-CARBON-005/006B):** Observed-loss floor separated from planned baseline. "FS = bigger number" framing dropped. VM0009 "active but in transition." IFM "VM0045 / VM0010 — advisor-confirm." Peat EF "conservative." Buffer "risk-tool placeholder." Co-dominant REDD uncertainties. Tonnage suppressed for hard_no/flagged. "Engage 180Climate" CTA added.
+
+3. **Quick wins (WO-CARBON-006C):** HA label updated. Carbon density grounding noted as WO-CARBON-001b scope.
+
+## Evidence
+
+- `coordination/evidence/WO-CARBON-003/review-report.txt` — Opus APPROVED (routing)
+- `coordination/evidence/WO-CARBON-004/review-report.txt` — Opus APPROVED (estimate range)
+- `coordination/evidence/WO-CARBON-006/review-report.txt` — Opus APPROVED (peat fix + narrative)
+- `docs/adr/ADR-0012-peat-routing-correction.md` — approved ADR
+- `docs/gate-m-advisor-pack.md` — full methodology/numbers pack (updated post-fix)
+- `docs/methodology.md` — updated normative routing table
+
+## Acceptance criteria
+
+- [x] Peat routing: no VM0027 in cited_methods (empty), no VM0027/VM0048/VM0007 in verra_family
+- [x] PEAT golden fixture asserts verra_family_must_not_contain + cited_methods_must_be_empty
+- [x] Narrative: observed-loss floor ≠ planned baseline (explicit separation)
+- [x] Narrative: no "FS = bigger number" framing
+- [x] Narrative: tonnage suppressed for hard_no / flagged
+- [x] Narrative: "Engage 180Climate" CTA present
+- [x] Narrative: buffer labelled as placeholder for risk-tool output
+- [x] Narrative: peat EF labelled conservative
+- [x] Narrative: co-dominant REDD uncertainties (baseline + carbon density)
+- [x] No "% accuracy" / "% confidence" anywhere (ADR-0009)
+- [x] 81 golden-case tests green
+- [x] ADR-0012 approved and implemented
+
+## Next
+
+John approves Gate M → Phase 3 (frontend + report pipeline + email + PDF/DOCX).
+
+*Never advance a gate yourself — that's John.*
+
+---
+
 # GATE 1 READY
 
 **Date:** 2026-06-24

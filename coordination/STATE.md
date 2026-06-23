@@ -1,6 +1,6 @@
 phase: P2 · Carbon engine
-active_wo: WO-CARBON-003 + WO-CARBON-004 COMPLETE — stopped for Cowork number review
-status: STOPPED — awaiting Cowork review of actual carbon numbers before narrative (005) + Gate M
-last_commit: merge WO-CARBON-003 (routing) + WO-CARBON-004 (real estimate) into main
-next_step: Cowork reviews OUTBOX numbers → approves WO-CARBON-005 (narrative, Sonnet)
+active_wo: WO-CARBON-006 COMPLETE — GATE M READY
+status: GATE M READY — all fixes applied + Opus APPROVED; awaiting John sign-off
+last_commit: feat(engine+narrative): WO-CARBON-006 — peat routing correction + narrative rewrite
+next_step: John signs Gate M → Phase 3 (frontend + report pipeline)
 updated: 2026-06-24
