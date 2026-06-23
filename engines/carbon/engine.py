@@ -220,14 +220,17 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
     effective_area = boundary.area_ha if boundary.area_ha > 0 else 25_000.0
     project_years = min(inp.permit_years_remaining, _MAX_CREDITING_YR)
 
-    # Baseline annual loss rate: 8-year recent average (2016–2023) as proxy
+    # Baseline annual loss rate: 8-year recent average (2016–2023) as proxy.
+    # Loss rate denominator uses the same area floor as the data adapter (max(area, 25,000 ha))
+    # to avoid artificially inflated rates for sub-threshold polygons.
     recent_years = [y for y in range(2016, 2024) if y in forest.annual_loss_ha]
     if recent_years:
         avg_annual_loss_ha = sum(forest.annual_loss_ha[y] for y in recent_years) / len(recent_years)
     else:
         avg_annual_loss_ha = sum(forest.annual_loss_ha.values()) / max(len(forest.annual_loss_ha), 1)
 
-    loss_rate = avg_annual_loss_ha / effective_area  # fraction/yr
+    loss_rate_area = max(effective_area, 25_000.0)  # matches stub/adapter area floor
+    loss_rate = avg_annual_loss_ha / loss_rate_area  # fraction/yr
 
     if inp.project_type == "PEAT":
         low, high, unc = _estimate_peat(effective_area, project_years, forest, loss_rate)

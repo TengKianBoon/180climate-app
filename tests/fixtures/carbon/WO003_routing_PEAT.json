@@ -18,5 +18,11 @@
     "additionality_basis": "legal harvest right foregone",
     "verra_family_contains": ["VM0027"],
     "cited_methods_must_not_contain": ["VM0048", "VM0007"]
+  },
+  "expected_range": {
+    "quantity_low_tco2e": 12277761.0,
+    "quantity_high_tco2e": 19605702.0,
+    "ipcc_tier": "Tier 1",
+    "freeze_note": "WO-CARBON-004 — frozen 2026-06-24. Dominant term: peat drainage (IPCC 2013 Wetlands Table 2.1, 9–13 tCO2/ha/yr). Secondary: AGB+BGB (IPCC 2006 Table 4.7 peat_swamp 409.3 tCO2/ha)."
   }
 }

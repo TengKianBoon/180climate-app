@@ -1,0 +1,55 @@
+WO-CARBON-004 WHITE-BOX REVIEW — Opus Reviewer — 2026-06-24
+============================================================
+
+RESULT: APPROVED
+
+Number-path invariants checked:
+ 1. Range invariant (low < high with guard)          PASS — guard at lines 282-283 / 330-331
+ 2. Always a range, never bare scalar                PASS — returns (low, high, unc) tuple
+ 3. No "% accuracy / % confidence" in output        PASS — only "%/yr" rate strings present
+ 4. IPCC Tier 1 label in both REDD and PEAT bands   PASS
+ 5. Baseline = dominant uncertainty (REDD)           PASS — "baseline (legally-permitted harvest rate)"
+    Baseline = dominant uncertainty (PEAT)           WARN (non-blocking) — PEAT cites "peat depth/
+                                                     drainage intensity" as dominant (methodologically
+                                                     correct; drainage term = ~76% of estimate).
+                                                     Flag for John at Gate M, not a formula error.
+ 6. REDD formula transparency                        PASS — docstring cites formula exactly
+ 7. PEAT two-term formula                            PASS — drainage EF 9-13 (IPCC 2013 Wetlands
+                                                     Table 2.1); AGB uses peat_swamp (409.3 NOT 657.1)
+ 8. Project years capped at 30                       PASS
+ 9. Loss-rate denominator max(area, 25,000)          PASS — line 232
+10. QualityFactors non-placeholder                   PASS — real content for all 4 factors
+11. Determinism (no random/time)                     PASS
+
+Hand-checks:
+  WO002_HTI_eligible (73,787 ha, 20yr, 0.8812%/yr, biomass 657.1):
+    low = 73787 × (0.008812×0.8) × 20 × 657.1 × 0.7 = 4,785,077 ✓
+    high = 73787 × 0.008812 × 20 × 657.1 × 0.8 = 6,835,824 ✓
+
+  WO003_PEAT (73,787 ha, 20yr):
+    drain_low = 73787 × 9.0 × 20 × 0.7 = 9,297,192
+    AGB_low   = 73787×(0.8812%×0.8)×20 × 409.3 × 0.7 = 2,980,569
+    Total low = 12,277,761 ✓
+    drain_high = 73787 × 13.0 × 20 × 0.8 = 15,347,745
+    AGB_high   = 73787×0.8812%×20 × 409.3 × 0.8 = 4,257,956
+    Total high = 19,605,701 ≈ 19,605,702 (rounding) ✓
+
+Warnings for Gate M review:
+  - Spec doc says peat_swamp=390.6 tCO2/ha; actual IPCC computation = 409.3. Code is correct.
+  - PEAT dominant uncertainty phrasing: wording says "peat depth/drainage" not "baseline harvest".
+    Methodologically more accurate for peat; John to judge at Gate M.
+
+WO-CARBON-004 VERIFIER REPORT — Opus Verifier — 2026-06-24
+===========================================================
+
+RESULT: APPROVED
+
+AC1 — All 81 tests pass                            PASS (81 passed, 0 failed)
+AC2 — Golden range assertions exact               PASS (6 cases)
+AC3 — Lint: no forbidden phrases                  PASS
+AC4 — IPCC Tier 1 label present                   PASS (all 6 estimates)
+AC5 — Determinism                                 PASS
+AC6 — PEAT > REDD same area (12.3M vs 4.8M)      PASS
+AC7 — QualityFactors non-placeholder              PASS (no PLACEHOLDER in any dump)
+
+No files edited.

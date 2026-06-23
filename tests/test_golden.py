@@ -217,3 +217,69 @@ def test_biomass_is_real_ipcc_value(fixture_name: str):
         f"biomass_tco2_per_ha={forest.biomass_tco2_per_ha} is below IPCC 2006 SE-Asia threshold "
         f"({'peat_swamp ≥350' if is_peat else 'lowland moist ≥500'}) for {fixture_name}"
     )
+
+
+# ── WO-CARBON-004: frozen numeric ranges ─────────────────────────────────────
+# These values are computed by the engine and frozen on 2026-06-24.
+# They are the test oracle for Gate M — Cowork reviews these numbers before sign-off.
+# Any change to the formula MUST regenerate these values AND update this fixture.
+
+RANGE_FIXTURES = [
+    "WO002_HTI_eligible.json",
+    "WO002_HTI_flag_years.json",
+    "WO002_HTI_fail_area.json",
+    "WO002_HA_eligible.json",
+    "WO002_HTI_flag_outside.json",
+    "WO003_routing_PEAT.json",
+]
+
+
+@pytest.mark.parametrize("fixture_name", RANGE_FIXTURES)
+def test_golden_ranges(fixture_name: str):
+    """WO-CARBON-004: frozen range values must match engine output exactly (determinism oracle).
+
+    These values are pinned for Gate M review. If the formula changes, regenerate with:
+      python -c "from engines.carbon.engine import ...; print(estimate.quantity_low_tco2e)"
+    and update the fixture's expected_range block.
+    """
+    case = _load(fixture_name)
+    if "expected_range" not in case:
+        pytest.skip(f"No expected_range in {fixture_name}")
+    exp = case["expected_range"]
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.quantity_low_tco2e == exp["quantity_low_tco2e"], (
+        f"{fixture_name}: quantity_low_tco2e expected {exp['quantity_low_tco2e']:,.0f}, "
+        f"got {estimate.quantity_low_tco2e:,.0f}"
+    )
+    assert estimate.quantity_high_tco2e == exp["quantity_high_tco2e"], (
+        f"{fixture_name}: quantity_high_tco2e expected {exp['quantity_high_tco2e']:,.0f}, "
+        f"got {estimate.quantity_high_tco2e:,.0f}"
+    )
+    assert estimate.quantity_low_tco2e < estimate.quantity_high_tco2e, (
+        "INVARIANT VIOLATION (ADR-0009): estimate must be a range, not a single value"
+    )
+    assert "Tier 1" in estimate.uncertainty, (
+        f"{fixture_name}: IPCC Tier 1 label missing from uncertainty band"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", RANGE_FIXTURES)
+def test_uncertainty_contains_ipcc_tier(fixture_name: str):
+    """ADR-0009: uncertainty band must cite an IPCC Tier label."""
+    case = _load(fixture_name)
+    if "expected_range" not in case:
+        pytest.skip(f"No expected_range in {fixture_name}")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    assert "Tier 1" in estimate.uncertainty, (
+        f"IPCC Tier label missing from uncertainty_band in {fixture_name}"
+    )
+    assert "baseline" in estimate.uncertainty.lower() or "dominant uncertainty" in estimate.uncertainty.lower(), (
+        f"Dominant uncertainty (baseline) not mentioned in uncertainty_band for {fixture_name}"
+    )
