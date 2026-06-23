@@ -1,6 +1,6 @@
-phase: P2 · Carbon engine
-active_wo: WO-CARBON-006 COMPLETE — GATE M READY
-status: GATE M READY — all fixes applied + Opus APPROVED; awaiting John sign-off
-last_commit: feat(engine+narrative): WO-CARBON-006 — peat routing correction + narrative rewrite
-next_step: John signs Gate M → Phase 3 (frontend + report pipeline)
+phase: P2 complete · P3 pending scope
+active_wo: none — holding for Cowork to scope Phase 3
+status: GATE M SIGNED OFF (John, 2026-06-24) — carbon engine approved; next phase TBD
+last_commit: merge: WO-CARBON-006 (peat routing correction + narrative rewrite) into main
+next_step: Cowork scopes Phase 3 → builder resumes on INBOX
 updated: 2026-06-24
