@@ -1,45 +1,40 @@
-# INBOX — the task right now   ·   written by: Cowork (planner)   ·   DISPATCHED 2026-06-23
+# INBOX — the task right now   ·   written by: Cowork (planner)   ·   DISPATCHED 2026-06-24
 
-## WO-000 — Repo scaffold + typed contracts + .claude harness + green CI
-**Phase:** P0 → P1 · **Depends on:** none · **Worktree:** feat/scaffold
-**Models:** Haiku/Sonnet (plumbing — no Opus needed) · **Retry budget:** 2 → STOP + write QUESTIONS.md
+## WO-001 — Vertical slice spine (end-to-end, ugly but real)
+**Phase:** P1 · **Depends on:** WO-000 (Gate 0 approved) · **Worktree:** feat/spine
+**Models:** Sonnet (wiring) · **Retry budget:** 2 → STOP + write QUESTIONS.md
 
-**Objective:** stand up the foundation everything else is built behind — the monorepo
-tree, the typed contracts ("the constitution"), the .claude/ harness, and a green CI.
+**Objective:** One sample concession flows end-to-end and produces a verdict + map + placeholder
+AI rationale, and a lead email is sent. Prove the whole pipe connects before widening.
 
 ### In scope
-- Repo tree per master spec §12: core/, engines/{carbon,eudr}/, narrative/, frontend/, api/, tests/, docs/.
-- core/contracts/ exactly as the Planning-Batch-01 contracts (type-checks clean: mypy/pydantic).
-- docs/: ensure methodology.md (ADR-0001 routing), spec, application-plan.md, orchestration-v2.md,
-  project-instructions.md, and adr/ADR-0001..0011.md are present.
-- .claude/: create CLAUDE.md from Block B of docs/project-instructions.md; settings.json with hooks
-  (secret-scan, contract-guard on core/contracts/*, verifier-no-edit, dangerous-bash veto, Stop-gate);
-  agents/ (writer, reviewer, verifier, test-writer); skills/ stubs (methodology, geospatial,
-  golden-case, brand-180climate, self-improving-code).
-- coordination/: ALREADY created by Cowork — do NOT recreate. Wire render_board.py into the end of
-  each step (or the Stop-hook) so board.html stays current.
-- .github/workflows/ci.yml: lint + type-check + tests on every PR; block merge on red.
-- LICENSE (Apache-2.0), .gitignore (secrets, __pycache__, build artifacts, .claude/worktrees/).
-- README.md = the portfolio headline: present the system as enterprise-grade AI development — shared-core
-  architecture, multi-agent orchestration (Builder + Reviewer + Verifier + Test-writer), Dreaming/memory
-  consolidation, the self-improving CoV loop, and the Verifier quality-control gate. Professional, no
-  job-seeking language. Include the reproducible free-tier setup + the GEE non-commercial caveat (ADR-0007).
+- `core/geo.py` — parse coord string + GeoJSON dict → Boundary (area_ha, centroid, within_indonesia)
+- `core/forest.py` — deterministic GFW-stub → ForestData (real integration is WO-CARBON-001)
+- `engines/carbon/engine.py` — eligibility gates + placeholder estimate range (labeled PLACEHOLDER)
+- `narrative/narrator.py` — template narrative (no LLM for the slice; LLM wired in WO-CARBON-005)
+- `api/main.py` — FastAPI: POST /api/carbon → EngineResult; POST /api/lead → email
+- `api/email.py` — SMTP via env vars; file-log fallback for CI
+- `frontend/index.html` — single HTML page: form → map (Leaflet CDN) + verdict + lead form
+- `tests/test_slice.py` — geo parsing, carbon engine, API route; one committed golden case
+- `tests/fixtures/carbon/WO001_golden.json` — golden case (input → expected output)
+- Update `requirements.txt` + `.github/workflows/ci.yml` with new deps
 
-### Acceptance criteria (Definition of Done)
-- Tree matches §12; core/contracts/ imports and type-checks clean.
-- CI runs and is GREEN on a placeholder test.
-- NO secrets anywhere in the repo.
-- README documents a reproducible free-tier setup + headlines the orchestration.
-- First commit (Conventional Commits) pushed to the PRIVATE GitHub repo; main protected.
+### Out of scope / do NOT touch
+- Real biomass/peat logic, real GFW API calls
+- Methodology routing detail (HTI→APD naming not needed for the slice)
+- EUDR engine, parallel modules
+- `core/contracts/*` (consume only — no changes)
 
-### Evidence to return (coordination/evidence/WO-000/, link from OUTBOX.md)
-- repo tree listing · CI green link · core/contracts type-check output · main-protection confirmation.
+### Acceptance criteria
+- [ ] Coords AND GeoJSON parse → Boundary + area_ha; malformed input → clear error
+- [ ] Forest stub returns ForestData; loss overlay renders on the Leaflet map
+- [ ] Placeholder carbon range + brief non-binding disclaimer render in the page
+- [ ] Lead form submits → email function called with correct payload (tested via mock)
+- [ ] One golden case committed; CI green end-to-end
+- [ ] Deterministic: same input → same output; no LLM in number path
+
+### Evidence to return (coordination/evidence/WO-001/)
+- pytest output (all green) · screenshot/description of the rendered slice · email mock test output · golden case file
 
 ### Gate
-Gate 0 — John approves scaffold + contracts + ADR-0001 (+ skim README) before WO-001 starts.
-Write coordination/GATE.md = "GATE 0 READY" + evidence pointers, push, and STOP.
-
----
-Next after Gate 0: WO-001 — vertical slice (one concession end-to-end: parse → boundary+area →
-GFW loss → placeholder number → map + verdict + AI rationale → capture → email info@180climate.net).
-Then Gate 1.
+Gate 1 — John: slice green end-to-end. Write coordination/GATE.md = "GATE 1 READY" + evidence pointers, push, and STOP.

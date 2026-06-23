@@ -1,0 +1,28 @@
+{
+  "description": "WO-001 golden case — HTI concession, coords input, Kalimantan Tengah",
+  "input": {
+    "contact": { "name": "Test User", "email": "test@example.com" },
+    "iup_name": "PT Hutan Lestari Kalimantan",
+    "iup_address": "Kalimantan Tengah",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": { "fmt": "coords", "payload": "-0.5,117.5" }
+  },
+  "expected": {
+    "eligibility_verdict": "flagged",
+    "permit_type_gate": "pass",
+    "permit_years_gate": "pass",
+    "methodology_baseline_class": "planned_clearfell",
+    "methodology_is_planned": true,
+    "additionality_basis": "legal harvest right foregone",
+    "estimate_low_gt_zero": true,
+    "estimate_high_gt_low": true
+  },
+  "invariants": {
+    "deterministic": true,
+    "no_single_carbon_number": true,
+    "methodology_route": "planned_clearfell",
+    "is_planned": true
+  }
+}

@@ -17,7 +17,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install pydantic mypy pytest
+        run: pip install pydantic mypy pytest shapely pyproj fastapi uvicorn python-multipart httpx
 
       - name: Type-check contracts
         run: mypy core/contracts/__init__.py --ignore-missing-imports

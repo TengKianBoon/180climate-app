@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>180Climate — Carbon Pre-Feasibility Screening</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8f9fa; color: #1a1a2e; }
+    header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
+    header h1 { font-size: 1.25rem; font-weight: 600; }
+    header span { opacity: .6; font-size: .85rem; }
+    .container { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    .card { background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #1a1a2e; }
+    label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: .25rem; }
+    input, select, textarea {
+      width: 100%; padding: .5rem .75rem; border: 1px solid #ddd; border-radius: 6px;
+      font-size: .9rem; margin-bottom: .75rem; background: #fafafa;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    button {
+      background: #2d6a4f; color: #fff; border: none; padding: .65rem 1.5rem;
+      border-radius: 6px; font-size: .9rem; cursor: pointer; font-weight: 600;
+    }
+    button:hover { background: #1b4332; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    #map { height: 380px; border-radius: 6px; margin-bottom: 1rem; }
+    .verdict-badge {
+      display: inline-block; padding: .3rem .8rem; border-radius: 20px;
+      font-size: .85rem; font-weight: 600; margin-bottom: .75rem;
+    }
+    .badge-eligible { background: #d8f3dc; color: #1b4332; }
+    .badge-flagged  { background: #fff3cd; color: #856404; }
+    .badge-hard_no  { background: #f8d7da; color: #842029; }
+    .estimate-range { font-size: 1.6rem; font-weight: 700; color: #2d6a4f; margin: .5rem 0; }
+    .disclaimer { font-size: .78rem; color: #888; margin-top: .5rem; font-style: italic; }
+    .narrative { font-size: .88rem; line-height: 1.6; white-space: pre-wrap; color: #333; }
+    .carrot { background: #edf7f0; border-left: 4px solid #2d6a4f;
+              padding: .75rem 1rem; border-radius: 0 6px 6px 0; font-size: .88rem; }
+    .data-sources { font-size: .75rem; color: #999; margin-top: .5rem; }
+    .step { display: none; }
+    .step.active { display: block; }
+    .error-msg { color: #842029; background: #f8d7da; padding: .5rem .75rem;
+                 border-radius: 6px; font-size: .85rem; margin-top: .5rem; }
+    .success-msg { color: #1b4332; background: #d8f3dc; padding: .5rem .75rem;
+                   border-radius: 6px; font-size: .85rem; margin-top: .5rem; }
+    .tabs { display: flex; gap: .5rem; margin-bottom: .75rem; }
+    .tab { padding: .4rem .9rem; border: 1px solid #ddd; border-radius: 6px;
+           cursor: pointer; font-size: .85rem; background: #f0f0f0; }
+    .tab.active { background: #2d6a4f; color: #fff; border-color: #2d6a4f; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>180Climate</h1>
+  <span>Carbon Pre-Feasibility Screening <strong>[PLACEHOLDER SLICE — WO-001]</strong></span>
+</header>
+
+<div class="container">
+
+  <!-- Step 1: Input form -->
+  <div id="step-form" class="step active">
+    <div class="card">
+      <h2>Step 1 — Concession details</h2>
+
+      <label>Your name *</label>
+      <input id="name" type="text" placeholder="Jane Smith" required>
+
+      <label>Your email *</label>
+      <input id="email" type="email" placeholder="jane@example.com" required>
+
+      <label>Company / organisation</label>
+      <input id="company" type="text" placeholder="Forestry Co.">
+
+      <label>Concession / IUP name *</label>
+      <input id="iup_name" type="text" placeholder="PT Hutan Lestari" required>
+
+      <label>IUP address / region</label>
+      <input id="iup_address" type="text" placeholder="Kalimantan Tengah">
+
+      <label>Permit type *</label>
+      <select id="permit_type">
+        <option value="HTI">HTI — Industrial Timber Plantation (clear-fell right)</option>
+        <option value="HA">HA — Natural Forest / Selective Logging right</option>
+      </select>
+
+      <label>Permit years remaining *</label>
+      <input id="permit_years" type="number" min="0" max="99" value="20">
+
+      <label>Project type *</label>
+      <select id="project_type">
+        <option value="REDD">REDD+ (Reduced Emissions from Deforestation)</option>
+        <option value="PEAT">PEAT (Avoided peat drainage/subsidence)</option>
+      </select>
+
+      <label>Concession location</label>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('coords')">Coordinates</div>
+        <div class="tab" onclick="switchTab('geojson')">GeoJSON polygon</div>
+      </div>
+      <div id="tab-coords" class="tab-content active">
+        <input id="coords" type="text" placeholder="e.g. -0.5,117.5 (lat,lng)">
+        <div style="font-size:.78rem;color:#888">Single point: enter lat,lng. Full polygon: paste GeoJSON in the other tab.</div>
+      </div>
+      <div id="tab-geojson" class="tab-content">
+        <textarea id="geojson_payload" placeholder='{"type":"Polygon","coordinates":[[[117,0],[118,0],[118,-1],[117,-1],[117,0]]]}' rows="5"></textarea>
+      </div>
+
+      <div id="form-error" class="error-msg" style="display:none"></div>
+      <br>
+      <button id="btn-submit" onclick="submitCarbon()">Screen this concession →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Results -->
+  <div id="step-result" class="step">
+    <div class="card">
+      <h2>Carbon Pre-Feasibility Result</h2>
+      <div id="verdict-badge" class="verdict-badge"></div>
+      <div class="estimate-range" id="estimate-range"></div>
+      <div class="disclaimer" id="disclaimer-text"></div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div id="map"></div>
+    </div>
+
+    <div class="card">
+      <h2>Indicative Narrative</h2>
+      <div class="narrative" id="narrative-text"></div>
+      <div class="data-sources" id="data-sources"></div>
+    </div>
+
+    <div class="card carrot" id="carrot-text"></div>
+
+    <div class="card">
+      <h2>Get the full report</h2>
+      <p style="font-size:.88rem;margin-bottom:1rem">
+        Fill in your details to receive the full pre-feasibility report — PDF download
+        with detailed methodology notes, financial model indicators, and next steps.
+      </p>
+
+      <label>Mobile (optional)</label>
+      <input id="lead-mobile" type="tel" placeholder="+62 ...">
+
+      <div id="lead-error" class="error-msg" style="display:none"></div>
+      <button id="btn-lead" onclick="submitLead()">Send me the full report →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Confirmation -->
+  <div id="step-done" class="step">
+    <div class="card">
+      <div class="success-msg" style="font-size:1rem;padding:1rem">
+        ✓ Thank you. The 180Climate team has your details and will be in touch.
+        Your full report will be sent to <strong id="confirm-email"></strong>.
+      </div>
+      <br>
+      <p class="carrot" style="margin-top:.75rem">
+        Want to speak to someone now? Email <strong>info@180climate.net</strong> or
+        visit <strong>www.180climate.net</strong>.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let _map = null;
+let _result = null;
+let _inputCache = {};
+let _geoTab = 'coords';
+
+function switchTab(tab) {
+  _geoTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase().includes(tab)));
+  document.getElementById('tab-coords').classList.toggle('active', tab === 'coords');
+  document.getElementById('tab-geojson').classList.toggle('active', tab === 'geojson');
+}
+
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function buildGeo() {
+  if (_geoTab === 'coords') {
+    const v = document.getElementById('coords').value.trim();
+    if (!v) throw new Error('Please enter coordinates (lat,lng) or paste a GeoJSON polygon.');
+    return { fmt: 'coords', payload: v };
+  } else {
+    const v = document.getElementById('geojson_payload').value.trim();
+    if (!v) throw new Error('Please paste a GeoJSON polygon.');
+    try { JSON.parse(v); } catch(e) { throw new Error('Invalid JSON in GeoJSON field.'); }
+    return { fmt: 'geojson', payload: v };
+  }
+}
+
+async function submitCarbon() {
+  const errEl = document.getElementById('form-error');
+  errEl.style.display = 'none';
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true; btn.textContent = 'Screening…';
+
+  try {
+    const geo = buildGeo();
+    _inputCache = {
+      name: document.getElementById('name').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      company: document.getElementById('company').value.trim(),
+      iup_name: document.getElementById('iup_name').value.trim(),
+      iup_address: document.getElementById('iup_address').value.trim() || '—',
+      permit_type: document.getElementById('permit_type').value,
+      permit_years_remaining: parseInt(document.getElementById('permit_years').value),
+      project_type: document.getElementById('project_type').value,
+      geo,
+    };
+    if (!_inputCache.name) throw new Error('Name is required.');
+    if (!_inputCache.email) throw new Error('Email is required.');
+    if (!_inputCache.iup_name) throw new Error('Concession name is required.');
+
+    const payload = {
+      contact: { name: _inputCache.name, email: _inputCache.email, company: _inputCache.company || null },
+      iup_name: _inputCache.iup_name,
+      iup_address: _inputCache.iup_address,
+      permit_type: _inputCache.permit_type,
+      permit_years_remaining: _inputCache.permit_years_remaining,
+      project_type: _inputCache.project_type,
+      geo,
+    };
+
+    const res = await fetch('/api/carbon', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'API error — please try again.');
+    }
+    _result = await res.json();
+    renderResult();
+    showStep('step-result');
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Screen this concession →';
+  }
+}
+
+function renderResult() {
+  const r = _result;
+
+  // Verdict badge
+  const badge = document.getElementById('verdict-badge');
+  const verdictKey = r.verdict.toLowerCase().includes('eligible') && !r.verdict.toLowerCase().includes('not')
+    ? 'eligible' : r.verdict.toLowerCase().includes('flagged') ? 'flagged' : 'hard_no';
+  badge.className = 'verdict-badge badge-' + verdictKey;
+  badge.textContent = r.verdict;
+
+  // Estimate range from summary
+  document.getElementById('estimate-range').textContent = r.summary;
+  document.getElementById('disclaimer-text').textContent = r.disclaimer.text;
+  document.getElementById('narrative-text').textContent = r.narrative;
+  document.getElementById('carrot-text').textContent = r.carrot;
+  document.getElementById('data-sources').textContent = 'Data: ' + r.data_sources.join(' · ');
+
+  // Map
+  if (_map) { _map.remove(); _map = null; }
+  _map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 18,
+  }).addTo(_map);
+
+  const bndry = r.map.boundary_geojson;
+  if (bndry.type === 'Point') {
+    const [lon, lat] = bndry.coordinates;
+    _map.setView([lat, lon], 10);
+    L.marker([lat, lon]).addTo(_map).bindPopup(_inputCache.iup_name).openPopup();
+  } else {
+    const layer = L.geoJSON(bndry, { style: { color: '#2d6a4f', weight: 2, fillOpacity: .15 } }).addTo(_map);
+    _map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+  }
+
+  // Loss overlay — simple legend (real tiles in WO-CARBON-001)
+  const loss = r.map.loss_overlay;
+  if (loss && loss.data) {
+    const total = Object.values(loss.data).reduce((a, b) => a + b, 0);
+    const info = L.control({ position: 'bottomright' });
+    info.onAdd = () => {
+      const d = L.DomUtil.create('div');
+      d.style.cssText = 'background:#fff;padding:6px 10px;border-radius:6px;font-size:11px;line-height:1.5';
+      d.innerHTML = `<b>Forest loss (stub)</b><br>Total 2001–2023: ${total.toLocaleString(undefined,{maximumFractionDigits:0})} ha<br><i>Real tiles: WO-CARBON-001</i>`;
+      return d;
+    };
+    info.addTo(_map);
+  }
+}
+
+async function submitLead() {
+  const errEl = document.getElementById('lead-error');
+  errEl.style.display = 'none';
+  const btn = document.getElementById('btn-lead');
+  btn.disabled = true; btn.textContent = 'Sending…';
+
+  try {
+    const summary = _result ? _result.summary : '';
+    const body = {
+      name: _inputCache.name,
+      email: _inputCache.email,
+      mobile: document.getElementById('lead-mobile').value.trim(),
+      company: _inputCache.company,
+      iup_name: _inputCache.iup_name,
+      permit_type: _inputCache.permit_type,
+      payload_summary: summary,
+    };
+    const res = await fetch('/api/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('Could not submit lead — please email info@180climate.net directly.');
+    document.getElementById('confirm-email').textContent = _inputCache.email;
+    showStep('step-done');
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send me the full report →';
+  }
+}
+</script>
+</body>
+</html>
