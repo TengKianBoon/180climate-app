@@ -705,9 +705,13 @@ async function submitLead() {
       email:   _cache.email,
       mobile:  _cache.mobile || '',
       company: company,
-      iup_name:    _cache.iup_name,
-      permit_type: _cache.permit_type,
-      payload_summary: _result ? _result.summary : '',
+      iup_name:             _cache.iup_name,
+      iup_address:          _cache.iup_address,
+      permit_type:          _cache.permit_type,
+      permit_years_remaining: _cache.permit_years_remaining,
+      project_type:         _cache.project_type,
+      payload_summary:      _result ? _result.summary : '',
+      geo:                  _cache.geo,
     };
     var res = await fetch('/api/lead', {
       method: 'POST',

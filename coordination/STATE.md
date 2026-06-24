@@ -1,6 +1,6 @@
 phase: P3 · Productize (carbon → shippable v1)
-active_wo: WO-CARBON-009 — lead delivery (email info@180climate.net + Sheet) → Gate P · on main
-status: WO-008 APPROVED (report + UI fixes, 101 green); WO-009 dispatched; awaiting John go-ahead
-last_commit: 963ffa5 chore(coordination): WO-008 COMPLETE
-next_step: John pastes go-ahead → builder commits coordination, runs WO-009 on main, STOPS at GATE P READY
+active_wo: WO-CARBON-009 — COMPLETE · GATE P READY
+status: STOPPED — 116 tests green; awaiting John to wire real SMTP + Sheets creds + verify end-to-end
+last_commit: (see git log — pushed to origin/main)
+next_step: John wires host env creds → verifies real email + Sheet → signs GATE P → dispatch Gate L work order (pre-launch-backlog.md)
 updated: 2026-06-24

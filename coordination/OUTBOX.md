@@ -1,63 +1,65 @@
-# OUTBOX — Builder (VS Code) · WO-CARBON-008 COMPLETE · 2026-06-24
+# OUTBOX — Builder (VS Code) · WO-CARBON-009 COMPLETE · GATE P READY · 2026-06-24
 
-## Status: STOPPED for John / Cowork review
+## Status: STOPPED — awaiting John to wire real SMTP + Sheets creds + sign Gate P
 
-Commit: `e9e892b` — pushed to origin/main
-Tests: **101/101 passed** (was 81; +20 new report tests)
-
----
-
-## (A) Frontend tweaks — all done
-
-**(i) Methodology pill now reads engine's MethodologyRoute**
-- `loss_overlay` in `/api/carbon` now carries `baseline_class`, `verra_family`, `additionality_basis`
-- Frontend pill uses `ov.baseline_class`/`ov.verra_family` — PEAT correctly shows **"no settled method"** (pill-warn class, brown) per ADR-0012
-- Fallback guard retained for missing overlay
-
-**(ii) Mobile (WhatsApp) moved to "Your details", required**
-- Field label: "Mobile (WhatsApp) *"
-- Required validation in `submitCarbon()` before API call
-- `_cache.mobile` flows into: carbon API payload (`contact.mobile`), lead API body, report download payload
-- Removed from lead gate (was optional there); lead gate now only shows company if not given in step 1
-
-**(iii) Project type optional**
-- First `<option value="">` added: "— permit-driven (default) —" (selected by default)
-- Red star removed; label now "(optional)"
-- Note shown below select: "We'll confirm your project type from your land."
-- When blank, JS defaults to `"REDD"` before submitting — contract `Literal["REDD","PEAT"]` always satisfied
-
-## (B) Report module — done
-
-**`reports/generator.py`** (new):
-- `make_filename()` → `YYMMDDHHMM` UTC, shared base for `.pdf` and `.docx`
-- `ReportData` dataclass — all fields from engine result + contact
-- `generate_pdf(data)` → bytes — reportlab A4; range in large green font, no single number, no "%", IPCC Tier 1, dominant-uncertainty paragraph, Engage CTA with `info@180climate.net`
-- `generate_docx(data)` → bytes — python-docx; same sections, same invariants
-
-**`POST /api/report?fmt=pdf|docx`** (new endpoint):
-- Accepts same `CarbonInput` as `/api/carbon`
-- Reruns engine, builds `ReportData`, returns file download with YYMMDDHHMM filename
-
-**Download buttons in Step 2 results**:
-- "Download PDF" and "Download DOCX" buttons — visible for eligible verdict only
-- JS `downloadReport(fmt)` fetches `/api/report`, triggers browser download
-
-**`tests/test_report.py`** (new, 20 tests):
-- PDF: header, range, no-%, IPCC Tier, dominant-uncertainty, Engage CTA, APD methodology, peat-no-settled-method, non-eligible-no-range
-- DOCX: header, range, no-%, IPCC Tier, dominant-uncertainty, Engage CTA, additionality basis, peat-no-settled-method
+Tests: **116/116 passed** (+15 lead-delivery tests over WO-008's 101)
 
 ---
 
-## ADR-0009 invariants — verified in tests
-- Range shown (never single number) ✓  No `% accuracy` / `% confidence` strings ✓
-- IPCC Tier 1 label present ✓  "dominant uncertainty" present ✓
-- "Engage 180Climate" CTA + `info@180climate.net` present ✓
-- PEAT: "no settled method" shown in pill + report ✓
+## Deliverables
+
+### `api/email.py` — rewritten
+New signature: `send_lead_email(iup_name, filename_base, form_data, docx_bytes=None)`
+- Subject: `"{iup_name} — {filename_base}"` (YYMMDDHHMM)
+- Body: full form (name, email, mobile, company, concession, permit type, project type, area, geometry, timestamp)
+- DOCX as MIMEBase attachment when provided
+- CI fallback (EMAIL_HOST unset): appends to `{OUTBOX_DIR}/outbox_emails.jsonl`
+- SMTP failure: also falls back to JSONL so no lead is silently lost
+
+### `api/sheets.py` — new
+`append_lead(row: dict) -> bool`
+- CI fallback (GOOGLE_SHEETS_ID unset): appends to `{OUTBOX_DIR}/outbox_leads.jsonl`
+- Real mode: lazy-imports `gspread` + `google.oauth2.service_account` (not in requirements.txt — deploy-only)
+- Sheet column order documented in GATE.md
+
+### `api/main.py` — wired
+- `_deliver(form_data, docx_bytes, filename_base)` — shared helper (email + Sheet)
+- `/api/report`: always generates DOCX for email (regardless of fmt param); calls `_deliver()` before returning download
+- `/api/lead`: expanded `LeadRequest` (includes `geo: Optional[GeoInput]`); if geo provided, re-runs engine → generates DOCX → calls `_deliver()`; graceful degradation if geo absent (email sent without DOCX)
+- `_build_form_data()` → assembles full lead dict with geometry_summary
+
+### `frontend/index.html` — `submitLead()` updated
+Now sends: `iup_address`, `permit_years_remaining`, `project_type`, `geo` from `_cache` — gives the API enough to regenerate DOCX
+
+### `tests/test_lead_delivery.py` — new, 15 tests
+All CI-safe (no SMTP, no Sheets):
+- `OUTBOX_DIR` env var → temp dir (isolated per test via `tempfile.mkdtemp`)
+- `/api/lead` tests (8): status=emailed, outbox written, subject format, form fields, DOCX size, Sheet row, no-geo degradation, no secrets
+- `/api/report` tests (7): email triggered on PDF+DOCX download, DOCX attached, subject format, Sheet row, geometry summary, Content-Disposition
 
 ---
 
-## Evidence
-- 101 tests green (`pytest -q` → 101 passed, 1 harmless httpx warning)
-- Commit e9e892b pushed to origin/main
+## ADR-0004 invariant — verified
+- `grep -r "EMAIL_PASSWORD\|GOOGLE_CREDENTIALS" api/ tests/` → 0 hits (only env var reads)
+- No credential strings in any committed file
 
-## Next: WO-CARBON-009 (lead delivery → Gate P) — awaiting John / Cowork approval
+---
+
+## What John must do to pass Gate P
+
+1. Add to host `.env` / deploy config:
+   ```
+   EMAIL_HOST=smtp.example.com
+   EMAIL_PORT=587
+   EMAIL_USER=...
+   EMAIL_PASSWORD=...
+   EMAIL_FROM=noreply@180climate.net
+   GOOGLE_SHEETS_ID=<spreadsheet-id>
+   GOOGLE_CREDENTIALS_JSON=<service-account-json>
+   ```
+2. `pip install gspread google-auth` on the deploy host (not in CI requirements)
+3. Run a real screening → click "Download PDF" → verify email in inbox (info@180climate.net) with DOCX
+4. Check Sheet has the new lead row
+5. Sign GATE P → dispatch Gate L
+
+## Next: Gate L (pre-launch-backlog.md)

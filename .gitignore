@@ -16,5 +16,8 @@ node_modules/
 venv/
 env/
 *.log
+# Lead outbox files (real runs write here; CI uses OUTBOX_DIR tmp redirect)
+coordination/evidence/outbox_emails.jsonl
+coordination/evidence/outbox_leads.jsonl
 .DS_Store
 Thumbs.db

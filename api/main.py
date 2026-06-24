@@ -1,27 +1,26 @@
-"""api/main.py — FastAPI application for the WO-001 vertical slice.
+"""api/main.py — FastAPI application for the 180Climate pre-FS pipeline.
 
 Routes:
   GET  /               → serves frontend/index.html
   GET  /health         → {"status": "ok"}
   POST /api/carbon     → CarbonInput → EngineResult
-  POST /api/lead       → LeadCapture payload → send email, return status
+  POST /api/lead       → full lead form → email (DOCX attached) + Sheet append
+  POST /api/report     → CarbonInput + fmt=pdf|docx → file download + email
 
 Run locally:
-  uvicorn api.main:app --reload --port 8000
+  python -m uvicorn api.main:app --reload --port 8000
 """
 from __future__ import annotations
-import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from core.contracts import (
-    CarbonInput, EngineResult, Disclaimer, MapOverlay,
+    CarbonInput, EngineResult, Disclaimer, GeoInput, MapOverlay,
     LeadCapture, ContactInfo, NarrativeRequest,
 )
 from core.geo import parse_geo
@@ -29,7 +28,8 @@ from core.forest import query_forest_data
 from engines.carbon.engine import run_carbon_engine
 from narrative.narrator import generate_narrative
 from api.email import send_lead_email
-from reports.generator import generate_pdf, generate_docx, ReportData
+from api.sheets import append_lead
+from reports.generator import generate_pdf, generate_docx, ReportData, make_filename
 
 app = FastAPI(title="180Climate Pre-FS API", version="0.1.0-slice")
 
@@ -43,6 +43,108 @@ _CARROT = (
     "For a bankable feasibility — site visit, accredited methodology, financial model, "
     "Verra registration, and market access — contact info@180climate.net."
 )
+_VERDICT_LABELS = {
+    "eligible": "Eligible — indicative carbon project opportunity identified",
+    "flagged":  "Flagged — review required before proceeding",
+    "hard_no":  "Not Eligible — does not meet minimum screening criteria",
+}
+
+
+# ── Shared helpers ────────────────────────────────────────────────────────────
+
+def _geometry_summary(boundary) -> str:  # type: ignore[no-untyped-def]
+    gtype = boundary.geojson.get("type", "")
+    if gtype == "Point":
+        lat = boundary.centroid_lat
+        lon = boundary.centroid_lon
+        return (
+            f"Point ({lat:.4f}°{'N' if lat >= 0 else 'S'}, "
+            f"{lon:.4f}°{'E' if lon >= 0 else 'W'}), "
+            f"{boundary.area_ha:,.0f} ha proxy"
+        )
+    return f"Polygon boundary ({boundary.area_ha:,.0f} ha)"
+
+
+def _build_report_data(
+    inp: CarbonInput,
+    boundary,           # type: ignore[no-untyped-def]
+    estimate,           # type: ignore[no-untyped-def]
+    filename_base: str | None = None,
+) -> ReportData:
+    is_eligible = estimate.eligibility.verdict == "eligible"
+    return ReportData(
+        iup_name=inp.iup_name,
+        iup_address=inp.iup_address,
+        permit_type=inp.permit_type,
+        permit_years_remaining=inp.permit_years_remaining,
+        project_type=inp.project_type,
+        contact_name=inp.contact.name,
+        contact_email=inp.contact.email,
+        contact_mobile=inp.contact.mobile,
+        contact_company=inp.contact.company,
+        verdict=estimate.eligibility.verdict,
+        verdict_label=_VERDICT_LABELS.get(
+            estimate.eligibility.verdict, estimate.eligibility.verdict
+        ),
+        quantity_low_tco2e=estimate.quantity_low_tco2e if is_eligible else None,
+        quantity_high_tco2e=estimate.quantity_high_tco2e if is_eligible else None,
+        baseline_class=estimate.methodology.baseline_class,
+        verra_family=estimate.methodology.verra_family,
+        additionality_basis=estimate.methodology.additionality_basis,
+        uncertainty=estimate.uncertainty,
+        area_ha=boundary.area_ha,
+        **({"filename_base": filename_base} if filename_base else {}),
+    )
+
+
+def _build_form_data(
+    inp: CarbonInput,
+    boundary,           # type: ignore[no-untyped-def]
+    estimate,           # type: ignore[no-untyped-def]
+    ts: str,
+    payload_summary: str,
+) -> dict:
+    is_eligible = estimate.eligibility.verdict == "eligible"
+    return {
+        "timestamp": ts,
+        "name":    inp.contact.name,
+        "email":   inp.contact.email,
+        "mobile":  inp.contact.mobile or "",
+        "company": inp.contact.company or "",
+        "iup_name": inp.iup_name,
+        "iup_address": inp.iup_address,
+        "permit_type": inp.permit_type,
+        "permit_years_remaining": inp.permit_years_remaining,
+        "project_type": inp.project_type,
+        "area_ha": round(boundary.area_ha, 1),
+        "geometry_summary": _geometry_summary(boundary),
+        "verdict": estimate.eligibility.verdict,
+        "quantity_low_tco2e": estimate.quantity_low_tco2e if is_eligible else None,
+        "quantity_high_tco2e": estimate.quantity_high_tco2e if is_eligible else None,
+        "payload_summary": payload_summary,
+    }
+
+
+def _deliver(
+    form_data: dict,
+    docx_bytes: bytes,
+    filename_base: str,
+) -> None:
+    """Fire-and-forget: email + Sheet append. Errors are logged, never raised."""
+    send_lead_email(
+        iup_name=form_data.get("iup_name", "Lead"),
+        filename_base=filename_base,
+        form_data=form_data,
+        docx_bytes=docx_bytes,
+    )
+    row = {k: form_data.get(k, "") for k in [
+        "timestamp", "iup_name", "name", "email", "mobile", "company",
+        "permit_type", "permit_years_remaining", "project_type",
+        "area_ha", "geometry_summary",
+        "verdict", "quantity_low_tco2e", "quantity_high_tco2e",
+    ]}
+    row["filename_base"] = filename_base
+    append_lead(row)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -62,23 +164,18 @@ def index() -> HTMLResponse:
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
 
-# ── Carbon API ────────────────────────────────────────────────────────────────
+# ── Carbon screening ──────────────────────────────────────────────────────────
 
 @app.post("/api/carbon", response_model=None)
 def carbon(inp: CarbonInput) -> JSONResponse:
-    # 1 — parse geometry
     try:
         boundary = parse_geo(inp.geo)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    # 2 — forest data (deterministic stub)
-    forest = query_forest_data(boundary)
-
-    # 3 — carbon engine
+    forest   = query_forest_data(boundary)
     estimate = run_carbon_engine(inp, boundary, forest)
 
-    # 4 — narrative (template in the slice; LLM in WO-CARBON-005)
     narr_req = NarrativeRequest(
         engine="carbon",
         payload=estimate.model_dump(),
@@ -86,13 +183,7 @@ def carbon(inp: CarbonInput) -> JSONResponse:
     )
     narr = generate_narrative(narr_req)
 
-    # 5 — build EngineResult
     is_eligible = estimate.eligibility.verdict == "eligible"
-    verdict_labels = {
-        "eligible": "Eligible — indicative carbon project opportunity identified",
-        "flagged": "Flagged — review required before proceeding",
-        "hard_no": "Not Eligible — does not meet minimum screening criteria",
-    }
     if is_eligible:
         summary = (
             f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
@@ -104,7 +195,7 @@ def carbon(inp: CarbonInput) -> JSONResponse:
 
     result = EngineResult(
         engine="carbon",
-        verdict=verdict_labels.get(estimate.eligibility.verdict, estimate.eligibility.verdict),
+        verdict=_VERDICT_LABELS.get(estimate.eligibility.verdict, estimate.eligibility.verdict),
         summary=summary,
         map=MapOverlay(
             base_tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -137,43 +228,80 @@ class LeadRequest(BaseModel):
     mobile: str = ""
     company: str = ""
     iup_name: str = ""
-    permit_type: str = ""
+    iup_address: str = "Indonesia"
+    permit_type: Literal["HTI", "HA"] = "HTI"
+    permit_years_remaining: int = 20
+    project_type: Literal["REDD", "PEAT"] = "REDD"
     payload_summary: str = ""
+    # Full geo for DOCX regeneration (sent by frontend from _cache)
+    geo: Optional[GeoInput] = None
 
 
 @app.post("/api/lead")
 def lead(req: LeadRequest) -> dict[str, Any]:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
-    lead_obj = LeadCapture(
-        contact=ContactInfo(
-            name=req.name,
-            email=req.email,
-            mobile=req.mobile or None,
-            company=req.company or None,
-        ),
-        engine="carbon",
-        payload_summary=(
-            req.payload_summary
-            or f"IUP: {req.iup_name or '—'} | Permit: {req.permit_type or '—'}"
-        ),
-        timestamp=ts,
-        delivery_status="pending",
-    )
-    subject_prefix = f"{req.iup_name or 'Lead'} ({req.permit_type or '?'})"
-    ok = send_lead_email(lead_obj, subject_prefix=subject_prefix)
-    status = "emailed" if ok else "failed"
-    lead_obj.delivery_status = status  # type: ignore[assignment]
-    return {"status": status, "timestamp": ts}
+
+    docx_bytes: bytes | None = None
+    filename_base = make_filename()
+    form_data: dict = {
+        "timestamp": ts,
+        "name":    req.name,
+        "email":   req.email,
+        "mobile":  req.mobile or "",
+        "company": req.company or "",
+        "iup_name": req.iup_name,
+        "iup_address": req.iup_address,
+        "permit_type": req.permit_type,
+        "permit_years_remaining": req.permit_years_remaining,
+        "project_type": req.project_type,
+        "payload_summary": req.payload_summary,
+        "area_ha": None,
+        "geometry_summary": "—",
+        "verdict": "—",
+        "quantity_low_tco2e": None,
+        "quantity_high_tco2e": None,
+    }
+
+    if req.geo:
+        # Re-run engine to get accurate DOCX + form enrichment
+        try:
+            carbon_inp = CarbonInput(
+                contact=ContactInfo(
+                    name=req.name,
+                    email=req.email,
+                    mobile=req.mobile or None,
+                    company=req.company or None,
+                ),
+                iup_name=req.iup_name,
+                iup_address=req.iup_address,
+                permit_type=req.permit_type,
+                permit_years_remaining=req.permit_years_remaining,
+                project_type=req.project_type,
+                geo=req.geo,
+            )
+            boundary = parse_geo(req.geo)
+            forest   = query_forest_data(boundary)
+            estimate = run_carbon_engine(carbon_inp, boundary, forest)
+
+            is_eligible = estimate.eligibility.verdict == "eligible"
+            form_data.update({
+                "area_ha": round(boundary.area_ha, 1),
+                "geometry_summary": _geometry_summary(boundary),
+                "verdict": estimate.eligibility.verdict,
+                "quantity_low_tco2e": estimate.quantity_low_tco2e if is_eligible else None,
+                "quantity_high_tco2e": estimate.quantity_high_tco2e if is_eligible else None,
+            })
+
+            rdata = _build_report_data(carbon_inp, boundary, estimate, filename_base)
+            docx_bytes = generate_docx(rdata)
+        except Exception:
+            pass  # best-effort DOCX; email still sent without attachment
+
+    _deliver(form_data, docx_bytes or b"", filename_base)
+    return {"status": "emailed", "timestamp": ts}
 
 
 # ── Report download ───────────────────────────────────────────────────────────
-
-_VERDICT_LABELS = {
-    "eligible": "Eligible — indicative carbon project opportunity identified",
-    "flagged":  "Flagged — review required before proceeding",
-    "hard_no":  "Not Eligible — does not meet minimum screening criteria",
-}
-
 
 @app.post("/api/report")
 def report(
@@ -188,40 +316,36 @@ def report(
     forest   = query_forest_data(boundary)
     estimate = run_carbon_engine(inp, boundary, forest)
 
-    is_eligible = estimate.eligibility.verdict == "eligible"
-    data = ReportData(
-        iup_name=inp.iup_name,
-        iup_address=inp.iup_address,
-        permit_type=inp.permit_type,
-        permit_years_remaining=inp.permit_years_remaining,
-        project_type=inp.project_type,
-        contact_name=inp.contact.name,
-        contact_email=inp.contact.email,
-        contact_mobile=inp.contact.mobile,
-        contact_company=inp.contact.company,
-        verdict=estimate.eligibility.verdict,
-        verdict_label=_VERDICT_LABELS.get(
-            estimate.eligibility.verdict, estimate.eligibility.verdict
-        ),
-        quantity_low_tco2e=estimate.quantity_low_tco2e if is_eligible else None,
-        quantity_high_tco2e=estimate.quantity_high_tco2e if is_eligible else None,
-        baseline_class=estimate.methodology.baseline_class,
-        verra_family=estimate.methodology.verra_family,
-        additionality_basis=estimate.methodology.additionality_basis,
-        uncertainty=estimate.uncertainty,
-        area_ha=boundary.area_ha,
-    )
+    filename_base = make_filename()
+    rdata = _build_report_data(inp, boundary, estimate, filename_base)
 
-    fn_base = data.filename_base
-    if fmt == "pdf":
-        content = generate_pdf(data)
-        media   = "application/pdf"
-        fname   = f"{fn_base}.pdf"
+    is_eligible = estimate.eligibility.verdict == "eligible"
+    if is_eligible:
+        summary = (
+            f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
+            f" (lifetime) · IPCC Tier 1 · {estimate.methodology.verra_family}"
+        )
     else:
-        content = generate_docx(data)
+        reasons = "; ".join(estimate.eligibility.reasons)
+        summary = f"Eligibility issues: {reasons}"
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+    form_data = _build_form_data(inp, boundary, estimate, ts, summary)
+    form_data["filename_base"] = filename_base
+
+    # Always generate DOCX for the email attachment (regardless of download format)
+    docx_bytes = generate_docx(rdata)
+    _deliver(form_data, docx_bytes, filename_base)
+
+    if fmt == "pdf":
+        content = generate_pdf(rdata)
+        media   = "application/pdf"
+        fname   = f"{filename_base}.pdf"
+    else:
+        content = docx_bytes
         media   = ("application/vnd.openxmlformats-officedocument"
                    ".wordprocessingml.document")
-        fname   = f"{fn_base}.docx"
+        fname   = f"{filename_base}.docx"
 
     return Response(
         content=content,

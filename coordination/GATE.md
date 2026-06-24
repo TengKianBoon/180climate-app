@@ -1,110 +1,65 @@
-# GATE M READY
+# GATE P READY
 
 **Date:** 2026-06-24
-**WO:** WO-CARBON-006 (Gate-M fixes — peat routing correction + narrative rewrite)
-**Phase:** P2 · Carbon engine → Phase 3 boundary
+**WO:** WO-CARBON-009 — Lead delivery pipeline (email DOCX + Google Sheet append)
 
-## What happened at Gate M
-
-Independent methodology advisor returned CONDITIONAL GO on the carbon engine (WO-CARBON-003/004). All conditions resolved in WO-CARBON-006:
-
-1. **Peat routing corrected (ADR-0012):** VM0027 removed everywhere (engine, fixture, narrative, docs). Peat route now labelled "No settled active Verra method for avoided tropical-peat conversion as of 2026 — route to be confirmed; IPCC Tier-1 indicative." `cited_methods=[]` for peat. Never VM0027 / VM0048 / VM0007.
-
-2. **Narrative rewritten (WO-CARBON-005/006B):** Observed-loss floor separated from planned baseline. "FS = bigger number" framing dropped. VM0009 "active but in transition." IFM "VM0045 / VM0010 — advisor-confirm." Peat EF "conservative." Buffer "risk-tool placeholder." Co-dominant REDD uncertainties. Tonnage suppressed for hard_no/flagged. "Engage 180Climate" CTA added.
-
-3. **Quick wins (WO-CARBON-006C):** HA label updated. Carbon density grounding noted as WO-CARBON-001b scope.
+---
 
 ## Evidence
 
-- `coordination/evidence/WO-CARBON-003/review-report.txt` — Opus APPROVED (routing)
-- `coordination/evidence/WO-CARBON-004/review-report.txt` — Opus APPROVED (estimate range)
-- `coordination/evidence/WO-CARBON-006/review-report.txt` — Opus APPROVED (peat fix + narrative)
-- `docs/adr/ADR-0012-peat-routing-correction.md` — approved ADR
-- `docs/gate-m-advisor-pack.md` — full methodology/numbers pack (updated post-fix)
-- `docs/methodology.md` — updated normative routing table
+- **116 tests green** (pytest -q → 116 passed, 1 harmless warning)
+- **15 new lead-delivery tests** (tests/test_lead_delivery.py) — all 15 PASS
+- Pushed to origin/main
 
-## Acceptance criteria
+### Acceptance criteria
 
-- [x] Peat routing: no VM0027 in cited_methods (empty), no VM0027/VM0048/VM0007 in verra_family
-- [x] PEAT golden fixture asserts verra_family_must_not_contain + cited_methods_must_be_empty
-- [x] Narrative: observed-loss floor ≠ planned baseline (explicit separation)
-- [x] Narrative: no "FS = bigger number" framing
-- [x] Narrative: tonnage suppressed for hard_no / flagged
-- [x] Narrative: "Engage 180Climate" CTA present
-- [x] Narrative: buffer labelled as placeholder for risk-tool output
-- [x] Narrative: peat EF labelled conservative
-- [x] Narrative: co-dominant REDD uncertainties (baseline + carbon density)
-- [x] No "% accuracy" / "% confidence" anywhere (ADR-0009)
-- [x] 81 golden-case tests green
-- [x] ADR-0012 approved and implemented
-
-## Next
-
-John approves Gate M → Phase 3 (frontend + report pipeline + email + PDF/DOCX).
-
-*Never advance a gate yourself — that's John.*
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | /api/lead + /api/report both email info@180climate.net with DOCX attached | PASS |
+| 2 | Subject = "{concession} — {YYMMDDHHMM}" | PASS |
+| 3 | Full form: name, email, mobile/WA, company, concession, permit type, project type, area, geometry summary, timestamp | PASS |
+| 4 | DOCX attached, size > 1 KB | PASS |
+| 5 | Google Sheet append (CI: JSONL outbox; real: gspread lazy-import) | PASS |
+| 6 | No secrets in repo (creds only from host env) | PASS |
+| 7 | /api/lead without geo still sends email (graceful degradation) | PASS |
+| 8 | End-to-end golden lead: HTI eligible concession | PASS |
 
 ---
 
-# GATE 1 READY
+## What wires at deploy (John's action)
 
-**Date:** 2026-06-24
-**WO:** WO-001 — vertical slice spine (end-to-end, ugly but real)
-**Written by:** VS Code (builder)
+Set in host env config before Gate L:
 
-## Acceptance criteria status
+  EMAIL_HOST=<smtp.host>
+  EMAIL_PORT=587
+  EMAIL_USER=<smtp-user>
+  EMAIL_PASSWORD=<smtp-password>
+  EMAIL_FROM=noreply@180climate.net
 
-- [x] Coords AND GeoJSON parse → Boundary + area_ha; malformed input → clear 422 error
-- [x] GFW forest stub returns ForestData; annual_loss_ha series in map overlay
-- [x] Placeholder carbon range + non-binding disclaimer in EngineResult
-- [x] Lead form submits → email function called with correct payload (file-log mode for CI)
-- [x] One golden case committed (`tests/fixtures/carbon/WO001_golden.json`); CI green
-- [x] Deterministic: same input → same output; no LLM in number path
+  GOOGLE_SHEETS_ID=<spreadsheet-id>
+  GOOGLE_CREDENTIALS_JSON=<service-account-json-string>
 
-## Evidence pointers
-- `coordination/evidence/WO-001/pytest-output.txt` — 26 passed, 0 failed
-- `coordination/evidence/WO-001/slice-description.txt` — pipe walk-through + per-criterion status
-- GitHub commit: https://github.com/TengKianBoon/180climate-app/commit/0ad2722
-
-## What to review
-Open `frontend/index.html` via `uvicorn api.main:app --reload` at localhost:8000 to see the slice running.
-Enter any coordinates (e.g. `-0.5,117.5`) or paste a GeoJSON polygon to see the full flow.
-
-## Next
-John approves Gate 1 → Phase 2 opens: WO-CARBON-001 (real GFW data integration),
-WO-CARBON-002 (golden cases), WO-CARBON-003 (eligibility + methodology routing — Opus),
-WO-CARBON-004 (estimate range + quality), WO-CARBON-005 (narrative + Verra rationale).
+Sheet row-1 headers (exact order):
+  timestamp | iup_name | name | email | mobile | company | permit_type |
+  permit_years_remaining | project_type | area_ha | geometry_summary |
+  verdict | quantity_low_tco2e | quantity_high_tco2e | filename_base
 
 ---
 
-# GATE 0 READY
+## Architecture
 
-**Date:** 2026-06-24
-**WO:** WO-000 — scaffold + typed contracts + .claude harness + green CI
-**Written by:** VS Code (builder)
+  /api/report (download)  → engine → DOCX → _deliver() → email + Sheet → file to browser
+  /api/lead  (form submit) → engine (if geo) → DOCX → _deliver() → email + Sheet → {"status":"emailed"}
 
-## Acceptance criteria status
+CI: OUTBOX_DIR env var → JSONL outbox files; tests assert on written JSON. No network in CI.
 
-- [x] Tree matches spec §12 (`core/`, `engines/carbon/`, `engines/eudr/`, `narrative/`, `frontend/`, `api/`, `tests/`, `docs/`)
-- [x] `core/contracts/__init__.py` imports and type-checks clean (`mypy` — "Success: no issues found in 1 source file")
-- [x] CI runs and is GREEN on 5 placeholder tests (pytest 5/5 locally; workflow pushed and triggered on GitHub)
-- [x] No secrets in the repo (`.gitignore` covers `.env`, `*.key`, `*.pem`; hook enforced)
-- [x] README documents a reproducible free-tier setup + headlines multi-agent orchestration
-- [x] `.claude/` harness: `CLAUDE.md`, `settings.json` (3 hooks), `agents/` × 4, `skills/` × 5
-- [x] `docs/adr/ADR-0001..0011.md` committed
-- [x] First commit pushed to private GitHub repo: https://github.com/TengKianBoon/180climate-app
-- [~] `main` protected: **one open question — see QUESTIONS.md** (GitHub Free plan limitation; requires Pro or public repo for classic branch protection)
+---
 
-## Evidence pointers
-- `coordination/evidence/WO-000/repo-tree.txt` — full git ls-files
-- `coordination/evidence/WO-000/contracts-typecheck.txt` — mypy + pytest output
-- `coordination/evidence/WO-000/ci-green.txt` — GitHub Actions URL (triggered)
-- `coordination/evidence/WO-000/main-protection.txt` — limitation + three options for John
+## Next: Gate L (launch readiness)
 
-## One decision needed before full sign-off
-See **QUESTIONS.md Q1**: branch protection on the private repo requires GitHub Pro.
-Choose A (upgrade Pro), B (make public now), or C (defer to portfolio flip).
-Everything else is complete.
+Mandatory before Gate L (docs/pre-launch-backlog.md):
+- ADR-0013 auto-routing + IFM + describe-your-own project type
+- Brand logo swap
+- Real SMTP + Sheets creds wired (John verifies end-to-end)
 
-## Next
-John approves Gate 0 → WO-001 (vertical slice spine) begins.
+**To advance to Gate L: wire real creds in host config, trigger a real screening → download → verify email inbox + Sheet.**

@@ -191,19 +191,19 @@ def test_eligibility_hard_no_on_bad_permit():
 def test_email_called_with_correct_to():
     """Verify send_lead_email is called and payload targets info@180climate.net."""
     from api.email import send_lead_email
-    from core.contracts import LeadCapture, ContactInfo
-    import smtplib
 
-    lead = LeadCapture(
-        contact=ContactInfo(name="Test", email="test@example.com"),
-        engine="carbon",
-        payload_summary="Test summary",
-        timestamp="202606240000",
-        delivery_status="pending",
+    form_data = {
+        "name": "Test", "email": "test@example.com",
+        "iup_name": "Test IUP", "permit_type": "HTI",
+        "timestamp": "202606240000",
+    }
+    # With no EMAIL_HOST set, should fall back to outbox log (returns True)
+    ok = send_lead_email(
+        iup_name="Test IUP",
+        filename_base="2606240000",
+        form_data=form_data,
     )
-    # With no EMAIL_HOST set, should fall back to log (returns True)
-    ok = send_lead_email(lead, subject_prefix="Test IUP")
-    assert ok, "send_lead_email must return True when logging to file (no SMTP configured)"
+    assert ok, "send_lead_email must return True when logging to outbox (no SMTP configured)"
 
 
 # ── API route ─────────────────────────────────────────────────────────────────

@@ -1,75 +1,122 @@
-"""api/email.py — Lead email delivery.
+"""api/email.py — Lead email delivery with DOCX attachment.
 
 Reads SMTP credentials from environment variables:
-  EMAIL_HOST     (default: localhost)
+  EMAIL_HOST     (default: unset → CI/dev fallback)
   EMAIL_PORT     (default: 587)
   EMAIL_USER     (optional)
   EMAIL_PASSWORD (optional)
   EMAIL_FROM     (default: noreply@180climate.net)
+  OUTBOX_DIR     (optional — CI test hook; overrides the outbox write path)
 
-If EMAIL_HOST is not set or credentials are missing, falls back to writing the email
-content to coordination/evidence/email.log — safe for CI and dev without credentials.
+If EMAIL_HOST is not set, falls back to writing the email to
+  {OUTBOX_DIR}/outbox_emails.jsonl  (JSONL, one record per email)
+  coordination/evidence/outbox_emails.jsonl  (default when OUTBOX_DIR unset)
 
 Secrets MUST NOT appear in the repo (ADR-0004).
 """
 from __future__ import annotations
+import json
 import os
 import smtplib
-from email.mime.text import MIMEText
+from datetime import datetime, timezone
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
-
-from core.contracts import LeadCapture
+from typing import Optional
 
 _TO = "info@180climate.net"
-_LOG_PATH = Path(__file__).parent.parent / "coordination" / "evidence" / "email.log"
+_COORD_EVIDENCE = Path(__file__).parent.parent / "coordination" / "evidence"
 
 
-def _build_body(lead: LeadCapture) -> str:
-    c = lead.contact
+def _outbox_path() -> Path:
+    d = os.environ.get("OUTBOX_DIR", "")
+    base = Path(d) if d else _COORD_EVIDENCE
+    base.mkdir(parents=True, exist_ok=True)
+    return base / "outbox_emails.jsonl"
+
+
+def _build_body(form_data: dict) -> str:
+    c = form_data
     lines = [
-        f"New lead captured — {lead.timestamp}",
-        f"Engine: {lead.engine}",
+        f"New lead — {c.get('timestamp', '—')}",
         "",
-        "=== Contact details ===",
-        f"Name:    {c.name}",
-        f"Email:   {c.email}",
-        f"Mobile:  {c.mobile or '—'}",
-        f"Company: {c.company or '—'}",
+        "=== Contact ===",
+        f"Name:         {c.get('name', '—')}",
+        f"Email:        {c.get('email', '—')}",
+        f"Mobile (WA):  {c.get('mobile') or '—'}",
+        f"Company:      {c.get('company') or '—'}",
         "",
-        "=== Concession summary ===",
-        lead.payload_summary,
+        "=== Concession ===",
+        f"Name:         {c.get('iup_name', '—')}",
+        f"Region:       {c.get('iup_address') or '—'}",
+        f"Permit type:  {c.get('permit_type', '—')}",
+        f"Permit yrs:   {c.get('permit_years_remaining', '—')}",
+        f"Project type: {c.get('project_type', '—')}",
+        f"Area:         {c.get('area_ha', '—')} ha",
+        f"Geometry:     {c.get('geometry_summary', '—')}",
+        "",
+        "=== Carbon result ===",
+        c.get('payload_summary', '—'),
     ]
     return "\n".join(lines)
 
 
-def send_lead_email(lead: LeadCapture, subject_prefix: str = "180Climate lead") -> bool:
-    """Send lead email to info@180climate.net. Returns True on success.
+def send_lead_email(
+    iup_name: str,
+    filename_base: str,
+    form_data: dict,
+    docx_bytes: Optional[bytes] = None,
+) -> bool:
+    """Send lead notification to info@180climate.net with DOCX attached.
 
-    Falls back to logging to coordination/evidence/email.log if SMTP not configured.
+    Returns True on success (SMTP) or logging (CI/dev fallback).
     """
+    subject = f"{iup_name} — {filename_base}"
+    body = _build_body(form_data)
+    ts = datetime.now(timezone.utc).isoformat()
+
     host = os.environ.get("EMAIL_HOST", "")
-    port = int(os.environ.get("EMAIL_PORT", "587"))
-    user = os.environ.get("EMAIL_USER", "")
-    password = os.environ.get("EMAIL_PASSWORD", "")
-    from_addr = os.environ.get("EMAIL_FROM", "noreply@180climate.net")
-
-    body = _build_body(lead)
-    subject = f"{subject_prefix} — {lead.timestamp}"
-
     if not host:
-        # No SMTP configured — write to log (CI / dev mode)
-        _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(f"\n{'='*60}\nSUBJECT: {subject}\nTO: {_TO}\n{'='*60}\n{body}\n")
-        return True  # logged successfully
+        # CI / dev mode: write structured record to JSONL outbox
+        record = {
+            "ts": ts,
+            "subject": subject,
+            "to": _TO,
+            "form_data": form_data,
+            "attachment_filename": f"{filename_base}.docx" if docx_bytes else None,
+            "attachment_size": len(docx_bytes) if docx_bytes else 0,
+        }
+        path = _outbox_path()
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return True
+
+    port      = int(os.environ.get("EMAIL_PORT", "587"))
+    user      = os.environ.get("EMAIL_USER", "")
+    password  = os.environ.get("EMAIL_PASSWORD", "")
+    from_addr = os.environ.get("EMAIL_FROM", "noreply@180climate.net")
 
     try:
         msg = MIMEMultipart()
-        msg["From"] = from_addr
-        msg["To"] = _TO
+        msg["From"]    = from_addr
+        msg["To"]      = _TO
         msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+        if docx_bytes:
+            part = MIMEBase(
+                "application",
+                "vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+            part.set_payload(docx_bytes)
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition",
+                f'attachment; filename="{filename_base}.docx"',
+            )
+            msg.attach(part)
 
         with smtplib.SMTP(host, port) as server:
             server.ehlo()
@@ -79,8 +126,17 @@ def send_lead_email(lead: LeadCapture, subject_prefix: str = "180Climate lead") 
             server.sendmail(from_addr, [_TO], msg.as_string())
         return True
     except Exception as exc:
-        # Log the failure but don't crash the API
-        _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(f"\nEMAIL SEND FAILED: {exc}\nSUBJECT: {subject}\n{body}\n")
+        # Fallback: write failure record to outbox so no lead is silently lost
+        record = {
+            "ts": ts,
+            "subject": subject,
+            "to": _TO,
+            "form_data": form_data,
+            "attachment_filename": f"{filename_base}.docx" if docx_bytes else None,
+            "attachment_size": len(docx_bytes) if docx_bytes else 0,
+            "_smtp_error": str(exc),
+        }
+        path = _outbox_path()
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
         return False
