@@ -1,25 +1,20 @@
-# INBOX — Cowork (planner) · 2026-06-24 · WO-AUTOROUTE-002 dispatch (peat = FLAG, never a tonnage)
+# INBOX — Cowork (planner) · 2026-06-24 · WO-AUTOROUTE-003 (forest-presence gate + REDD+/IFM routing)
 
-## WO-AUTOROUTE-001 review: APPROVED (contract faithful to ADR-0013; two overlays independent;
-## intersects=None=unknown; forest-gate defaults to flag; backward-compat; 145 green, Opus PASS).
-## On main, no branches. Commit coordination/ FIRST, then commit+push each step.
+## WO-AUTOROUTE-002 review: APPROVED. Peat = FLAG never a tonnage — enforced structurally (Stratum validator),
+## at the API (has_range guard), and as a regression fixture (SMPP deep-dome → flag, not exclude). 159 green; Opus
+## caught + fixed the eligible-with-None crash. On main, no branches; commit coordination/ FIRST.
 
-## WO-AUTOROUTE-002 — Peat = FLAG, never a tonnage (ADR-0013-peatland) · Opus
-- Wire `LegalOverlayResult` into the engine's peat branch: evaluate Overlay A (KHG) + Overlay B (PIPPIB)
-  INDEPENDENTLY → set `peat_additionality_status` + the two ADR status notes (A or B intersects → "presumed
-  non-additional…"; neither but peat present → "developability not determinable from free data…").
-- **A peat-dominant concession surfaces as a FLAG at the verdict level — NO headline tonnage.** Decide cleanly
-  how the engine represents this (e.g. peat strata `quantity_*=None`; the top-level estimate returns a flag result
-  rather than a number for peat-dominant cases). Downgrade the existing PEAT golden number (18–28 M) to a flag.
-- **STRUCTURAL invariant (add now):** a Pydantic validator on `Stratum` — if `soil_type=="peat"` then
-  `quantity_low_tco2e`/`quantity_high_tco2e` MUST be None, else raise. Make peat-no-tonnage true by construction,
-  not just by test. (Contract tweak is Gate-C-covered — same ADR.)
-- Add an **SMPP-style fixture** (deep dome → flag, NEVER excluded — proves peat≠exclude; restoration pathway).
-- **Report copy:** plain-language rationale next to the peat flag (so the owner sees why no number, not "tool failed").
-- Acceptance: peat → flag + status, no tonnage anywhere for peat; validator blocks a peat tonnage; existing
-  non-peat numbers unchanged; determinism; tests green; Opus review.
-- **Then STOP for Cowork review** (integrity-critical).
+## WO-AUTOROUTE-003 — Forest-presence gate + REDD+/IFM routing · Opus (logic) + Sonnet (UI)
+- **Forest-presence/condition gate (REQUIRED before any REDD/IFM number):** wire `ForestPresenceGate` into the
+  engine — confirm standing forest + condition from Hansen tree-cover + loss + ESA CCI/GEDI + JRC TMF.
+  `gate_result` pass/flag/fail. **HTI on cleared/scrub → no at-risk forest → flag likely-ineligible (no number).**
+- **REDD+/IFM routing by permit + condition:** HTI on standing natural forest → APD; HA on intact/light-degraded →
+  IFM; heavily-degraded → low baseline / flag. Set MethodologyRoute per stratum.
+- **UI:** project type **optional** (auto-determined from land; advanced override); show the auto-determined classification + the permit-validity caveat (permits overlap / One-Map → advisor-confirm) in the narrative.
+- Acceptance: forest-gate blocks a REDD/IFM number when no at-risk forest (add an HTI-on-cleared golden case → flag);
+  routing correct on golden cases; existing non-peat numbers unchanged where forest is confirmed; determinism; tests green; Opus review.
+- **Then STOP for Cowork review.**
 
-## Then: 003 forest-gate + REDD+/IFM routing → 004 classifier + mixed → 005 golden + re-verify → Gate (John+advisor).
-## Carry-forward (before launch): wire REAL KHG fungsi-lindung + SK PIPPIB maps (overlays are fixtures now).
+## Then: 004 free-text classifier (out of number path) + mixed soil-first stratification → 005 golden + re-verify → Gate (John + advisor).
+## Carry-forward (before launch): wire REAL KHG + SK PIPPIB maps (overlays are fixtures now).
 Retry budget 2 → QUESTIONS. Regenerate board + commit + push each step.
