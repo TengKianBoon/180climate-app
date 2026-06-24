@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 3588808.0,
-    "quantity_high_tco2e": 5126868.0,
+    "quantity_low_tco2e": 10756304.0,
+    "quantity_high_tco2e": 15366148.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "WO-CARBON-004 — frozen 2026-06-24. HA 15yr (vs HTI 20yr); same area + loss rate."
+    "freeze_note": "WO-CARBON-001b — re-frozen 2026-06-24 with real Hansen GFC-2022-v1.10 pixel loss data (stub replaced; methodology/framing unchanged). HA 15yr; same area+loss rate as HTI_eligible. Was: 3588808–5126868 (stub proxy)."
   }
 }

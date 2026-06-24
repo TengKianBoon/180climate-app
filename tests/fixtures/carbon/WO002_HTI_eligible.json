@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 4785077.0,
-    "quantity_high_tco2e": 6835824.0,
+    "quantity_low_tco2e": 14341738.0,
+    "quantity_high_tco2e": 20488198.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "WO-CARBON-004 — frozen 2026-06-24. Formula: area × loss_rate × years × biomass × (1−buffer). Pending Cowork number review."
+    "freeze_note": "WO-CARBON-001b — re-frozen 2026-06-24 with real Hansen GFC-2022-v1.10 pixel loss data (stub replaced; methodology/framing unchanged). Loss rate 2.64%/yr (tile 10N_110E, real pixel read). Was: 4785077–6835824 (stub proxy 0.8812%/yr)."
   }
 }
