@@ -86,26 +86,35 @@ def carbon(inp: CarbonInput) -> JSONResponse:
     narr = generate_narrative(narr_req)
 
     # 5 — build EngineResult
+    is_eligible = estimate.eligibility.verdict == "eligible"
     verdict_labels = {
         "eligible": "Eligible — indicative carbon project opportunity identified",
         "flagged": "Flagged — review required before proceeding",
         "hard_no": "Not Eligible — does not meet minimum screening criteria",
     }
+    if is_eligible:
+        summary = (
+            f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
+            f" (lifetime) · IPCC Tier 1 · {estimate.methodology.verra_family}"
+        )
+    else:
+        reasons = "; ".join(estimate.eligibility.reasons)
+        summary = f"Eligibility issues: {reasons}"
+
     result = EngineResult(
         engine="carbon",
         verdict=verdict_labels.get(estimate.eligibility.verdict, estimate.eligibility.verdict),
-        summary=(
-            f"Preliminary estimate: {estimate.quantity_low_tco2e:,.0f}–"
-            f"{estimate.quantity_high_tco2e:,.0f} tCO₂e [PLACEHOLDER]. "
-            f"Methodology: {estimate.methodology.verra_family}."
-        ),
+        summary=summary,
         map=MapOverlay(
             base_tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
             boundary_geojson=boundary.geojson,
             loss_overlay={
                 "type": "annual_loss_series",
-                "data": forest.annual_loss_ha,
-                "note": "GFW/Hansen stub — real tiles in WO-CARBON-001",
+                "data": {str(y): v for y, v in forest.annual_loss_ha.items()},
+                "quantity_low_tco2e": estimate.quantity_low_tco2e if is_eligible else None,
+                "quantity_high_tco2e": estimate.quantity_high_tco2e if is_eligible else None,
+                "verdict": estimate.eligibility.verdict,
+                "area_ha": round(boundary.area_ha, 1),
             },
         ),
         narrative=narr.text,

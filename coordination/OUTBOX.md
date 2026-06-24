@@ -1,126 +1,102 @@
 # OUTBOX — written by: Builder (VS Code) · Date: 2026-06-24
 
-## Status: STOPPED — awaiting Cowork final number re-review (WO-CARBON-001c)
+## Status: STOPPED — awaiting Cowork UI review (WO-CARBON-007)
 
-WO-CARBON-001c complete. Real ESA CCI Biomass v3.0 2018 density replaces the IPCC 657.1 tCO2/ha
-default for polygon inputs. 81 tests pass. Opus Reviewer APPROVED (no blockers).
-**Stopping here for Cowork to review the IPCC-default-vs-real-density change before productize.**
-
----
-
-## THE PRIMARY PAYLOAD: IPCC-default-vs-real density comparison
-
-### What changed in WO-CARBON-001c
-- **Density source**: IPCC 2006 Table 4.7 blanket default (657.1 tCO2/ha) → real ESA CCI Biomass v3.0 2018  
-  concession-mean AGB, clipped to polygon boundary via rasterio/GDAL vsicurl (CEDA public, no auth).
-  Cached as JSON fixtures for CI offline determinism.
-- **Fallback chain**: DENSITY_COG_URL env override → ESA CCI Biomass v3.0 2018 (auto) → IPCC Tier-1 (labelled).
-- **Loss rates**: UNCHANGED (WO-CARBON-001b real Hansen values; not re-read here).
-- **Framing / routing / contracts**: UNCHANGED.
-
-### ESA CCI Biomass v3.0 2018 — what we read
-
-| Polygon | ESA CCI tile | AGB (tDM/ha) | → tCO2/ha (× 0.47 × 44/12) | Source label |
-|---|---|---|---|---|
-| Large (73,787 ha; 0.9°N centroid) | N10E110 | 155 tDM/ha | **266.5 tCO2/ha** | ESA CCI Biomass v3.0 2018 (CEDA public, tile N10E110, 100m) |
-| Small (1,107 ha; -0.015°N centroid) | N00E110 | 101 tDM/ha | **174.2 tCO2/ha** | ESA CCI Biomass v3.0 2018 (CEDA public, tile N00E110, 100m) |
-| Point inputs | N/A | N/A | 657.1 tCO2/ha | IPCC 2006 Table 4.7 Tier-1 fallback (no polygon window for pixel read) |
-
-**Why lower than IPCC default:** The ESA CCI concession-mean includes already-disturbed pixels (logged, partial-canopy, edge-degraded areas) within the polygon boundary. The IPCC Tier-1 value (657.1 tCO2/ha) represents intact lowland moist dipterocarp forest — a ceiling, not a concession average. Satellite-measured AGB is the more defensible input for a real concession.
-
-### Golden range comparison: IPCC default (001b) vs real ESA CCI (001c)
-
-| Fixture | 001b low | 001b high | **001c low** | **001c high** | Density ratio |
-|---|---|---|---|---|---|
-| HTI eligible (20yr, 73,787 ha) | 14,341,738 | 20,488,198 | **5,816,578** | **8,309,397** | 266.5/657.1 = 0.406 |
-| HTI flag years (3yr, 73,787 ha) | 2,151,261 | 3,073,230 | **872,487** | **1,246,410** | 0.406 |
-| HTI fail area (20yr, 1,107 ha) | 7,914 | 11,306 | **2,098** | **2,997** | 174.2/657.1 = 0.265 |
-| HA eligible (15yr, 73,787 ha) | 10,756,304 | 15,366,148 | **4,362,433** | **6,232,048** | 0.406 |
-| HTI point/outside (stub/IPCC) | 2,279,952 | 3,257,074 | 2,279,952 | 3,257,074 | **UNCHANGED** (Point → IPCC fallback) |
-| PEAT (20yr, 73,787 ha) | 18,230,495 | 28,109,607 | 18,230,495 | 28,109,607 | **UNCHANGED** (peat uses hardcoded peat_swamp AGB, not `forest.biomass_tco2_per_ha`) |
-
-**Why the large polygon dropped ~59%:** Concession-mean AGB (266.5 tCO2/ha) is ~41% of IPCC intact-forest default (657.1 tCO2/ha). A real East Kalimantan logging concession has already lost much of its above-ground biomass to prior selective harvest — 266 tCO2/ha is plausible and conservative.
-
-**Why the small polygon dropped more (~73%):** ESA CCI measured only 174.2 tCO2/ha for that 1,107 ha plot. Small near-border polygons in Kalimantan are often more degraded; the lower biomass reflects this.
+WO-CARBON-007 complete. Frontend upgraded: real carbon range, IPCC Tier 1 badge,
+annual forest loss chart, ADR-0003 funnel gate, on-brand. 81 tests pass.
+Verifier: 48/48 acceptance criteria PASS (no blockers). Playwright unavailable for
+screenshots — API + HTML structure verified via TestClient.
+**Stopping here for Cowork to review the UI before WO-CARBON-008 (report).**
 
 ---
 
-## Formula (unchanged from WO-CARBON-004)
+## What changed in WO-CARBON-007
 
-### REDD (APD / IFM)
-```
-quantity = eligible_area [ha]
-         × baseline_loss_rate [ha/ha/yr]     ← 7-yr avg annual loss (2016–2022) / max(area, 25,000)
-         × project_duration [yr]              ← min(permit_years_remaining, 30)
-         × carbon_density [tCO2/ha]           ← ESA CCI concession-mean (or IPCC Tier-1 fallback)
-         × (1 − buffer_deduction)             ← 20% optimistic / 30% conservative
+### `api/main.py`
+- `summary` field: removed `[PLACEHOLDER]` — now `"5,816,578 – 8,309,397 tCO₂e (lifetime) · IPCC Tier 1 · APD (VM0009)"` for eligible; `"Eligibility issues: …"` for non-eligible
+- `loss_overlay` dict enriched: now carries `quantity_low_tco2e`, `quantity_high_tco2e`, `verdict`, `area_ha` for frontend
+- Annual loss `data` keys serialised as strings (explicit) for JSON compatibility
 
-Low estimate:  loss_rate × 0.8, buffer 30%.
-High estimate: loss_rate × 1.0, buffer 20%.
-```
-
-### PEAT (IPCC Tier-1, no settled Verra method — ADR-0012)
-```
-Dominant: area × EF_peat [tCO2/ha/yr] × years × (1 − buffer)
-  EF range: 9.0–13.0 tCO2/ha/yr (IPCC 2013 Wetlands Table 2.1, tropical drained)
-
-Secondary: at_risk_ha × peat_swamp_AGB_BGB × (1 − buffer)
-  AGB+BGB: 409.3 tCO2/ha (IPCC 2006 Table 4.7 peat_swamp)
-```
+### `frontend/index.html` — complete overhaul from WO-001 placeholder
+| Feature | WO-001 (before) | WO-CARBON-007 (after) |
+|---|---|---|
+| Carbon range | "[PLACEHOLDER]" string | Large "5,816,578 – 8,309,397 tCO₂e" display |
+| IPCC Tier | Absent | "IPCC Tier 1" navy pill badge |
+| Methodology | Absent | "APD (VM0009)" / "IFM (VM0045/VM0010)" pill |
+| Forest loss | Stub legend ("WO-CARBON-001") | Annual bar chart 2001–2022 with 2016–22 window highlighted |
+| Verdict card | Plain badge | Colour-coded gradient card (green/amber/red) |
+| Funnel gate | Mobile field only | ADR-0003 compliant: name+email → headline result; mobile+company → full report |
+| Brand | Basic | 180° logo, #1a1a2e/#2d6a4f colour scheme |
+| [PLACEHOLDER] references | 2 | 0 |
+| "stub" / "WO-CARBON-001" artifacts | 2 | 0 |
 
 ---
 
-## Key data parameters (WO-CARBON-001c)
+## Verifier results (48/48 PASS)
 
-- **Real loss rate (large polygon, tile 10N_110E, 2016–2022):** 2.641 %/yr (avg 1,948.7 ha/yr) — from 001b
-- **Real loss rate (small polygon, tile 00N_110E, 2016–2022):** 0.097 %/yr (avg 24.3 ha/yr) — from 001b
-- **Carbon density — large polygon:** 266.5 tCO2/ha (ESA CCI Biomass v3.0 2018, tile N10E110, AGB 155 tDM/ha)
-- **Carbon density — small polygon:** 174.2 tCO2/ha (ESA CCI Biomass v3.0 2018, tile N00E110, AGB 101 tDM/ha)
-- **Carbon density — Point inputs:** 657.1 tCO2/ha (IPCC 2006 Table 4.7 Tier-1 fallback, labelled)
-- **Peat drainage EF:** 9.0–13.0 tCO2/ha/yr (IPCC 2013 Wetlands Table 2.1)
-- **Buffer:** 20–30% (VCS non-permanence buffer pool proxy)
-- **IPCC Tier:** Tier 1 throughout (screening only — not registry-grade)
+### API checks (16/16)
+- engine = "carbon" ✓
+- verdict contains "Eligible" (golden HTI case) ✓
+- summary = "5,816,578 – 8,309,397 tCO₂e (lifetime) · IPCC Tier 1 · APD (VM0009/legacy…)" — no [PLACEHOLDER] ✓
+- loss_overlay.quantity_low_tco2e = 5,816,578.0 (exact) ✓
+- loss_overlay.quantity_high_tco2e = 8,309,397.0 (exact) ✓
+- loss_overlay.data: 22 year-keys 2001–2022 ✓
+- loss_overlay.verdict = "eligible" ✓
+- loss_overlay.area_ha = 73,787.2 ha ✓
+- narrative contains "legal harvest right foregone" ✓
+- narrative contains "Tier 1" ✓
+- narrative ends with "Engage 180Climate" CTA ✓
+- disclaimer.kind = "carbon_non_binding" ✓
+- carrot contains "info@180climate.net" ✓
+- data_sources non-empty (GFW/Hansen + ESA CCI) ✓
+
+### HTML structure checks (32/32)
+- No [PLACEHOLDER] anywhere ✓
+- step-form: name, email, company, iup_name, permit_type, permit_years, project_type, coords/geojson tabs ✓
+- step-result: verdict-card, range-display, tier-row, #map, loss-chart, narrative-text, lead-gate ✓
+- step-done: confirmation + info@180climate.net ✓
+- ADR-0003 funnel gate: lead-gate with mobile field gating "full report" ✓
+- Brand colours: #1a1a2e header, #2d6a4f buttons ✓
+- No "stub" or "WO-CARBON-001" artifacts ✓
+- Annual loss CSS: loss-row, loss-bar, .win (as .loss-bar.win) ✓
+- IPCC Tier badge: pill-tier class ✓
+- Markdown renderer: md() function in JS ✓
+
+Note: Playwright unavailable for pixel screenshots. Visual review is via the spec checklist above.
+To view the UI: `uvicorn api.main:app --reload --port 8000` → `http://localhost:8000`
 
 ---
 
-## Opus Reviewer notes (non-blocking)
+## Key data parameters (unchanged from 001c)
 
-1. **AGB display rounding (cosmetic):** The label "155 tDM/ha → 266 tCO2/ha" uses a rounded integer for display; the stored `biomass_tco2_per_ha=266.5` is the authoritative figure from the true floating-point AGB. No arithmetic error.
-2. **Zero-masking policy:** `treat_zero_as_nodata=True` excludes already-cleared pixels from the concession mean (avoids diluting density with non-forest pixels). This raises the mean above a naive area-weighted average including zeros — defensible for a pre-feasibility screening tool.
-3. **JSON encoding:** `±` and arrow characters in uncertainty_band may render as replacement char in some Windows terminals (cp1252); harmless to tests and downstream PDF/DOCX rendering.
-
----
-
-## Implementation summary
-
-- `core/data/gfw.py` — density fallback chain: DENSITY_COG_URL → ESA CCI auto-tile → IPCC Tier-1; NW-corner tile naming; `_read_agb_cog` via rasterio vsicurl; source label in `data_sources`
-- `engines/carbon/engine.py` — dynamic density-source label in `uncertainty` string (ESA CCI vs IPCC)
-- `tests/test_golden.py` — `test_biomass_is_real_ipcc_value` → `test_biomass_is_populated_and_labelled`; threshold >50 tCO2/ha (any plausible tropical value)
-- `tests/fixtures/data_cache/` — 2 polygon cache files regenerated with real ESA CCI density (266.5, 174.2 tCO2/ha); 3 unchanged
-- `tests/fixtures/carbon/` — 4 golden fixtures re-frozen (HTI_eligible, HTI_flag_years, HTI_fail_area, HA_eligible); 2 unchanged (flag_outside, PEAT)
-- Opus Reviewer: **APPROVED** (no blockers)
+- Carbon range (golden HTI, 73,787 ha, 20yr): **5,816,578 – 8,309,397 tCO₂e**
+- Density: ESA CCI Biomass v3.0 2018, tile N10E110, 266.5 tCO₂/ha
+- Loss rate: Hansen GFC-2022, tile 10N_110E, 2.641%/yr (7-yr avg 2016–2022)
+- IPCC Tier 1 throughout · not registry-grade
 
 ---
 
-## Items for Cowork final number review
+## Items for Cowork UI review
 
-**N1 (magnitude credibility):** HTI eligible now 5.8M–8.3M tCO2e over 20 years for 73,787 ha.
-Is this more credible than the 14.3M–20.5M IPCC-default estimate? (Sanity check: 73,787 ha × 2.641%/yr × 20yr × 266.5 tCO2/ha × 0.7–0.8 buffer ≈ 5.8M–8.3M. Math correct.)
+**U1 (funnel gate):** ADR-0003 compliant — name+email gives headline result; mobile+company gates the full report. Confirm gate is at the right level of friction.
 
-**N2 (density defensibility):** ESA CCI concession-mean (266.5 tCO2/ha) is 41% of the IPCC intact-forest ceiling (657.1 tCO2/ha). Does this feel right for an East Kalimantan HTI concession that has been selectively logged?
+**U2 (annual loss chart):** Shows all 22 years 2001–2022 as a bar chart; 2016–2022 window highlighted in red. Avg shown as a legend in the map and as a chart note. Confirm this is sufficient for the screening tool (no map tile overlay — satellite loss tiles deferred, not in scope for WO-007).
 
-**N3 (Point/PEAT unchanged):** Point inputs and PEAT still use IPCC fallback — by design. No change needed.
+**U3 (narrative rendering):** `**bold**` markdown rendered to `<strong>` in-browser; `---` → `<hr>`. No LLM call in this path — template narrative only.
 
-**N4 (next step):** If approved, merge `feat/carbon-001c` to main and begin Phase 3 (productize: frontend, report, email). Or flag any concerns before merge.
+**U4 (non-eligible verdict):** For hard_no/flagged cases, the range display is suppressed (shows empty) and the summary shows the eligibility issues. Confirm this is the right UX for those verdicts.
+
+**U5 (next step):** If approved → WO-CARBON-008 (PDF + DOCX report, ADR-0010).
 
 ---
 
 ## Counts
-- Total tests: **81** (all passing — cached reads, offline CI)
-- Re-frozen golden fixtures: 4 (HTI_eligible, HTI_flag_years, HTI_fail_area, HA_eligible)
-- Unchanged fixtures: 2 (HTI_flag_outside — Point/stub; PEAT — hardcoded peat_swamp AGB)
-- Opus Reviewer: APPROVED (no blockers; 3 non-blocking notes)
+- Tests: **81** (all passing)
+- Verifier: 48/48 PASS
+- [PLACEHOLDER] references: 0 (was 2)
+- "stub" / "WO-CARBON-001" artifacts: 0 (was 2)
+- Screenshot: PLAYWRIGHT_UNAVAILABLE — visual verification requires local server
 
 ## Next step (awaiting Cowork go-ahead)
-→ Cowork reviews IPCC-vs-ESA-CCI table above; approves or asks questions → signal to Builder.
-→ If approved: merge `feat/carbon-001c` → main → begin Phase 3 (productize).
+→ Cowork reviews UI checklist + runs `uvicorn api.main:app --port 8000` for visual check
+→ If approved: merge `feat/carbon-007` → main → begin WO-CARBON-008 (PDF+DOCX report)
