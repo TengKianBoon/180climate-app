@@ -1,22 +1,17 @@
-# INBOX — Cowork (planner) · 2026-06-24 · WO-CARBON-009 (lead delivery → Gate P)
+# INBOX — Cowork (planner) · 2026-06-24 · ADR-0013 (auto-routing) — DESIGN phase (advisor review first)
 
-## WO-008 review: APPROVED (report defensible + on-brand; 3 UI fixes correct; 101 green). Merged on main.
+## Builder: HOLD — do NOT build yet.
+ADR-0013 (auto land-characterization + methodology routing + IFM + "describe your own") is in DESIGN.
+It is a contract change (Gate C) + methodology-sensitive, so the independent advisor reviews it FIRST.
 
-## Git discipline (unchanged): work on main, commit coordination/ FIRST, commit+push each step, no branches, no stash.
+Drafts:
+- docs/adr/ADR-0013-auto-routing.md (the decision record, Proposed)
+- docs/adr-0013-advisor-pack.md (the self-contained advisor review pack — John sends this to the Claude.ai project)
+- docs/feature-autoroute.md (the design)
 
-## WO-CARBON-009 — Lead delivery → Gate P · Sonnet · on main
-Wire the lead pipeline (ADR-0004 + ADR-0010). All lead email → info@180climate.net.
-- **On report download / lead submit:** email **info@180climate.net** with the **DOCX attached** (reuse
-  reports/generator.generate_docx) + the **full lead-capture form** (name, email, mobile/WhatsApp, company,
-  concession, permit type, project type, area, geometry summary) + timestamp; **subject "{concession} — {filename}"**.
-- **Append the lead to the Google Sheet** (ADR-0004).
-- **SECRETS:** email (SMTP) + Sheets credentials live in **host env config, NEVER in the repo.** In CI/build:
-  **mock** the email (write to a local outbox file) + a stub Sheet writer. Real creds wired at deploy (Gate P).
-- **Acceptance:** download/submit → email function called with DOCX + full form (assert via the mock/outbox file)
-  → Sheet append (mock in CI); end-to-end on a golden lead; **no secrets in repo**; tests green.
-- **→ Gate P** (John verifies the real email + attachment + form capture + Sheet end-to-end; John provides the
-  real SMTP + Sheets creds in host config). Write coordination/GATE.md = "GATE P READY" + evidence, STOP.
+## Sequence (no build until step 3):
+1. John sends docs/adr-0013-advisor-pack.md to the Claude.ai project → independent review.
+2. Cowork folds the advisor's input into ADR-0013; John approves; record Gate C (contract change).
+3. THEN Cowork dispatches the build WO batch (data adapters + characterization + engine routing + UI + report).
 
-Retry budget 2 → QUESTIONS. Regenerate board + commit + push each step.
-
-## QUEUED (pre-launch, MANDATORY before Gate L): ADR-0013 auto-routing + IFM + "describe your own" option; brand logo swap. (docs/pre-launch-backlog.md)
+## Status: carbon v1 BUILD complete (Gate P signed). This is pre-launch (Gate L blocker) work.
