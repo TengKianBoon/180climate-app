@@ -4,6 +4,9 @@ from core.contracts import (
     EUDRInput, PlotVerdict, EUDRVerdict, LeadCapture, CarbonGates, EUDRConfig,
     ContactInfo, GeoInput, GateResult, ForestData, QualityFactors,
     Plot, ChecklistItem, NarrativeRequest, NarrativeResult,
+    # ADR-0013 new types (WO-AUTOROUTE-001)
+    OverlayIntersection, LegalOverlayResult, ForestPresenceGate,
+    Stratum, ProjectClassification,
 )
 
 

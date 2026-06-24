@@ -231,7 +231,7 @@ class LeadRequest(BaseModel):
     iup_address: str = "Indonesia"
     permit_type: Literal["HTI", "HA"] = "HTI"
     permit_years_remaining: int = 20
-    project_type: Literal["REDD", "PEAT"] = "REDD"
+    project_type: Literal["REDD", "PEAT", "IFM", "other"] = "REDD"
     payload_summary: str = ""
     # Full geo for DOCX regeneration (sent by frontend from _cache)
     geo: Optional[GeoInput] = None

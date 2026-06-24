@@ -65,7 +65,8 @@ class CarbonInput(BaseModel):
     iup_address: str
     permit_type: Literal["HTI", "HA"]
     permit_years_remaining: int
-    project_type: Literal["REDD", "PEAT"]
+    project_type: Literal["REDD", "PEAT", "IFM", "other"]  # IFM + other added (ADR-0013)
+    project_type_description: Optional[str] = None          # used when project_type="other"
     geo: GeoInput
 
 class GateResult(BaseModel):
@@ -91,6 +92,51 @@ class QualityFactors(BaseModel):
     leakage: str
     methodology_fit: str
 
+# ---------- ADR-0013 overlay + classification types ----------
+
+class OverlayIntersection(BaseModel):
+    """Result of one spatial overlay query (KHG, PIPPIB, WorldCover, JRC TMF)."""
+    intersects: Optional[bool] = None   # None = data unavailable; not a negative result
+    area_ha: Optional[float] = None
+    source: str = ""
+    note: str = ""
+
+class LegalOverlayResult(BaseModel):
+    """Two-overlay peat legal status evaluated independently (ADR-0013-peatland)."""
+    overlay_a_khg: OverlayIntersection       # PP57/2016 ecosystem function / fungsi lindung
+    overlay_b_pippib: OverlayIntersection    # Inpres5/2019 moratorium / PIPPIB
+    peat_additionality_status: str           # see ADR-0013 outcome strings; never a tonnage
+    note: str = ""
+
+class ForestPresenceGate(BaseModel):
+    """Forest presence + condition gate — required before any REDD/IFM number (ADR-0013-auto-routing)."""
+    forest_confirmed: Optional[bool] = None
+    canopy_cover_pct: Optional[float] = None
+    condition: Literal["intact", "light_degradation", "heavy_degradation", "cleared", "unknown"] = "unknown"
+    gate_result: Literal["pass", "flag", "fail"] = "flag"
+    note: str = ""
+
+class Stratum(BaseModel):
+    """One classified land-area unit; soil-first stratification (ADR-0013)."""
+    stratum_id: str
+    area_ha: float
+    soil_type: Literal["mineral", "peat", "unknown"] = "unknown"
+    methodology: Optional[MethodologyRoute] = None
+    legal_overlay: Optional[LegalOverlayResult] = None
+    forest_gate: Optional[ForestPresenceGate] = None
+    eligibility_verdict: Literal["eligible", "flagged", "hard_no"] = "flagged"
+    eligibility_reasons: list[str] = []
+    quantity_low_tco2e: Optional[float] = None
+    quantity_high_tco2e: Optional[float] = None
+
+class ProjectClassification(BaseModel):
+    """Per-stratum project classification; replaces single project_type (ADR-0013)."""
+    strata: list[Stratum]
+    dominant_soil: Literal["mineral", "peat", "mixed", "unknown"] = "unknown"
+    auto_determined: bool = True
+    user_project_type_override: Optional[str] = None   # for project_type="other" free-text
+    note: str = ""
+
 class CarbonEstimate(BaseModel):
     eligibility: EligibilityResult
     methodology: MethodologyRoute
@@ -99,6 +145,7 @@ class CarbonEstimate(BaseModel):
     quantity_high_tco2e: float                # a RANGE, never a single false-precise number
     uncertainty: str
     quality: QualityFactors
+    classification: Optional[ProjectClassification] = None  # ADR-0013; None = not yet classified
 
 # ---------- EUDR ----------
 class Plot(BaseModel):
