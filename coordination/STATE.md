@@ -1,6 +1,6 @@
-phase: P4 · Pre-launch (carbon v1 build done; Gate P + Gate C signed)
-active_wo: none — holding for Cowork to dispatch ADR-0013 v2 build WO batch
-status: GATE C SIGNED by John (2026-06-24). ADR-0013 v2 approved: auto-routing + 4 legal guardrails (PIPPIB overlay, forest-presence, peat->flag, free-text out of number path) + mixed-concession stratification + permit-validity caveat. Builder HOLDING.
-last_commit: ceb8b1d chore(coordination): GATE P SIGNED
-next_step: Cowork dispatches ADR-0013 v2 build WO batch -> builder implements -> tests green -> Gate L
+phase: P4 · Pre-launch — ADR-0013 build (auto-routing + legal guardrails)
+active_wo: WO-AUTOROUTE-001 — contract change + legal/forest adapters (dispatched) · on main
+status: Gate C signed. ADR-0013 build batch scoped (WO-AUTOROUTE-001..005). Awaiting John go-ahead for WO-001.
+last_commit: 0602622 chore(coordination): GATE C SIGNED
+next_step: John pastes go-ahead → builder commits coordination, runs WO-AUTOROUTE-001 on main, STOPS for Cowork review
 updated: 2026-06-24
