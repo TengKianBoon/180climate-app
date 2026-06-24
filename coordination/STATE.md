@@ -1,6 +1,6 @@
-phase: P4 · Pre-launch — ADR-0013 build (final WO)
-active_wo: WO-AUTOROUTE-005 — golden suite + full re-verify → Gate-AR (dispatched) · on main
-status: WO-004 (classifier + mixed stratification) APPROVED — classifier out of number path (determinism tested), 167 green. WO-005 dispatched (assembles the Gate-AR pack for John + advisor). Awaiting John go-ahead.
-last_commit: WO-AUTOROUTE-004 COMPLETE (167 green)
-next_step: John pastes go-ahead → builder runs WO-005 on main, STOPS at GATE-AR READY for John + advisor sign-off
+phase: P4 · Pre-launch — ADR-0013 build
+active_wo: GATE-AR — waiting for John + advisor sign-off
+status: WO-AUTOROUTE-005 COMPLETE — golden suite consolidated, all invariants re-verified, 231 tests green. GATE-AR READY.
+last_commit: feat(golden+gate): WO-AUTOROUTE-005 golden suite + GATE-AR pack
+next_step: John + methodology advisor review docs/adr-0013-build-gate-pack.md → sign off GATE-AR
 updated: 2026-06-24

@@ -1,0 +1,23 @@
+{
+  "description": "PEAT project, HTI 20yr, 49,120 ha polygon near (-4.0, 108.0). Overlay A=KHG no intersection, Overlay B=PIPPIB no intersection → 'flag — possibly developable peat'. Depth survey required. Never a tonnage (ADR-0013).",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT West Java Peat Neither",
+    "iup_address": "Jawa Barat, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "PEAT",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[107.90,-3.90],[108.10,-3.90],[108.10,-4.10],[107.90,-4.10],[107.90,-3.90]]]}"
+    }
+  },
+  "expected_peat_flag": {
+    "quantity_low_tco2e": null,
+    "quantity_high_tco2e": null,
+    "peat_additionality_status_contains": "possibly developable peat",
+    "overlay_a_khg_intersects": false,
+    "overlay_b_pippib_intersects": false,
+    "never_hard_no": true
+  }
+}

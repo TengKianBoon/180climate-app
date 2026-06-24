@@ -1,0 +1,19 @@
+{
+  "annual_loss_ha": {
+    "2001": 150.0, "2002": 155.0, "2003": 148.0, "2004": 160.0, "2005": 152.0,
+    "2006": 145.0, "2007": 153.0, "2008": 158.0, "2009": 149.0, "2010": 156.0,
+    "2011": 161.0, "2012": 165.0, "2013": 158.0, "2014": 163.0, "2015": 157.0,
+    "2016": 180.0, "2017": 175.0, "2018": 185.0, "2019": 182.0, "2020": 178.0,
+    "2021": 181.0, "2022": 179.0, "2023": 177.0
+  },
+  "baseline_cover_pct": 30.0,
+  "loss_after_2020_ha": 538.0,
+  "data_sources": [
+    "GFW/Hansen GFC-2022-v1.10 lossyear pixel read (tile 10S_110E, 30 m, public GCS, no auth)",
+    "Biomass: ESA CCI Biomass v3.0 2018, concession-mean AGB (tile S10E110) — 90 tDM/ha → 154.8 tCO2/ha"
+  ],
+  "uncertainty_band": "Tier 1 indicative screening — ESA CCI Biomass v3.0 2018; Hansen GFC-2022-v1.10 pixel loss rate. Not registry-grade.",
+  "peat_present": null,
+  "peat_depth_proxy_m": null,
+  "biomass_tco2_per_ha": 154.8
+}

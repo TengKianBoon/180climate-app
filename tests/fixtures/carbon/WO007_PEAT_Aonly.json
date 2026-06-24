@@ -1,0 +1,23 @@
+{
+  "description": "PEAT project, HTI 20yr, 49,220 ha polygon near (-1.5, 112.0). Overlay A=KHG intersects (12,000 ha), Overlay B=PIPPIB no intersection → peat_additionality_status: 'flag — A: ecosystem-function peatland'. Never a tonnage (ADR-0013).",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Kalimantan Tengah Peat A",
+    "iup_address": "Kalimantan Tengah, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "PEAT",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[111.90,-1.40],[112.10,-1.40],[112.10,-1.60],[111.90,-1.60],[111.90,-1.40]]]}"
+    }
+  },
+  "expected_peat_flag": {
+    "quantity_low_tco2e": null,
+    "quantity_high_tco2e": null,
+    "peat_additionality_status_contains": "flag — A:",
+    "overlay_a_khg_intersects": true,
+    "overlay_b_pippib_intersects": false,
+    "never_hard_no": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "description": "HTI REDD, 20yr, 49,220 ha polygon near (-1.5, 115.0). Baseline cover 30% (20-40%), JRC degraded → forest gate: heavy_degradation, flag. Number IS still computed (gate=flag, not fail). Eligible verdict despite forest flag (no eligibility gates fail).",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Barito Heavy Degraded",
+    "iup_address": "Kalimantan Tengah, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[114.90,-1.40],[115.10,-1.40],[115.10,-1.60],[114.90,-1.60],[114.90,-1.40]]]}"
+    }
+  },
+  "expected_forest_gate": {
+    "forest_condition": "heavy_degradation",
+    "forest_gate_result": "flag",
+    "quantity_low_tco2e_not_null": true,
+    "eligibility_verdict": "eligible"
+  }
+}

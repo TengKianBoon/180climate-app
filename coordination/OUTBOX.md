@@ -1,91 +1,89 @@
-# OUTBOX — Builder · WO-AUTOROUTE-004 · 2026-06-24
+# OUTBOX — Builder · WO-AUTOROUTE-005 · 2026-06-24
 
-## Status: COMPLETE — stopping for Cowork review
+## Status: COMPLETE — GATE-AR READY (stopping for John + advisor sign-off)
 
-WO-AUTOROUTE-004 complete. **167 tests green** (164 existing all pass, +3 new).
+WO-AUTOROUTE-005 complete. **231 tests green** (167 existing all pass, +64 new).
 
 ---
 
 ## What was delivered
 
-### classifier/ (new module)
-- `classifier/__init__.py`: module init with docstring declaring it as the intake LLM boundary
-- `classifier/intake.py`: `classify_project(description, permit_type, model)` → `ClassifierResult`
-  - Maps free-text to REDD | IFM | PEAT | out_of_scope
-  - Defaults to `out_of_scope` when description is empty, SDK absent, or ANTHROPIC_API_KEY unset
-  - Falls back gracefully on any API or parse error
-  - NEVER imported by `engines/` — determinism invariant preserved by design + asserted in tests
+### New golden carbon fixtures (5)
+- `tests/fixtures/carbon/WO007_PEAT_Aonly.json`: PEAT, HTI, -1.5/112.0 polygon — KHG intersects, PIPPIB no intersection → "flag — A:" status
+- `tests/fixtures/carbon/WO007_PEAT_Bonly.json`: PEAT, HTI, -3.5/110.0 polygon — KHG no intersection, PIPPIB intersects → "flag — B:" status
+- `tests/fixtures/carbon/WO007_PEAT_neither.json`: PEAT, HTI, -4.0/108.0 polygon — both overlays no intersection → "possibly developable peat" status
+- `tests/fixtures/carbon/WO008_forest_intact.json`: REDD, HTI, -0.5/116.0 polygon — 75% cover, JRC undisturbed → intact, pass, number computed
+- `tests/fixtures/carbon/WO008_forest_heavy.json`: REDD, HTI, -1.5/115.0 polygon — 30% cover, JRC degraded → heavy_degradation, flag, number still computed
 
-### engines/carbon/engine.py
-- `run_mixed_stratification(inp, boundary, forest, min_stratum_ha=1000.0)` added (after `run_carbon_engine`)
-  - Soil-first stratification: queries KHG peat area; if both peat ≥ 1000 ha AND mineral ≥ 1000 ha → 2 strata
-  - **Peat stratum**: flag, no tonnage (ADR-0013), KHG/PIPPIB overlays evaluated
-  - **Mineral stratum**: REDD/IFM estimate on mineral area only (forest gate + `_estimate_redd`)
-  - `combined_eligibility.verdict = "flagged"` always when peat stratum present
-  - Falls back to `run_carbon_engine()` if not sufficiently mixed
-  - Module docstring updated: references WO-AUTOROUTE-004, intake classifier mention in docstring only (not import)
-  - "Only LLM in narrative/" comment updated to reflect both narrative/ and classifier/ boundary
+### New data cache fixtures (5)
+Cache keys computed from actual UTM-projected area (shapely/pyproj), not nominal:
+- `d67cc15689b40193.json`: Peat A-only centroid (-1.5000, 112.0000, 49195.6 ha)
+- `e74d7830034b5964.json`: Peat B-only centroid (-3.5000, 110.0000, 49122.6 ha)
+- `1d5d7f387cb0c771.json`: Peat neither centroid (-4.0000, 108.0000, 49215.3 ha)
+- `cf72ac513d9218d5.json`: Forest intact centroid (-0.5000, 116.0000, 49210.2 ha)
+- `e1bd28d27ac80cd1.json`: Forest heavy centroid (-1.5000, 115.0000, 49240.9 ha)
 
-### api/main.py
-- `_capture_out_of_scope_lead()`: lead capture for out-of-scope (email + Sheet, best-effort)
-- `_handle_other_project_type()`: full handler for project_type="other"
-  - Calls `classify_project()` at intake boundary
-  - If `out_of_scope`: captures lead + returns JSON with apology, CTA, cta_email, lead_captured
-  - If REDD/IFM: calls `run_mixed_stratification()` (soil-first stratification)
-  - If PEAT: calls `run_carbon_engine()`
-  - Tags `classification.user_project_type_override` with original description
-  - Returns `EngineResult` with classifier_category + classifier_confidence in loss_overlay
-- `carbon()` endpoint: checks `inp.project_type == "other"` → delegates to `_handle_other_project_type()`
+### New overlay fixtures (10)
+- `khg_-1.500_112.000.json` + `pippib_-1.500_112.000.json`: Peat A-only (KHG=true, PIPPIB=false)
+- `khg_-3.500_110.000.json` + `pippib_-3.500_110.000.json`: Peat B-only (KHG=false, PIPPIB=true)
+- `khg_-4.000_108.000.json` + `pippib_-4.000_108.000.json`: Peat neither (both false)
+- `worldcover_-0.500_116.000.json` + `jrc_tmf_-0.500_116.000.json`: Forest intact (78% cover, undisturbed)
+- `worldcover_-1.500_115.000.json` + `jrc_tmf_-1.500_115.000.json`: Forest heavy (32% cover, degraded)
 
-### narrative/narrator.py
-- Module docstring updated: "LLM calls: narrative/ (template) and classifier/ (intake only — never in number path)"
-- `generate_narrative()`: `is_mixed` derived from `estimate.classification.dominant_soil`
-- Carbon estimate block: changed from `if elig.verdict == "eligible"` to `if low is not None`
-  - Shows range for ANY non-None quantity (including mixed-concession flagged cases with mineral range)
-  - `range_label` is "**Indicative Carbon Range (mineral stratum — peat stratum separately flagged)**" for mixed
+### Tests/test_golden.py (+57 new parametrized test cases)
+New test functions with parametrization:
+- `test_peat_overlay_combo_no_tonnage` (3 params): all peat overlay combos produce no tonnage (ADR-0013)
+- `test_peat_overlay_combo_status_matches` (3 params): correct peat_additionality_status text per combo
+- `test_peat_overlay_combo_overlays_independent` (3 params): A and B stored separately
+- `test_peat_overlay_combo_never_hard_no` (3 params): never "hard_no", always "flagged"
+- `test_forest_gate_condition_and_result` (2 params): condition and gate_result verified
+- `test_forest_gate_variant_has_number` (2 params): pass/flag gates compute number
+- `test_forest_gate_variant_eligibility` (2 params): eligibility verdict verified
+- `test_all_peat_no_forbidden_phrases` (5 params): full sweep of 5 peat fixtures
+- `test_all_redd_no_forbidden_phrases` (8 params): full sweep of 8 REDD fixtures
+- `test_all_fixtures_is_planned_and_additionality_correct` (13 params): all 13 fixtures
+- `test_all_peat_never_vm0027_vm0048_vm0007` (5 params): methodology invariant sweep
+- `test_all_redd_never_vm0048_vm0007` (8 params): methodology invariant sweep
 
-### frontend/index.html
-- `project_type` select: added "Other / Describe your own" option + `onchange="onProjectTypeChange()"`
-- `project_type_desc_row`: textarea "Describe your project" — shown only when "other" selected
-- `onProjectTypeChange()`: toggles description row visibility
-- `submitCarbon()`: captures `rawDesc`, stores in `_cache.project_type_description`, sends in payload
-- `renderResult()`: out-of-scope guard at top — shows apology + CTA + lead_captured confirmation
-- Range display: changed from `verdict === 'eligible'` to `quantity_low_tco2e != null` — shows mineral range for mixed-flagged cases
+### tests/test_classifier.py (new file, 7 tests)
+Unit tests for classifier/intake.py — all deterministic (no real LLM calls):
+- Empty/whitespace description → out_of_scope
+- No ANTHROPIC_API_KEY → out_of_scope fallback (never raises)
+- ClassifierResult accepts all 4 valid category literals
+- ClassifierResult rejects invalid categories via Pydantic ValidationError
+- ClassifierResult defaults verified
+- Classifier never raises on any input (tested with 4 edge-case descriptions)
 
-### Fixtures (new)
-- `tests/fixtures/carbon/WO006_mixed_concession.json`: HTI 49,228 ha polygon near (-2.0, 113.0), KHG 15,000 ha peat
-- `tests/fixtures/data_cache/a6cc657e3aaf8bfe.json`: forest data for mixed concession (cache key for centroid -2.0000,113.0000,49228.1)
-- `tests/fixtures/overlays/khg_-2.000_113.000.json`: KHG intersects=true, area_ha=15000
-- `tests/fixtures/overlays/pippib_-2.000_113.000.json`: PIPPIB intersects=false
-- `tests/fixtures/overlays/worldcover_-2.000_113.000.json`: Tree cover (class 10), 50%
-- `tests/fixtures/overlays/jrc_tmf_-2.000_113.000.json`: degraded, 55% TMF
+### Bug fix: test_golden.py _load() encoding
+`_load()` updated to use `encoding="utf-8"` — prevents Windows cp1252 misreading of em dash characters in fixture files containing Unicode strings.
 
-### Tests (+3 new in test_golden.py)
-| Test | Assertion |
-|------|-----------|
-| `test_number_path_deterministic_classifier_excluded` | `from classifier` / `import classifier` not in engine.py source + determinism |
-| `test_mixed_stratification_peat_flag_mineral_number` | 2 strata, peat=flag+no-number, mineral has range, overall=flagged |
-| `test_mixed_stratum_areas_sum_to_boundary` | peat_area + mineral_area == boundary.area_ha (no double-counting) |
+### Gate pack documents
+- `coordination/GATE.md`: GATE-AR READY pack (replaces previous Gate C content)
+- `docs/adr-0013-build-gate-pack.md`: self-contained gate pack for John + advisor
 
 ---
 
 ## Key decisions
-1. **Structural test uses `from classifier` / `import classifier` check** (not bare "classifier") — the word appears in the engine docstring as documentation, which is acceptable.
-2. **Cache key for mixed fixture** is `a6cc657e3aaf8bfe` (SHA-256 of "-2.0000,113.0000,49228.1") — actual UTM area 49228.1 ha, not the description's 49,207 ha.
-3. **`is_tree_cover` excluded from worldcover fixture** — it's a computed `@property` on `WorldCoverResult`, not a constructor field.
-4. **PIPPIB fixture uses `area_ha: null`** — `OverlayIntersection.area_ha: Optional[float] = None` accepts null.
-5. **Narrator `if low is not None` change** — shows mineral range for mixed-flagged cases while still suppressing for pure hard_no/flagged-without-range cases.
+
+1. **Actual vs nominal area_ha for cache keys**: The WO spec listed nominal area values (49219.8, etc.) but pyproj/shapely UTM computation gives different values (~49195 ha for a 0.2°×0.2° box near -1.5°). Cache keys were computed from actual shapely areas — this is correct behavior (the cache uses real computed boundary.area_ha).
+
+2. **`_load()` encoding fix**: Read fixtures with `encoding='utf-8'` — prevents Windows cp1252 garbling of Unicode em dashes in peat_additionality_status strings. Safe: all fixtures are UTF-8.
+
+3. **`is_tree_cover` excluded from worldcover fixtures**: It is a `@property` on `WorldCoverResult`, not a constructor field. Only `land_class`, `label`, `tree_cover_pct`, `note` are stored in fixtures.
+
+4. **Forest intact condition**: 75% cover + JRC "undisturbed" → `condition="intact"`, `gate_result="pass"` — number computed, verdict="eligible". Confirmed from engine logic (cover >= 60 AND undisturbed).
+
+5. **Forest heavy condition**: 30% cover + JRC "degraded" → falls through to `cover_pct >= 20` branch → `condition="heavy_degradation"`, `gate_result="flag"` — number still computed. Eligibility gates all pass → verdict="eligible".
 
 ---
 
-## 167 tests green
+## 231 tests green
 ```
-167 passed, 1 warning in 3.08s
+231 passed, 1 warning in 5.34s
 ```
 
 ---
 
 ## Open questions for reviewer
-1. Is the `from classifier` / `import classifier` text-search check robust enough, or should it use AST-based import analysis?
-2. The out-of-scope lead capture calls `_deliver()` with `b""` (empty bytes) — no DOCX for out-of-scope. Is this acceptable for the Sheet row format?
-3. `_handle_other_project_type()` uses `run_mixed_stratification()` for REDD/IFM classified projects. Should it also run `run_mixed_stratification()` for PEAT-classified or fall through to `run_carbon_engine()` as currently coded?
+1. The five data cache keys differ from what the WO spec specified (spec used nominal areas). The correct keys are the ones derived from actual shapely UTM computation. Is this understood and accepted?
+2. WO008_forest_heavy expects `eligibility_verdict = "eligible"` — this is because forest gate "flag" does not change eligibility (only "fail" does). The existing `test_forest_gate_variant_eligibility` assertion confirms this. Is this the intended behavior?

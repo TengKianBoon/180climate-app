@@ -1,0 +1,21 @@
+{
+  "description": "HTI REDD, 20yr, 49,234 ha polygon near (-0.5, 116.0). Baseline cover 75% (>=60), JRC undisturbed → forest gate: intact, pass. Number computed. Permit-validity caveat in note.",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Kutai Intact Forest",
+    "iup_address": "Kalimantan Timur, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[115.90,-0.40],[116.10,-0.40],[116.10,-0.60],[115.90,-0.60],[115.90,-0.40]]]}"
+    }
+  },
+  "expected_forest_gate": {
+    "forest_condition": "intact",
+    "forest_gate_result": "pass",
+    "quantity_low_tco2e_not_null": true,
+    "eligibility_verdict": "eligible"
+  }
+}

@@ -34,7 +34,7 @@ _FORBIDDEN_PHRASES = [
 
 
 def _load(name: str) -> dict:
-    return json.loads((_FIXTURE_DIR / name).read_text())
+    return json.loads((_FIXTURE_DIR / name).read_text(encoding="utf-8"))
 
 
 def _make_input(d: dict) -> CarbonInput:
@@ -650,3 +650,254 @@ def test_mixed_stratum_areas_sum_to_boundary(fixture_name: str):
             f"Stratum areas {total_stratum:,.1f} ha don't sum to boundary {boundary.area_ha:,.1f} ha "
             f"(each hectare must be in exactly one stratum — ADR-0013)"
         )
+
+
+# ── WO-AUTOROUTE-005: peat overlay combos ────────────────────────────────────
+
+PEAT_OVERLAY_FIXTURES = [
+    "WO007_PEAT_Aonly.json",
+    "WO007_PEAT_Bonly.json",
+    "WO007_PEAT_neither.json",
+]
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_OVERLAY_FIXTURES)
+def test_peat_overlay_combo_no_tonnage(fixture_name: str):
+    """All peat overlay combos must produce no tonnage (ADR-0013)."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    exp = case["expected_peat_flag"]
+    assert estimate.quantity_low_tco2e is None, (
+        f"INVARIANT (ADR-0013): peat must have quantity_low=None for {fixture_name}"
+    )
+    assert estimate.quantity_high_tco2e is None
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_OVERLAY_FIXTURES)
+def test_peat_overlay_combo_status_matches(fixture_name: str):
+    """Each overlay combo produces the correct peat_additionality_status text."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    exp = case["expected_peat_flag"]
+
+    peat_strata = [s for s in estimate.classification.strata if s.soil_type == "peat"]
+    assert peat_strata, f"{fixture_name}: no peat stratum"
+    status = peat_strata[0].legal_overlay.peat_additionality_status
+    assert exp["peat_additionality_status_contains"].lower() in status.lower(), (
+        f"{fixture_name}: expected status to contain {exp['peat_additionality_status_contains']!r}, "
+        f"got {status!r}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_OVERLAY_FIXTURES)
+def test_peat_overlay_combo_overlays_independent(fixture_name: str):
+    """Each overlay combo stores A and B independently (not collapsed to one bool)."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    exp = case["expected_peat_flag"]
+
+    peat_strata = [s for s in estimate.classification.strata if s.soil_type == "peat"]
+    lor = peat_strata[0].legal_overlay
+    if exp["overlay_a_khg_intersects"] is not None:
+        assert lor.overlay_a_khg.intersects == exp["overlay_a_khg_intersects"], (
+            f"{fixture_name}: KHG expected {exp['overlay_a_khg_intersects']}, "
+            f"got {lor.overlay_a_khg.intersects}"
+        )
+    if exp["overlay_b_pippib_intersects"] is not None:
+        assert lor.overlay_b_pippib.intersects == exp["overlay_b_pippib_intersects"], (
+            f"{fixture_name}: PIPPIB expected {exp['overlay_b_pippib_intersects']}, "
+            f"got {lor.overlay_b_pippib.intersects}"
+        )
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_OVERLAY_FIXTURES)
+def test_peat_overlay_combo_never_hard_no(fixture_name: str):
+    """All peat combos must be 'flagged', never 'hard_no'."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    assert estimate.eligibility.verdict != "hard_no", (
+        f"INVARIANT (ADR-0013): peat must never be hard_no (got hard_no for {fixture_name})"
+    )
+    assert estimate.eligibility.verdict == "flagged"
+
+
+# ── WO-AUTOROUTE-005: forest gate variants ────────────────────────────────────
+
+FOREST_GATE_VARIANT_FIXTURES = [
+    "WO008_forest_intact.json",
+    "WO008_forest_heavy.json",
+]
+
+
+@pytest.mark.parametrize("fixture_name", FOREST_GATE_VARIANT_FIXTURES)
+def test_forest_gate_condition_and_result(fixture_name: str):
+    """Forest gate variants: condition and gate_result must match expectations."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    exp = case["expected_forest_gate"]
+
+    assert estimate.classification is not None
+    fg = estimate.classification.strata[0].forest_gate
+    assert fg is not None, f"{fixture_name}: no forest_gate on stratum"
+    assert fg.condition == exp["forest_condition"], (
+        f"{fixture_name}: expected condition={exp['forest_condition']!r}, got {fg.condition!r}"
+    )
+    assert fg.gate_result == exp["forest_gate_result"], (
+        f"{fixture_name}: expected gate_result={exp['forest_gate_result']!r}, got {fg.gate_result!r}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", FOREST_GATE_VARIANT_FIXTURES)
+def test_forest_gate_variant_has_number(fixture_name: str):
+    """Forest gate pass/flag variants (intact and heavy): number IS computed (gate not fail)."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    exp = case["expected_forest_gate"]
+
+    if exp.get("quantity_low_tco2e_not_null"):
+        assert estimate.quantity_low_tco2e is not None, (
+            f"{fixture_name}: expected quantity_low_tco2e to be computed (forest gate "
+            f"{exp['forest_gate_result']!r} does not block number)"
+        )
+        assert estimate.quantity_high_tco2e is not None
+        assert estimate.quantity_low_tco2e < estimate.quantity_high_tco2e
+
+
+@pytest.mark.parametrize("fixture_name", FOREST_GATE_VARIANT_FIXTURES)
+def test_forest_gate_variant_eligibility(fixture_name: str):
+    """Forest gate intact/heavy: eligibility verdict matches expected."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    exp = case["expected_forest_gate"]
+    assert estimate.eligibility.verdict == exp["eligibility_verdict"], (
+        f"{fixture_name}: expected verdict={exp['eligibility_verdict']!r}, "
+        f"got {estimate.eligibility.verdict!r}"
+    )
+
+
+# ── WO-AUTOROUTE-005: full invariant sweep across all REDD/IFM golden fixtures ─
+
+ALL_REDD_FIXTURES = [
+    "WO002_HTI_eligible.json",
+    "WO002_HA_eligible.json",
+    "WO002_HTI_flag_years.json",
+    "WO002_HTI_fail_area.json",
+    "WO002_HTI_flag_outside.json",
+    "WO005_HTI_cleared.json",
+    "WO008_forest_intact.json",
+    "WO008_forest_heavy.json",
+]
+
+ALL_PEAT_FIXTURES = [
+    "WO003_routing_PEAT.json",
+    "WO004_SMPP_peat_flag.json",
+    "WO007_PEAT_Aonly.json",
+    "WO007_PEAT_Bonly.json",
+    "WO007_PEAT_neither.json",
+]
+
+
+@pytest.mark.parametrize("fixture_name", ALL_PEAT_FIXTURES)
+def test_all_peat_no_forbidden_phrases(fixture_name: str):
+    """Invariant: no forbidden phrases in any peat estimate output."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    dump = estimate.model_dump_json()
+    for pattern in _FORBIDDEN_PHRASES:
+        assert not re.search(pattern, dump, re.IGNORECASE), (
+            f"INVARIANT VIOLATION (ADR-0009): forbidden phrase {pattern!r} in {fixture_name}"
+        )
+
+
+@pytest.mark.parametrize("fixture_name", ALL_REDD_FIXTURES)
+def test_all_redd_no_forbidden_phrases(fixture_name: str):
+    """Invariant: no forbidden phrases in any REDD/IFM estimate output."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    dump = estimate.model_dump_json()
+    for pattern in _FORBIDDEN_PHRASES:
+        assert not re.search(pattern, dump, re.IGNORECASE), (
+            f"INVARIANT VIOLATION (ADR-0009): forbidden phrase {pattern!r} in {fixture_name}"
+        )
+
+
+@pytest.mark.parametrize("fixture_name", ALL_REDD_FIXTURES + ALL_PEAT_FIXTURES)
+def test_all_fixtures_is_planned_and_additionality_correct(fixture_name: str):
+    """Invariant (ADR-0001): is_planned=True and additionality_basis='legal harvest right foregone'."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    assert estimate.methodology.is_planned is True, (
+        f"INVARIANT VIOLATION (ADR-0001): is_planned must be True for {fixture_name}"
+    )
+    assert estimate.methodology.additionality_basis == "legal harvest right foregone", (
+        f"INVARIANT VIOLATION (ADR-0001): additionality_basis wrong for {fixture_name}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", ALL_PEAT_FIXTURES)
+def test_all_peat_never_vm0027_vm0048_vm0007(fixture_name: str):
+    """Invariant (ADR-0012): no forbidden methodology names in any peat output."""
+    FORBIDDEN_METHODS = ["VM0027", "VM0048", "VM0007"]
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    for bad in FORBIDDEN_METHODS:
+        assert bad not in estimate.methodology.verra_family, (
+            f"INVARIANT VIOLATION (ADR-0012): {bad!r} must NEVER appear in verra_family "
+            f"(got {estimate.methodology.verra_family!r} for {fixture_name})"
+        )
+        for m in estimate.methodology.cited_methods:
+            assert bad not in m, (
+                f"INVARIANT VIOLATION (ADR-0001/0012): {bad!r} in cited_methods for {fixture_name}"
+            )
+
+
+@pytest.mark.parametrize("fixture_name", ALL_REDD_FIXTURES)
+def test_all_redd_never_vm0048_vm0007(fixture_name: str):
+    """Invariant (ADR-0001): VM0048 and VM0007 must never appear in REDD/IFM output."""
+    FORBIDDEN_METHODS = ["VM0048", "VM0007"]
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    for bad in FORBIDDEN_METHODS:
+        assert bad not in estimate.methodology.verra_family, (
+            f"INVARIANT VIOLATION (ADR-0001): {bad!r} in verra_family for {fixture_name}"
+        )
+        for m in estimate.methodology.cited_methods:
+            assert bad not in m, (
+                f"INVARIANT VIOLATION (ADR-0001): {bad!r} in cited_methods for {fixture_name}"
+            )
