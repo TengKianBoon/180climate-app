@@ -74,7 +74,7 @@ The ADR-0013 auto-routing feature adds four legal/methodological guardrails to t
 | SMPP deep dome (A + unknown B) | Guardrail 1: peat FLAG | No tonnage, data-unavail note | WO004_SMPP_peat_flag |
 | HTI on cleared land | Guardrail 2: forest gate fail | No tonnage, "no at-risk forest" | WO005_HTI_cleared |
 | HTI intact forest | Guardrail 2: forest gate pass | Number computed | WO008_forest_intact |
-| HTI heavy degradation | Guardrail 2: forest gate flag | Number computed, flagged | WO008_forest_heavy |
+| HTI heavy degradation | Guardrail 2: forest gate flag | Number computed (indicative), verdict flagged | WO008_forest_heavy |
 | Free text "other" → out-of-scope | Guardrail 3: classifier | Out-of-scope JSON + lead | (API test) |
 | Mixed peat+mineral | Guardrail 4: stratification | Peat: no tonnage; Mineral: range | WO006_mixed_concession |
 

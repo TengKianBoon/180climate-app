@@ -478,6 +478,16 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
             classification=classification,
         )
 
+    # Forest gate flag (heavy_degradation/light) — number computed but verdict forced to flagged
+    if forest_gate.gate_result == "flag" and eligibility.verdict not in ("hard_no", "flagged"):
+        eligibility = EligibilityResult(
+            gates=eligibility.gates,
+            verdict="flagged",
+            reasons=eligibility.reasons + [
+                f"forest gate flag: {forest_gate.note}"
+            ],
+        )
+
     # ── Non-peat REDD / IFM estimate (forest confirmed or data uncertain) ────
     low, high, unc = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
 
@@ -605,6 +615,14 @@ def run_mixed_stratification(
             f"Not registry-grade."
         )
     else:
+        if forest_gate.gate_result == "flag" and eligibility.verdict not in ("hard_no", "flagged"):
+            eligibility = EligibilityResult(
+                gates=eligibility.gates,
+                verdict="flagged",
+                reasons=eligibility.reasons + [
+                    f"forest gate flag: {forest_gate.note}"
+                ],
+            )
         mineral_low, mineral_high, unc_redd = _estimate_redd(
             mineral_area, project_years, forest, loss_rate, methodology
         )

@@ -1,5 +1,5 @@
 {
-  "description": "HTI REDD, 20yr, 49,220 ha polygon near (-1.5, 115.0). Baseline cover 30% (20-40%), JRC degraded → forest gate: heavy_degradation, flag. Number IS still computed (gate=flag, not fail). Eligible verdict despite forest flag (no eligibility gates fail).",
+  "description": "HTI REDD, 20yr, 49,220 ha polygon near (-1.5, 115.0). Baseline cover 30% (20-40%), JRC degraded → forest gate: heavy_degradation, flag. Number IS still computed (gate=flag, not fail) as indicative. Verdict forced to flagged by forest gate flag.",
   "input": {
     "contact": {"name": "Test User", "email": "test@example.com"},
     "iup_name": "PT Barito Heavy Degraded",
@@ -16,6 +16,6 @@
     "forest_condition": "heavy_degradation",
     "forest_gate_result": "flag",
     "quantity_low_tco2e_not_null": true,
-    "eligibility_verdict": "eligible"
+    "eligibility_verdict": "flagged"
   }
 }
