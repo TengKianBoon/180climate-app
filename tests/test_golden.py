@@ -425,3 +425,115 @@ def test_peat_overlays_independent(fixture_name: str):
     from core.contracts import OverlayIntersection
     assert isinstance(lor.overlay_a_khg, OverlayIntersection)
     assert isinstance(lor.overlay_b_pippib, OverlayIntersection)
+
+
+# ── WO-AUTOROUTE-003: forest-presence gate tests ──────────────────────────
+
+FOREST_GATE_FIXTURES = ["WO005_HTI_cleared.json"]
+
+
+@pytest.mark.parametrize("fixture_name", FOREST_GATE_FIXTURES)
+def test_forest_gate_fail_no_number(fixture_name: str):
+    """ADR-0013-auto-routing: cleared land must NEVER emit a tonnage — quantity_*=None."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.quantity_low_tco2e is None, (
+        f"INVARIANT VIOLATION (ADR-0013-auto-routing): cleared land must have "
+        f"quantity_low_tco2e=None (got {estimate.quantity_low_tco2e} for {fixture_name})"
+    )
+    assert estimate.quantity_high_tco2e is None, (
+        f"INVARIANT VIOLATION (ADR-0013-auto-routing): cleared land must have "
+        f"quantity_high_tco2e=None (got {estimate.quantity_high_tco2e} for {fixture_name})"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", FOREST_GATE_FIXTURES)
+def test_forest_gate_fail_flagged_not_hard_no(fixture_name: str):
+    """ADR-0013-auto-routing: cleared land → 'flagged', never 'hard_no' (restoration path may exist)."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.eligibility.verdict == "flagged", (
+        f"{fixture_name}: expected 'flagged' for cleared land, "
+        f"got {estimate.eligibility.verdict!r}"
+    )
+    assert estimate.eligibility.verdict != "hard_no", (
+        f"INVARIANT VIOLATION: cleared land must never be hard_no "
+        f"(reforestation pathway may exist). Got {estimate.eligibility.verdict!r}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", FOREST_GATE_FIXTURES)
+def test_forest_gate_condition_cleared(fixture_name: str):
+    """ADR-0013-auto-routing: classification must record forest_gate condition='cleared'."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.classification is not None, (
+        f"{fixture_name}: cleared case must have classification"
+    )
+    strata = estimate.classification.strata
+    assert len(strata) >= 1
+    fg = strata[0].forest_gate
+    assert fg is not None, f"{fixture_name}: stratum must have forest_gate"
+    assert fg.gate_result == "fail", (
+        f"{fixture_name}: expected gate_result='fail', got {fg.gate_result!r}"
+    )
+    assert fg.condition == "cleared", (
+        f"{fixture_name}: expected condition='cleared', got {fg.condition!r}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", FOREST_GATE_FIXTURES)
+def test_forest_gate_reason_in_eligibility(fixture_name: str):
+    """ADR-0013-auto-routing: forest gate fail reason must appear in eligibility reasons."""
+    case = _load(fixture_name)
+    exp = case["expected_forest_gate"]
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    reason_text = " ".join(estimate.eligibility.reasons).lower()
+    assert exp["forest_gate_reason_contains"].lower() in reason_text, (
+        f"{fixture_name}: expected reason to contain "
+        f"{exp['forest_gate_reason_contains']!r} in {estimate.eligibility.reasons}"
+    )
+
+
+def test_existing_hti_eligible_unchanged_after_forest_gate():
+    """Regression: forest gate pass must not change existing HTI eligible numbers."""
+    case = _load("WO002_HTI_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    # Forest gate should pass (baseline_cover=70.7%, JRC degraded → light_degradation)
+    assert estimate.classification is not None
+    fg = estimate.classification.strata[0].forest_gate
+    assert fg is not None
+    assert fg.gate_result == "pass", (
+        f"Forest gate should pass for existing HTI eligible fixture, got {fg.gate_result!r}. "
+        "This means the forest gate is incorrectly blocking the number."
+    )
+    # Numbers unchanged
+    exp = case["expected_range"]
+    assert estimate.quantity_low_tco2e == exp["quantity_low_tco2e"], (
+        f"REGRESSION: HTI eligible quantity_low changed after forest gate wiring. "
+        f"Expected {exp['quantity_low_tco2e']:,.0f}, got {estimate.quantity_low_tco2e:,.0f}"
+    )
+    assert estimate.quantity_high_tco2e == exp["quantity_high_tco2e"], (
+        f"REGRESSION: HTI eligible quantity_high changed after forest gate wiring. "
+        f"Expected {exp['quantity_high_tco2e']:,.0f}, got {estimate.quantity_high_tco2e:,.0f}"
+    )

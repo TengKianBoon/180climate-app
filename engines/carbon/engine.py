@@ -7,6 +7,10 @@ WO-CARBON-006 / ADR-0012: peat routing corrected — VM0027 removed (inactivated
 WO-AUTOROUTE-002 / ADR-0013: peat = FLAG never a tonnage. Two independent overlays
   (A=KHG fungsi-lindung PP57/2016, B=PIPPIB moratorium Inpres5/2019). Peat routes to
   peat_additionality_status flag; quantity_low/high_tco2e = None. Non-peat unchanged.
+WO-AUTOROUTE-003 / ADR-0013-auto-routing: forest-presence gate for non-peat REDD/IFM.
+  HTI on cleared/scrub land → gate_result=fail → flagged, no number.
+  Forest condition drives MethodologyRoute context (intact/light → pass; heavy → flag).
+  REDD+/IFM routing by permit type + condition remains: HTI→APD, HA→IFM.
 
 Determinism invariant: pure functions + typed models; NO LLM calls here.
 The only LLM call in the product is in narrative/.
@@ -24,10 +28,10 @@ from __future__ import annotations
 from core.contracts import (
     CarbonInput, CarbonEstimate, EligibilityResult, GateResult,
     MethodologyRoute, QualityFactors, CarbonGates,
-    LegalOverlayResult, ProjectClassification, Stratum,
+    ForestPresenceGate, LegalOverlayResult, ProjectClassification, Stratum,
 )
 from core.contracts import Boundary, ForestData
-from core.overlays import query_khg, query_pippib
+from core.overlays import query_khg, query_pippib, query_worldcover, query_jrc_tmf
 
 
 _GATES = CarbonGates()
@@ -276,6 +280,77 @@ def _evaluate_peat_overlays(boundary: Boundary) -> LegalOverlayResult:
     )
 
 
+def _evaluate_forest_gate(boundary: Boundary, forest: ForestData) -> ForestPresenceGate:
+    """Evaluate the forest-presence/condition gate (ADR-0013-auto-routing).
+
+    Uses Hansen baseline cover pct (from ForestData), JRC TMF disturbance history,
+    and ESA WorldCover land cover to determine whether standing at-risk forest exists.
+
+    gate_result:
+      pass — forest confirmed (intact or lightly degraded; REDD/IFM number may proceed)
+      flag — forest uncertain (heavily degraded or data insufficient; flag in classification)
+      fail — no at-risk forest confirmed (cleared/scrub land; blocks the number)
+
+    Conditions (evaluated top-down):
+      cleared:          baseline_cover_pct < 20, OR (JRC deforested AND WorldCover non-tree)
+      intact:           baseline_cover_pct >= 60 AND JRC undisturbed
+      light_degradation: baseline_cover_pct >= 40 AND JRC undisturbed/degraded/regrowth
+      heavy_degradation: baseline_cover_pct >= 20 (all other cases with data)
+      unknown:          data insufficient
+    """
+    wc = query_worldcover(boundary)
+    jrc = query_jrc_tmf(boundary)
+    cover_pct = forest.baseline_cover_pct
+
+    if cover_pct < 20 or (jrc.disturbance_class == "deforested" and not wc.is_tree_cover):
+        condition = "cleared"
+        gate_result = "fail"
+        note = (
+            f"No at-risk forest confirmed: Hansen baseline cover {cover_pct:.0f}% "
+            f"(threshold 20%); JRC TMF: {jrc.disturbance_class}; "
+            f"WorldCover: {wc.label}. "
+            "No REDD/IFM baseline can be asserted (ADR-0013-auto-routing)."
+        )
+    elif cover_pct >= 60 and jrc.disturbance_class == "undisturbed":
+        condition = "intact"
+        gate_result = "pass"
+        note = (
+            f"Forest confirmed intact: {cover_pct:.0f}% Hansen baseline cover; "
+            f"JRC TMF undisturbed ({jrc.tropical_forest_pct:.0f}% TMF). "
+            "Permit-validity caveat: Indonesian permits may overlap or face One-Map disputes "
+            "— advisor-confirm before any crediting claim."
+        )
+    elif cover_pct >= 40 and jrc.disturbance_class in ("undisturbed", "degraded", "regrowth"):
+        condition = "light_degradation"
+        gate_result = "pass"
+        note = (
+            f"Forest confirmed with light degradation: {cover_pct:.0f}% Hansen baseline cover; "
+            f"JRC TMF {jrc.disturbance_class}. "
+            "Permit-validity caveat: Indonesian permits may overlap or face One-Map disputes "
+            "— advisor-confirm before any crediting claim."
+        )
+    elif cover_pct >= 20:
+        condition = "heavy_degradation"
+        gate_result = "flag"
+        note = (
+            f"Forest condition uncertain: {cover_pct:.0f}% Hansen baseline cover; "
+            f"JRC TMF: {jrc.disturbance_class}. "
+            "Low baseline carbon risk — field verification recommended before any crediting claim."
+        )
+    else:
+        condition = "unknown"
+        gate_result = "flag"
+        note = "Forest presence data insufficient; field verification required."
+
+    return ForestPresenceGate(
+        forest_confirmed=(gate_result == "pass"),
+        canopy_cover_pct=cover_pct,
+        condition=condition,
+        gate_result=gate_result,
+        note=note,
+    )
+
+
 def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) -> CarbonEstimate:
     """Run the full carbon pre-feasibility engine.
 
@@ -352,9 +427,73 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
             classification=classification,
         )
 
-    # ── Non-peat REDD / IFM estimate ─────────────────────────────────────────
-    low, high, unc = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
+    # ── Forest-presence gate (ADR-0013-auto-routing) — non-peat REDD/IFM ────
+    forest_gate = _evaluate_forest_gate(boundary, forest)
     quality = _quality_factors(inp, methodology)
+
+    if forest_gate.gate_result == "fail" and eligibility.verdict != "hard_no":
+        # No at-risk forest confirmed — flag, no number (cleared/scrub land)
+        eligibility = EligibilityResult(
+            gates=eligibility.gates,
+            verdict="flagged",
+            reasons=eligibility.reasons + [
+                f"forest gate fail: {forest_gate.note}"
+            ],
+        )
+        mineral_stratum = Stratum(
+            stratum_id="mineral",
+            area_ha=effective_area,
+            soil_type="mineral",
+            methodology=methodology,
+            forest_gate=forest_gate,
+            eligibility_verdict="flagged",
+            eligibility_reasons=[forest_gate.note],
+        )
+        classification = ProjectClassification(
+            strata=[mineral_stratum],
+            dominant_soil="mineral",
+            auto_determined=True,
+            note=f"Forest gate fail — condition: {forest_gate.condition}",
+        )
+        unc = (
+            f"Forest gate fail — no at-risk forest confirmed (ADR-0013-auto-routing). "
+            f"Condition: {forest_gate.condition}. "
+            f"{forest_gate.note} "
+            f"Tier 1 baseline cannot be asserted without confirmed standing forest. "
+            "Not registry-grade. Full land survey required before any crediting claim."
+        )
+        return CarbonEstimate(
+            eligibility=eligibility,
+            methodology=methodology,
+            forest=forest,
+            quantity_low_tco2e=None,
+            quantity_high_tco2e=None,
+            uncertainty=unc,
+            quality=quality,
+            classification=classification,
+        )
+
+    # ── Non-peat REDD / IFM estimate (forest confirmed or data uncertain) ────
+    low, high, unc = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
+
+    # Attach forest gate to classification for all non-peat results
+    mineral_stratum = Stratum(
+        stratum_id="mineral",
+        area_ha=effective_area,
+        soil_type="mineral",
+        methodology=methodology,
+        forest_gate=forest_gate,
+        eligibility_verdict=eligibility.verdict,
+        eligibility_reasons=eligibility.reasons,
+        quantity_low_tco2e=low,
+        quantity_high_tco2e=high,
+    )
+    classification = ProjectClassification(
+        strata=[mineral_stratum],
+        dominant_soil="mineral",
+        auto_determined=True,
+        note=f"Forest condition: {forest_gate.condition} (gate: {forest_gate.gate_result})",
+    )
 
     return CarbonEstimate(
         eligibility=eligibility,
@@ -364,6 +503,7 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
         quantity_high_tco2e=high,
         uncertainty=unc,
         quality=quality,
+        classification=classification,
     )
 
 

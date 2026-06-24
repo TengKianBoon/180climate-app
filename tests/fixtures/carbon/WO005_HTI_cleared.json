@@ -1,0 +1,24 @@
+{
+  "description": "HTI, 20 yr, 24,132 ha polygon near (-1.0, 115.0) on cleared/scrub land — no standing forest confirmed (baseline cover 8%, JRC deforested 2017, WorldCover grassland) → forest gate fail → flagged, no number (ADR-0013-auto-routing)",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Lahan Terbuka",
+    "iup_address": "Kalimantan Tengah, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[114.93,-0.93],[115.07,-0.93],[115.07,-1.07],[114.93,-1.07],[114.93,-0.93]]]}"
+    }
+  },
+  "expected_forest_gate": {
+    "eligibility_verdict": "flagged",
+    "quantity_low_tco2e": null,
+    "quantity_high_tco2e": null,
+    "forest_gate_result": "fail",
+    "forest_condition": "cleared",
+    "never_hard_no": true,
+    "forest_gate_reason_contains": "no at-risk forest"
+  }
+}

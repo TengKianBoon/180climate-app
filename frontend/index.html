@@ -256,11 +256,12 @@
       <div class="form-row">
         <label>Project type <span class="opt">(optional)</span></label>
         <select id="project_type">
-          <option value="">— permit-driven (default) —</option>
+          <option value="">— auto-determined from land (default) —</option>
           <option value="REDD">REDD+ — Reduced Emissions from Deforestation</option>
+          <option value="IFM">IFM — Improved Forest Management</option>
           <option value="PEAT">PEAT — Avoided Peat Drainage / Subsidence</option>
         </select>
-        <div style="font-size:.74rem;color:#999;margin-top:.25rem">We'll confirm your project type from your land.</div>
+        <div style="font-size:.74rem;color:#999;margin-top:.25rem">We'll confirm project type and forest condition from your land data.</div>
       </div>
     </div>
 
@@ -533,9 +534,23 @@ function renderResult() {
   var methLabel = (ov.baseline_class === 'peat')
     ? 'no settled method'
     : (ov.verra_family || (_cache.permit_type === 'HTI' ? 'APD (VM0009)' : 'IFM (VM0045 / VM0010)'));
-  document.getElementById('tier-row').innerHTML =
-    '<span class="badge-pill pill-tier">IPCC Tier 1</span>'
+  var tierHtml = '<span class="badge-pill pill-tier">IPCC Tier 1</span>'
     + '<span class="badge-pill ' + methPillClass + '">' + methLabel + '</span>';
+  // Forest condition badge (WO-AUTOROUTE-003)
+  if (ov.forest_condition) {
+    var fgLabels = {
+      'intact': 'Forest: intact',
+      'light_degradation': 'Forest: lightly degraded',
+      'heavy_degradation': 'Forest: heavily degraded',
+      'cleared': 'Forest: cleared — no baseline',
+      'unknown': 'Forest: unknown',
+    };
+    var fgClass = (ov.forest_gate_result === 'pass') ? 'pill-meth'
+                : (ov.forest_gate_result === 'fail') ? 'pill-warn' : 'pill-warn';
+    tierHtml += '<span class="badge-pill ' + fgClass + '">'
+      + (fgLabels[ov.forest_condition] || ('Forest: ' + ov.forest_condition)) + '</span>';
+  }
+  document.getElementById('tier-row').innerHTML = tierHtml;
 
   // Summary / reasons for non-eligible
   var sumEl = document.getElementById('verdict-summary');

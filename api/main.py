@@ -65,6 +65,18 @@ def _geometry_summary(boundary) -> str:  # type: ignore[no-untyped-def]
     return f"Polygon boundary ({boundary.area_ha:,.0f} ha)"
 
 
+def _forest_gate_overlay(estimate) -> dict:  # type: ignore[no-untyped-def]
+    """Extract forest gate info for the loss_overlay dict (UI display)."""
+    if estimate.classification and estimate.classification.strata:
+        fg = estimate.classification.strata[0].forest_gate
+        if fg:
+            return {
+                "forest_condition": fg.condition,
+                "forest_gate_result": fg.gate_result,
+            }
+    return {}
+
+
 def _build_report_data(
     inp: CarbonInput,
     boundary,           # type: ignore[no-untyped-def]
@@ -179,7 +191,10 @@ def carbon(inp: CarbonInput) -> JSONResponse:
     narr_req = NarrativeRequest(
         engine="carbon",
         payload=estimate.model_dump(),
-        must_state=["legal harvest right foregone"],
+        must_state=[
+            "legal harvest right foregone",
+            "permit-validity: Indonesian permits may overlap or face One-Map disputes — advisor-confirm",
+        ],
     )
     narr = generate_narrative(narr_req)
 
@@ -210,6 +225,7 @@ def carbon(inp: CarbonInput) -> JSONResponse:
                 "baseline_class": estimate.methodology.baseline_class,
                 "verra_family": estimate.methodology.verra_family,
                 "additionality_basis": estimate.methodology.additionality_basis,
+                **_forest_gate_overlay(estimate),
             },
         ),
         narrative=narr.text,

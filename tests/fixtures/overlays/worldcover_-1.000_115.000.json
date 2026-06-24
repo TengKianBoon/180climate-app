@@ -1,0 +1,6 @@
+{
+  "land_class": 30,
+  "label": "Grassland",
+  "tree_cover_pct": 0.0,
+  "note": "CI stub: cleared / scrub-grassland — no standing tree cover (HTI-cleared test case)"
+}

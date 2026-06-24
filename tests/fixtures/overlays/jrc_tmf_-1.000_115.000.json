@@ -1,0 +1,6 @@
+{
+  "disturbance_class": "deforested",
+  "tropical_forest_pct": 5.0,
+  "deforestation_year": 2017,
+  "note": "CI stub: deforested land — historically TMF but cleared by 2017 (HTI-cleared test case)"
+}
