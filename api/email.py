@@ -3,10 +3,15 @@
 Reads SMTP credentials from environment variables:
   EMAIL_HOST     (default: unset → CI/dev fallback)
   EMAIL_PORT     (default: 587)
+  EMAIL_USE_SSL  (set to "true" for port-465 SMTP_SSL; default auto-detect by port)
   EMAIL_USER     (optional)
   EMAIL_PASSWORD (optional)
   EMAIL_FROM     (default: noreply@180climate.net)
   OUTBOX_DIR     (optional — CI test hook; overrides the outbox write path)
+
+SSL mode selection (Hostinger):
+  port 465 → smtplib.SMTP_SSL  (implicit TLS at connect — set EMAIL_USE_SSL=true or port=465)
+  port 587 → smtplib.SMTP + starttls()  (STARTTLS — default)
 
 If EMAIL_HOST is not set, falls back to writing the email to
   {OUTBOX_DIR}/outbox_emails.jsonl  (JSONL, one record per email)
@@ -94,6 +99,7 @@ def send_lead_email(
         return True
 
     port      = int(os.environ.get("EMAIL_PORT", "587"))
+    use_ssl   = os.environ.get("EMAIL_USE_SSL", "").lower() == "true" or port == 465
     user      = os.environ.get("EMAIL_USER", "")
     password  = os.environ.get("EMAIL_PASSWORD", "")
     from_addr = os.environ.get("EMAIL_FROM", "noreply@180climate.net")
@@ -118,12 +124,20 @@ def send_lead_email(
             )
             msg.attach(part)
 
-        with smtplib.SMTP(host, port) as server:
-            server.ehlo()
-            server.starttls()
-            if user and password:
-                server.login(user, password)
-            server.sendmail(from_addr, [_TO], msg.as_string())
+        if use_ssl:
+            # Port 465 — implicit TLS at connect (Hostinger SMTP_SSL)
+            with smtplib.SMTP_SSL(host, port) as server:
+                if user and password:
+                    server.login(user, password)
+                server.sendmail(from_addr, [_TO], msg.as_string())
+        else:
+            # Port 587 — STARTTLS
+            with smtplib.SMTP(host, port) as server:
+                server.ehlo()
+                server.starttls()
+                if user and password:
+                    server.login(user, password)
+                server.sendmail(from_addr, [_TO], msg.as_string())
         return True
     except Exception as exc:
         # Fallback: write failure record to outbox so no lead is silently lost
