@@ -15,8 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -29,6 +29,7 @@ from core.forest import query_forest_data
 from engines.carbon.engine import run_carbon_engine
 from narrative.narrator import generate_narrative
 from api.email import send_lead_email
+from reports.generator import generate_pdf, generate_docx, ReportData
 
 app = FastAPI(title="180Climate Pre-FS API", version="0.1.0-slice")
 
@@ -115,6 +116,9 @@ def carbon(inp: CarbonInput) -> JSONResponse:
                 "quantity_high_tco2e": estimate.quantity_high_tco2e if is_eligible else None,
                 "verdict": estimate.eligibility.verdict,
                 "area_ha": round(boundary.area_ha, 1),
+                "baseline_class": estimate.methodology.baseline_class,
+                "verra_family": estimate.methodology.verra_family,
+                "additionality_basis": estimate.methodology.additionality_basis,
             },
         ),
         narrative=narr.text,
@@ -160,3 +164,67 @@ def lead(req: LeadRequest) -> dict[str, Any]:
     status = "emailed" if ok else "failed"
     lead_obj.delivery_status = status  # type: ignore[assignment]
     return {"status": status, "timestamp": ts}
+
+
+# ── Report download ───────────────────────────────────────────────────────────
+
+_VERDICT_LABELS = {
+    "eligible": "Eligible — indicative carbon project opportunity identified",
+    "flagged":  "Flagged — review required before proceeding",
+    "hard_no":  "Not Eligible — does not meet minimum screening criteria",
+}
+
+
+@app.post("/api/report")
+def report(
+    inp: CarbonInput,
+    fmt: str = Query(default="pdf", pattern="^(pdf|docx)$"),
+) -> Response:
+    try:
+        boundary = parse_geo(inp.geo)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    forest   = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    is_eligible = estimate.eligibility.verdict == "eligible"
+    data = ReportData(
+        iup_name=inp.iup_name,
+        iup_address=inp.iup_address,
+        permit_type=inp.permit_type,
+        permit_years_remaining=inp.permit_years_remaining,
+        project_type=inp.project_type,
+        contact_name=inp.contact.name,
+        contact_email=inp.contact.email,
+        contact_mobile=inp.contact.mobile,
+        contact_company=inp.contact.company,
+        verdict=estimate.eligibility.verdict,
+        verdict_label=_VERDICT_LABELS.get(
+            estimate.eligibility.verdict, estimate.eligibility.verdict
+        ),
+        quantity_low_tco2e=estimate.quantity_low_tco2e if is_eligible else None,
+        quantity_high_tco2e=estimate.quantity_high_tco2e if is_eligible else None,
+        baseline_class=estimate.methodology.baseline_class,
+        verra_family=estimate.methodology.verra_family,
+        additionality_basis=estimate.methodology.additionality_basis,
+        uncertainty=estimate.uncertainty,
+        area_ha=boundary.area_ha,
+    )
+
+    fn_base = data.filename_base
+    if fmt == "pdf":
+        content = generate_pdf(data)
+        media   = "application/pdf"
+        fname   = f"{fn_base}.pdf"
+    else:
+        content = generate_docx(data)
+        media   = ("application/vnd.openxmlformats-officedocument"
+                   ".wordprocessingml.document")
+        fname   = f"{fn_base}.docx"
+
+    return Response(
+        content=content,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )

@@ -220,6 +220,10 @@
         </div>
       </div>
       <div class="form-row">
+        <label>Mobile (WhatsApp) <span class="req">*</span></label>
+        <input id="mobile" type="tel" placeholder="+62 811 ...">
+      </div>
+      <div class="form-row">
         <label>Company / organisation <span class="opt">(optional)</span></label>
         <input id="company" type="text" placeholder="Forestry Co.">
       </div>
@@ -250,11 +254,13 @@
         </div>
       </div>
       <div class="form-row">
-        <label>Project type <span class="req">*</span></label>
+        <label>Project type <span class="opt">(optional)</span></label>
         <select id="project_type">
+          <option value="">— permit-driven (default) —</option>
           <option value="REDD">REDD+ — Reduced Emissions from Deforestation</option>
           <option value="PEAT">PEAT — Avoided Peat Drainage / Subsidence</option>
         </select>
+        <div style="font-size:.74rem;color:#999;margin-top:.25rem">We'll confirm your project type from your land.</div>
       </div>
     </div>
 
@@ -335,6 +341,19 @@
       <div class="carrot-text" id="carrot-text"></div>
     </div>
 
+    <!-- Report downloads (eligible only) -->
+    <div class="card" id="report-dl-card" style="display:none">
+      <h2>Download your report</h2>
+      <p style="font-size:.88rem;color:#444;margin-bottom:.85rem">
+        Range + IPCC Tier 1 + methodology + additionality + "Engage 180Climate" CTA.
+      </p>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <button class="btn" onclick="downloadReport('pdf')">Download PDF</button>
+        <button class="btn btn-outline" onclick="downloadReport('docx')">Download DOCX</button>
+      </div>
+      <div id="dl-status" style="font-size:.8rem;color:#666;margin-top:.5rem"></div>
+    </div>
+
     <!-- Lead gate: full report -->
     <div class="card lead-gate">
       <h2>Get the detailed pre-feasibility report (PDF)</h2>
@@ -342,10 +361,6 @@
         Receive a PDF report covering eligibility analysis, methodology route, financial
         model indicators, and next steps tailored to your concession.
       </p>
-      <div class="form-row">
-        <label>Mobile <span class="opt">(optional)</span></label>
-        <input id="lead-mobile" type="tel" placeholder="+62 811 ...">
-      </div>
       <div id="lead-company-row" class="form-row" style="display:none">
         <label>Company <span class="opt">(optional)</span></label>
         <input id="lead-company" type="text" placeholder="Your company name">
@@ -433,23 +448,26 @@ async function submitCarbon() {
 
   try {
     var geo = buildGeo();
+    var rawProjectType = document.getElementById('project_type').value || 'REDD';
     _cache = {
       name:    document.getElementById('name').value.trim(),
       email:   document.getElementById('email').value.trim(),
+      mobile:  document.getElementById('mobile').value.trim(),
       company: document.getElementById('company').value.trim(),
       iup_name:   document.getElementById('iup_name').value.trim(),
       iup_address: document.getElementById('iup_address').value.trim() || 'Indonesia',
       permit_type: document.getElementById('permit_type').value,
       permit_years_remaining: parseInt(document.getElementById('permit_years').value, 10),
-      project_type: document.getElementById('project_type').value,
+      project_type: rawProjectType,
       geo: geo,
     };
     if (!_cache.name)     throw new Error('Name is required.');
     if (!_cache.email)    throw new Error('Email is required.');
+    if (!_cache.mobile)   throw new Error('Mobile (WhatsApp) is required.');
     if (!_cache.iup_name) throw new Error('Concession name is required.');
 
     var payload = {
-      contact: { name: _cache.name, email: _cache.email, company: _cache.company || null },
+      contact: { name: _cache.name, email: _cache.email, mobile: _cache.mobile || null, company: _cache.company || null },
       iup_name: _cache.iup_name,
       iup_address: _cache.iup_address,
       permit_type: _cache.permit_type,
@@ -510,13 +528,14 @@ function renderResult() {
     rangeLblEl.textContent = '';
   }
 
-  // Tier + methodology pills
-  var methLabel = _cache.permit_type === 'HTI'  ? 'APD (VM0009)'
-                : _cache.permit_type === 'HA'   ? 'IFM (VM0045 / VM0010)'
-                : 'PEAT — Tier 1';
+  // Tier + methodology pills — engine's MethodologyRoute, not client-side permit_type
+  var methPillClass = (ov.baseline_class === 'peat') ? 'pill-warn' : 'pill-meth';
+  var methLabel = (ov.baseline_class === 'peat')
+    ? 'no settled method'
+    : (ov.verra_family || (_cache.permit_type === 'HTI' ? 'APD (VM0009)' : 'IFM (VM0045 / VM0010)'));
   document.getElementById('tier-row').innerHTML =
     '<span class="badge-pill pill-tier">IPCC Tier 1</span>'
-    + '<span class="badge-pill pill-meth">' + methLabel + '</span>';
+    + '<span class="badge-pill ' + methPillClass + '">' + methLabel + '</span>';
 
   // Summary / reasons for non-eligible
   var sumEl = document.getElementById('verdict-summary');
@@ -589,6 +608,10 @@ function renderResult() {
   // Show company field in lead form if user didn't provide one
   document.getElementById('lead-company-row').style.display =
     _cache.company ? 'none' : 'block';
+
+  // Show report download card only for eligible
+  var dlCard = document.getElementById('report-dl-card');
+  if (dlCard) dlCard.style.display = (verdict === 'eligible') ? 'block' : 'none';
 }
 
 // ── Annual loss bar chart ──────────────────────────────────────────────────
@@ -630,6 +653,43 @@ function renderLossChart(data) {
   wrap.style.display = 'block';
 }
 
+// ── Download report ────────────────────────────────────────────────────────
+async function downloadReport(fmt) {
+  var dlStatus = document.getElementById('dl-status');
+  dlStatus.textContent = 'Generating ' + fmt.toUpperCase() + '…';
+  try {
+    var payload = {
+      contact: { name: _cache.name, email: _cache.email, mobile: _cache.mobile || null, company: _cache.company || null },
+      iup_name: _cache.iup_name,
+      iup_address: _cache.iup_address,
+      permit_type: _cache.permit_type,
+      permit_years_remaining: _cache.permit_years_remaining,
+      project_type: _cache.project_type,
+      geo: _cache.geo,
+    };
+    var res = await fetch('/api/report?fmt=' + fmt, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Report generation failed — please try again.');
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var cd = res.headers.get('content-disposition') || '';
+    var fnMatch = cd.match(/filename="([^"]+)"/);
+    a.download = fnMatch ? fnMatch[1] : ('report.' + fmt);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    dlStatus.textContent = '';
+  } catch(e) {
+    dlStatus.textContent = e.message;
+  }
+}
+
 // ── Submit lead (full report gate) ─────────────────────────────────────────
 async function submitLead() {
   var errEl = document.getElementById('lead-error');
@@ -643,7 +703,7 @@ async function submitLead() {
     var body = {
       name:    _cache.name,
       email:   _cache.email,
-      mobile:  document.getElementById('lead-mobile').value.trim(),
+      mobile:  _cache.mobile || '',
       company: company,
       iup_name:    _cache.iup_name,
       permit_type: _cache.permit_type,
