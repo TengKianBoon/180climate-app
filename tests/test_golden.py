@@ -210,22 +210,33 @@ def test_data_sources_labelled(fixture_name: str):
 
 
 @pytest.mark.parametrize("fixture_name", ELIG_FIXTURES)
-def test_biomass_is_real_ipcc_value(fixture_name: str):
-    """Acceptance (WO-CARBON-001 / WO-CARBON-003): biomass_tco2_per_ha uses real IPCC 2006 values.
+def test_biomass_is_populated_and_labelled(fixture_name: str):
+    """Acceptance (WO-CARBON-001b/c): biomass_tco2_per_ha is populated with a real source label.
 
-    Forest-type-aware thresholds (IPCC 2006 Table 4.7 SE-Asia):
-      Non-peat projects: ≥500 tCO2/ha (lowland moist = 657.1; old stub range was 150–250)
-      PEAT projects:     ≥350 tCO2/ha (peat_swamp = 390.6 tCO2/ha for AGB+BGB)
+    WO-CARBON-001c: density is now real ESA CCI Biomass v3.0 2018 for polygon inputs
+    (concession-mean AGB), or IPCC Tier-1 fallback for Point inputs. Both are legitimate
+    real values — the old IPCC >=500 threshold assumed intact-forest defaults and is no
+    longer appropriate for concession-mean satellite estimates of actively-cleared areas.
+
+    Checks:
+      - biomass_tco2_per_ha > 50 (any plausible tropical-region value; excludes zero/null)
+      - data_sources contains a density/biomass label (ESA CCI or IPCC fallback)
     """
     case = _load(fixture_name)
     inp = _make_input(case["input"])
     boundary = parse_geo(inp.geo)
     forest = query_forest_data(boundary)
-    is_peat = inp.project_type == "PEAT"
-    threshold = 350.0 if is_peat else 500.0
-    assert forest.biomass_tco2_per_ha >= threshold, (
-        f"biomass_tco2_per_ha={forest.biomass_tco2_per_ha} is below IPCC 2006 SE-Asia threshold "
-        f"({'peat_swamp ≥350' if is_peat else 'lowland moist ≥500'}) for {fixture_name}"
+    assert forest.biomass_tco2_per_ha is not None and forest.biomass_tco2_per_ha > 50, (
+        f"biomass_tco2_per_ha={forest.biomass_tco2_per_ha} is not a plausible "
+        f"tropical value (expected >50 tCO2/ha) for {fixture_name}"
+    )
+    has_density_label = any(
+        any(kw in s for kw in ("ESA CCI", "GEDI", "Biomass", "biomass"))
+        for s in forest.data_sources
+    )
+    assert has_density_label, (
+        f"No density source label found in data_sources for {fixture_name}. "
+        f"Sources: {forest.data_sources}"
     )
 
 

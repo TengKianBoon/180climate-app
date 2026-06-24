@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 2151261.0,
-    "quantity_high_tco2e": 3073230.0,
+    "quantity_low_tco2e": 872487.0,
+    "quantity_high_tco2e": 1246410.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "WO-CARBON-001b — re-frozen 2026-06-24 with real Hansen GFC-2022-v1.10 pixel loss data (stub replaced; methodology/framing unchanged). 3-yr crediting; same area+loss rate as HTI_eligible. Was: 717762–1025374 (stub proxy)."
+    "freeze_note": "WO-CARBON-001c — re-frozen 2026-06-24 with real ESA CCI Biomass v3.0 2018 density (266.5 tCO2/ha). 3-yr crediting; same area+density as HTI_eligible. Was: 2151261–3073230 (IPCC 657.1)."
   }
 }
