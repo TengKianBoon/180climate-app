@@ -1,6 +1,7 @@
-# GATE-AR READY — ADR-0013 Auto-Routing Build
+# GATE-AR SIGNED — ADR-0013 Auto-Routing Build
 
-**Date:** 2026-06-24  
+**Ready:** 2026-06-24 | **Signed:** 2026-06-24  
+**Signed by:** John (Gate-AR approved)  
 **Work Orders:** WO-AUTOROUTE-001 through WO-AUTOROUTE-005  
 **Builder:** Claude Sonnet 4.6 (Opus 4.8 for contract + peat/forest logic reviews)
 
@@ -30,9 +31,9 @@ The complete ADR-0013 auto-routing feature:
 - [x] Existing non-peat numbers unchanged
 - [x] Out-of-scope: leads captured + polite apology CTA
 
-## Sign-off required from
-- [ ] **John** — overall approve Gate-AR
-- [ ] **Methodology advisor** — confirm peat legal overlay logic + forest gate thresholds + routing correctness
+## Sign-off
+- [x] **John** — Gate-AR approved 2026-06-24
+- [ ] **Methodology advisor** — confirm peat legal overlay logic + forest gate thresholds + routing correctness (carry-forward to Gate L)
 
 ## Carry-forward before Gate L (go-live)
 1. Wire REAL KHG + SK PIPPIB shapefiles (overlays are fixtures only)
