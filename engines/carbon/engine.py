@@ -291,6 +291,18 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
     eligibility = run_eligibility(inp, boundary)
     methodology = build_methodology_route(inp)
 
+    # ADR-0013: peat parcels surface as "flagged" — never eligible for a headline number.
+    # run_eligibility() is project-type-blind (it checks permit/years/area/location gates);
+    # the peat override ensures downstream summary and report code never sees "eligible"+None.
+    if inp.project_type == "PEAT" and eligibility.verdict != "hard_no":
+        eligibility = EligibilityResult(
+            gates=eligibility.gates,
+            verdict="flagged",
+            reasons=eligibility.reasons + [
+                "peat: flag — no tonnage asserted (ADR-0013); manual methodological review required"
+            ],
+        )
+
     # ── Estimate ──────────────────────────────────────────────────────────────
     effective_area = boundary.area_ha if boundary.area_ha > 0 else 25_000.0
     project_years = min(inp.permit_years_remaining, _MAX_CREDITING_YR)

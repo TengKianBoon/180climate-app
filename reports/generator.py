@@ -201,7 +201,7 @@ def generate_pdf(data: ReportData) -> bytes:
 
     # ── Carbon estimate ───────────────────────────────────────────────────────
     story.append(Paragraph("Indicative Carbon Estimate", H2))
-    if data.verdict == "eligible":
+    if data.quantity_low_tco2e is not None:   # has range (non-peat eligible)
         story.append(Paragraph(data.range_str(), RANGE))
         story.append(Paragraph("Project lifetime · IPCC Tier 1 Screening", LABEL))
         story.append(Spacer(1, 4))
@@ -220,7 +220,7 @@ def generate_pdf(data: ReportData) -> bytes:
         story.append(Paragraph(_PEAT_FLAG_INTRO, BODY))
     else:
         story.append(Paragraph(
-            "Carbon estimate not shown — resolve eligibility issues before proceeding.",
+            "Carbon estimate not shown — resolve screening issues before proceeding.",
             BODY))
     story.append(hr())
 
@@ -365,7 +365,7 @@ def generate_docx(data: ReportData) -> bytes:
 
     # ── Carbon estimate ───────────────────────────────────────────────────────
     _h2("Indicative Carbon Estimate")
-    if data.verdict == "eligible":
+    if data.quantity_low_tco2e is not None:   # has range (non-peat eligible)
         p = doc.add_paragraph()
         run = p.add_run(data.range_str())
         run.font.size = Pt(18)
@@ -387,7 +387,7 @@ def generate_docx(data: ReportData) -> bytes:
     elif data.baseline_class == "peat":
         _body(_PEAT_FLAG_INTRO, italic=True)
     else:
-        _body("Carbon estimate not shown — resolve eligibility issues before proceeding.",
+        _body("Carbon estimate not shown — resolve screening issues before proceeding.",
               italic=True)
     _hr()
 

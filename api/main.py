@@ -71,7 +71,8 @@ def _build_report_data(
     estimate,           # type: ignore[no-untyped-def]
     filename_base: str | None = None,
 ) -> ReportData:
-    is_eligible = estimate.eligibility.verdict == "eligible"
+    # Use quantity presence as the range guard — peat has qty=None regardless of verdict
+    has_range = estimate.quantity_low_tco2e is not None
     return ReportData(
         iup_name=inp.iup_name,
         iup_address=inp.iup_address,
@@ -86,8 +87,8 @@ def _build_report_data(
         verdict_label=_VERDICT_LABELS.get(
             estimate.eligibility.verdict, estimate.eligibility.verdict
         ),
-        quantity_low_tco2e=estimate.quantity_low_tco2e if is_eligible else None,
-        quantity_high_tco2e=estimate.quantity_high_tco2e if is_eligible else None,
+        quantity_low_tco2e=estimate.quantity_low_tco2e if has_range else None,
+        quantity_high_tco2e=estimate.quantity_high_tco2e if has_range else None,
         baseline_class=estimate.methodology.baseline_class,
         verra_family=estimate.methodology.verra_family,
         additionality_basis=estimate.methodology.additionality_basis,
@@ -104,7 +105,6 @@ def _build_form_data(
     ts: str,
     payload_summary: str,
 ) -> dict:
-    is_eligible = estimate.eligibility.verdict == "eligible"
     return {
         "timestamp": ts,
         "name":    inp.contact.name,
@@ -119,8 +119,8 @@ def _build_form_data(
         "area_ha": round(boundary.area_ha, 1),
         "geometry_summary": _geometry_summary(boundary),
         "verdict": estimate.eligibility.verdict,
-        "quantity_low_tco2e": estimate.quantity_low_tco2e if is_eligible else None,
-        "quantity_high_tco2e": estimate.quantity_high_tco2e if is_eligible else None,
+        "quantity_low_tco2e": estimate.quantity_low_tco2e,   # None for peat (ADR-0013)
+        "quantity_high_tco2e": estimate.quantity_high_tco2e,
         "payload_summary": payload_summary,
     }
 
@@ -183,15 +183,15 @@ def carbon(inp: CarbonInput) -> JSONResponse:
     )
     narr = generate_narrative(narr_req)
 
-    is_eligible = estimate.eligibility.verdict == "eligible"
-    if is_eligible:
+    has_range = estimate.quantity_low_tco2e is not None
+    if has_range:
         summary = (
             f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
             f" (lifetime) · IPCC Tier 1 · {estimate.methodology.verra_family}"
         )
     else:
         reasons = "; ".join(estimate.eligibility.reasons)
-        summary = f"Eligibility issues: {reasons}"
+        summary = f"Screening issues: {reasons}"
 
     result = EngineResult(
         engine="carbon",
@@ -203,8 +203,8 @@ def carbon(inp: CarbonInput) -> JSONResponse:
             loss_overlay={
                 "type": "annual_loss_series",
                 "data": {str(y): v for y, v in forest.annual_loss_ha.items()},
-                "quantity_low_tco2e": estimate.quantity_low_tco2e if is_eligible else None,
-                "quantity_high_tco2e": estimate.quantity_high_tco2e if is_eligible else None,
+                "quantity_low_tco2e": estimate.quantity_low_tco2e if has_range else None,
+                "quantity_high_tco2e": estimate.quantity_high_tco2e if has_range else None,
                 "verdict": estimate.eligibility.verdict,
                 "area_ha": round(boundary.area_ha, 1),
                 "baseline_class": estimate.methodology.baseline_class,
@@ -283,13 +283,13 @@ def lead(req: LeadRequest) -> dict[str, Any]:
             forest   = query_forest_data(boundary)
             estimate = run_carbon_engine(carbon_inp, boundary, forest)
 
-            is_eligible = estimate.eligibility.verdict == "eligible"
+            has_range = estimate.quantity_low_tco2e is not None
             form_data.update({
                 "area_ha": round(boundary.area_ha, 1),
                 "geometry_summary": _geometry_summary(boundary),
                 "verdict": estimate.eligibility.verdict,
-                "quantity_low_tco2e": estimate.quantity_low_tco2e if is_eligible else None,
-                "quantity_high_tco2e": estimate.quantity_high_tco2e if is_eligible else None,
+                "quantity_low_tco2e": estimate.quantity_low_tco2e if has_range else None,
+                "quantity_high_tco2e": estimate.quantity_high_tco2e if has_range else None,
             })
 
             rdata = _build_report_data(carbon_inp, boundary, estimate, filename_base)
@@ -319,15 +319,15 @@ def report(
     filename_base = make_filename()
     rdata = _build_report_data(inp, boundary, estimate, filename_base)
 
-    is_eligible = estimate.eligibility.verdict == "eligible"
-    if is_eligible:
+    has_range = estimate.quantity_low_tco2e is not None
+    if has_range:
         summary = (
             f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
             f" (lifetime) · IPCC Tier 1 · {estimate.methodology.verra_family}"
         )
     else:
         reasons = "; ".join(estimate.eligibility.reasons)
-        summary = f"Eligibility issues: {reasons}"
+        summary = f"Screening issues: {reasons}"
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
     form_data = _build_form_data(inp, boundary, estimate, ts, summary)
