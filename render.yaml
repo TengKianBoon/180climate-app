@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: 180climate-app
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Overlay B — PIPPIB moratorium map snapshot (deploy-time, see docs/deploy-runbook.md §1)
+      - key: PIPPIB_SNAPSHOT_PATH
+        sync: false
+      # Email delivery — Hostinger SMTP (see docs/deploy-runbook.md §2)
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        sync: false
+      - key: EMAIL_USE_SSL
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Google Sheets — lead backup (see docs/deploy-runbook.md §3)
+      - key: GOOGLE_SHEETS_ID
+        sync: false
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false
+      # Anthropic API — free-text classifier, optional (see docs/deploy-runbook.md §4)
+      - key: ANTHROPIC_API_KEY
+        sync: false
