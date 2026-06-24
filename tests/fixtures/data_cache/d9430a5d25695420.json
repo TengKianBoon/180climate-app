@@ -27,10 +27,10 @@
   "loss_after_2020_ha": 1885.62,
   "data_sources": [
     "GFW/Hansen GFC-2022-v1.10 lossyear pixel read (tile 10N_110E, 30 m, public GCS, no auth)",
-    "Biomass: IPCC (2006) Guidelines for National GHG Inventories, Vol. 4 AFOLU, Table 4.7 — Southeast Asia tropical forest defaults — Tier-1 fallback (set DENSITY_COG_URL to enable ESA CCI / GEDI read)"
+    "ESA CCI Biomass v3.0 2018 (CEDA public, tile N10E110, 100 m; concession mean 155 tDM/ha -> 266 tCO2/ha)"
   ],
   "uncertainty_band": "Tier 1 indicative screening — Hansen GFC-2022-v1.10 pixel loss rate (30 m, tile 10N_110E); baseline harvest rate from IUP permit not yet verified — dominant uncertainty. Not registry-grade.",
   "peat_present": null,
   "peat_depth_proxy_m": null,
-  "biomass_tco2_per_ha": 657.1
+  "biomass_tco2_per_ha": 266.5
 }

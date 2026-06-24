@@ -288,12 +288,24 @@ def _estimate_redd(
     if net_low >= net_high:
         net_high = net_low + max(1.0, round(net_low * 0.1, 0))
 
+    # Dynamic density source label (ESA CCI if available, else IPCC Tier-1)
+    _esa_src = next(
+        (s for s in forest.data_sources if "ESA CCI" in s or "GEDI" in s),
+        None,
+    )
+    if _esa_src:
+        density_label = f"ESA CCI / satellite AGB ({carbon_density:.0f} tCO2/ha)"
+    else:
+        density_label = f"IPCC 2006 Table 4.7 SE-Asia Tier-1 default ({carbon_density:.0f} tCO2/ha)"
+
     unc = (
-        f"Tier 1 indicative screening — IPCC 2006 Table 4.7 SE-Asia default biomass "
-        f"({carbon_density:.0f} tCO2/ha); proxy loss rate {loss_rate*100:.2f}%/yr "
-        f"(8-yr satellite average); buffer {int(_BUFFER_LOW*100)}–{int(_BUFFER_HIGH*100)}%. "
-        f"Baseline (legally-permitted harvest rate) is the dominant uncertainty — "
-        f"actual IUP extraction allocation not yet verified from permit document. "
+        f"Tier 1 indicative screening — carbon density: {density_label}; "
+        f"Hansen GFC-2022-v1.10 pixel loss {loss_rate*100:.3f}%/yr "
+        f"({len([y for y in range(2016, 2024) if y in forest.annual_loss_ha])}-yr avg 2016-2022); "
+        f"buffer {int(_BUFFER_LOW*100)}-{int(_BUFFER_HIGH*100)}%. "
+        f"Baseline (legally-permitted harvest rate) and carbon density are co-dominant "
+        f"uncertainties — IUP extraction rate not yet verified from permit document; "
+        f"satellite AGB is a concession-mean estimate, not field-measured. "
         f"Not registry-grade. Confirm with full feasibility study before any crediting claim."
     )
     return net_low, net_high, unc
