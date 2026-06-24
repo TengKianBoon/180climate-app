@@ -1,34 +1,28 @@
-# INBOX — written by: Cowork (planner) · 2026-06-24 · WO-CARBON-003 dispatch
+# INBOX — Cowork (planner) · 2026-06-24 · WO-CARBON-008 (report + UI tweaks) — re-dispatched after git recovery
 
-## Cowork review of WO-CARBON-001 + 002: APPROVED ✓
-Data layer (IPCC 2006 Table 4.7, swappable adapter, offline cache) and golden suite
-(gates, routing, ADR-0009 lint, determinism, never VM0048/VM0007) reviewed — solid and
-defensible. Proceed.
+## Git discipline for the PRODUCTIZE phase (important)
+- Work **directly on `main`** — NO feature branches for WO-008/009 (avoids the merge/CRLF collision).
+- **First step:** `git add coordination/ && git commit` to absorb this dispatch, THEN do the work.
+- Commit + push each green step. NEVER stash coordination/. `.gitattributes` now enforces LF.
 
-## Answers to your 4 questions
-- **Q1 (peat biomass):** YES — when peat_present, use the peat_swamp AGB default for the
-  standing-biomass term. BUT peat's DOMINANT carbon is avoided drainage/subsidence
-  (peat-depth), NOT above-ground biomass (spec §7, ADR-0006). So WO-CARBON-004 must add a
-  peat-carbon term as the dominant component for peat projects — not just swap the AGB number.
-  Also make `test_biomass_is_real_ipcc_value` forest-type-aware (≥500 for lowland moist;
-  peat asserts its own value) so peat doesn't falsely fail the ≥500 check.
-- **Q2 (pixel read):** YES, defer Hansen pixel-read to WO-CARBON-001b. The carbon baseline is
-  the legally-permitted harvest rate (APD/IFM foregone), NOT satellite-observed loss, so the
-  proxy does not distort the carbon number. Keep the "proxy/offline" label honest. Schedule
-  001b BEFORE Gate M (real loss is needed for the forest-condition verdict) and before the EUDR phase.
-- **Q3 (PEAT golden case):** IN SCOPE for WO-CARBON-003 — add a PEAT routing fixture
-  (peat → VM0027 interim; additionality "legal harvest right foregone"; never VM0048/VM0007). Pin it now.
-- **Q4 (WO-003 scope):** HARDEN/EXTEND the existing engines/carbon/engine.py — do NOT rewrite.
-  It works and is tested; hardening avoids regression and saves Opus budget.
+## WO-CARBON-008 — Report (PDF + DOCX) + UI tweaks · Sonnet · on main
+### (A) Frontend tweaks (no contract change)
+- (i) Methodology pill + report read the route from the **engine's MethodologyRoute** (NOT client-side
+  permit_type) — verify a PEAT project shows "no settled method" (ADR-0012 consistency).
+- (ii) **Mobile (WhatsApp)** → move into "Your details", make it **COMPULSORY** (required like name+email;
+  label "Mobile (WhatsApp)"); carry into the lead email.
+- (iii) **Project type → OPTIONAL (remove the red star).** The app must NOT require/wait for it. When blank,
+  default to the permit-driven forest route (HTI→APD, HA→IFM; NOT peat) + a note: "We'll confirm your
+  project type from your land." Keep REDD+/PEAT selectable. (Frontend defaults when blank → no contract change.)
 
-## WO-CARBON-003 — Eligibility + methodology routing · OPUS (high-stakes)
-- Harden eligibility gates to spec §10 (HTI/HA · >5 yr · ≥20,000 ha · inside-IUP); keep golden cases green.
-- Routing: HTI→APD, HA→IFM, **Peat→VM0027 interim**; additionality "legal harvest right foregone";
-  is_planned=True for HTI/HA; never VM0048 family; never VM0007. Add the PEAT golden fixture.
-- Model: Opus + High effort. Opus white-box Reviewer + black-box Verifier. Retry 2 → QUESTIONS.
+### (B) Report (PDF + DOCX)
+- PDF (user) + DOCX (internal), same content, filename = YYMMDDHHMM shared base. Carry: range + band + IPCC
+  Tier + screening qualifier + "baseline is the dominant uncertainty" (ADR-0009); engine-sourced methodology +
+  additionality wording; brief non-binding disclaimer; ends with "Engage 180Climate" CTA (info@180climate.net).
+  No single number / no "%". Golden snapshot test.
 
-## Then WO-CARBON-004 — Avoided-emissions range + quality · OPUS
-- quantity_low/high (range, never single) + uncertainty band + IPCC Tier; QualityFactors;
-  **add the dominant peat-carbon term for peat projects** (per Q1). ADR-0009 enforced.
+### Then STOP for Cowork review. → WO-CARBON-009 (lead delivery → Gate P).
+Retry budget 2 → QUESTIONS. Regenerate board + commit + push each step.
 
-## STOP after 004 → write OUTBOX for Cowork review of the NUMBERS before narrative (005) + Gate M.
+## QUEUED (pre-launch, MANDATORY before Gate L; not now): ADR-0013 auto-routing + IFM + "describe your own"
+project-type option (intake classifier → in/out-of-scope triage); brand logo swap. See docs/pre-launch-backlog.md.
