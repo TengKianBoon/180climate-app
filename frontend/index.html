@@ -7,243 +7,465 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, sans-serif; background: #f8f9fa; color: #1a1a2e; }
-    header { background: #1a1a2e; color: #fff; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-    header h1 { font-size: 1.25rem; font-weight: 600; }
-    header span { opacity: .6; font-size: .85rem; }
-    .container { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
-    .card { background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;
-            box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-    h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #1a1a2e; }
-    label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: .25rem; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; line-height: 1.5; }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+    header {
+      background: #1a1a2e; color: #fff; padding: .85rem 2rem;
+      display: flex; align-items: center; gap: .75rem;
+      position: sticky; top: 0; z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35);
+    }
+    .logo { font-size: 1.5rem; font-weight: 900; color: #52b788; letter-spacing: -1px; }
+    .header-name { font-size: 1.05rem; font-weight: 700; }
+    .header-tag {
+      margin-left: auto; font-size: .78rem; opacity: .5;
+      display: none;
+    }
+    @media(min-width:580px) { .header-tag { display: block; } }
+
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    .container { max-width: 920px; margin: 2rem auto; padding: 0 1rem; }
+
+    /* ── Cards ───────────────────────────────────────────────────────────── */
+    .card {
+      background: #fff; border-radius: 10px; padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.04);
+    }
+    .card h2 {
+      font-size: .95rem; font-weight: 700; margin-bottom: 1rem; color: #1a1a2e;
+      padding-bottom: .5rem; border-bottom: 1px solid #f0f0f0;
+    }
+
+    /* ── Form elements ───────────────────────────────────────────────────── */
+    .form-row { margin-bottom: .85rem; }
+    label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: .25rem; color: #444; }
+    .req { color: #c53030; }
+    .opt { color: #999; font-weight: 400; }
     input, select, textarea {
-      width: 100%; padding: .5rem .75rem; border: 1px solid #ddd; border-radius: 6px;
-      font-size: .9rem; margin-bottom: .75rem; background: #fafafa;
+      width: 100%; padding: .5rem .75rem; border: 1.5px solid #ddd; border-radius: 6px;
+      font-size: .9rem; background: #fafafa; transition: border-color .15s; color: #1a1a2e;
     }
-    textarea { resize: vertical; min-height: 80px; }
-    button {
-      background: #2d6a4f; color: #fff; border: none; padding: .65rem 1.5rem;
-      border-radius: 6px; font-size: .9rem; cursor: pointer; font-weight: 600;
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: #2d6a4f; background: #fff;
     }
-    button:hover { background: #1b4332; }
-    button:disabled { background: #aaa; cursor: not-allowed; }
-    #map { height: 380px; border-radius: 6px; margin-bottom: 1rem; }
-    .verdict-badge {
-      display: inline-block; padding: .3rem .8rem; border-radius: 20px;
-      font-size: .85rem; font-weight: 600; margin-bottom: .75rem;
+    textarea { resize: vertical; min-height: 80px; font-family: monospace; font-size: .82rem; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media(max-width:560px) { .grid2 { grid-template-columns: 1fr; } }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────── */
+    .btn {
+      background: #2d6a4f; color: #fff; border: none; padding: .7rem 1.75rem;
+      border-radius: 6px; font-size: .9rem; cursor: pointer; font-weight: 700;
+      transition: background .15s; display: inline-block;
     }
-    .badge-eligible { background: #d8f3dc; color: #1b4332; }
-    .badge-flagged  { background: #fff3cd; color: #856404; }
-    .badge-hard_no  { background: #f8d7da; color: #842029; }
-    .estimate-range { font-size: 1.6rem; font-weight: 700; color: #2d6a4f; margin: .5rem 0; }
-    .disclaimer { font-size: .78rem; color: #888; margin-top: .5rem; font-style: italic; }
-    .narrative { font-size: .88rem; line-height: 1.6; white-space: pre-wrap; color: #333; }
-    .carrot { background: #edf7f0; border-left: 4px solid #2d6a4f;
-              padding: .75rem 1rem; border-radius: 0 6px 6px 0; font-size: .88rem; }
-    .data-sources { font-size: .75rem; color: #999; margin-top: .5rem; }
-    .step { display: none; }
-    .step.active { display: block; }
-    .error-msg { color: #842029; background: #f8d7da; padding: .5rem .75rem;
-                 border-radius: 6px; font-size: .85rem; margin-top: .5rem; }
-    .success-msg { color: #1b4332; background: #d8f3dc; padding: .5rem .75rem;
-                   border-radius: 6px; font-size: .85rem; margin-top: .5rem; }
-    .tabs { display: flex; gap: .5rem; margin-bottom: .75rem; }
-    .tab { padding: .4rem .9rem; border: 1px solid #ddd; border-radius: 6px;
-           cursor: pointer; font-size: .85rem; background: #f0f0f0; }
+    .btn:hover { background: #1b4332; }
+    .btn:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-outline {
+      background: transparent; color: #2d6a4f;
+      border: 2px solid #2d6a4f; padding: .4rem .9rem; font-size: .82rem;
+    }
+    .btn-outline:hover { background: #edf7f0; }
+    .btn-full { width: 100%; text-align: center; }
+
+    /* ── Tabs ────────────────────────────────────────────────────────────── */
+    .tabs { display: flex; gap: .4rem; margin-bottom: .75rem; }
+    .tab {
+      padding: .3rem .8rem; border: 1.5px solid #ddd; border-radius: 20px;
+      cursor: pointer; font-size: .78rem; font-weight: 600; background: #f0f0f0;
+      transition: all .15s;
+    }
     .tab.active { background: #2d6a4f; color: #fff; border-color: #2d6a4f; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+
+    /* ── Steps ───────────────────────────────────────────────────────────── */
+    .step { display: none; }
+    .step.active { display: block; }
+
+    /* ── Error / success ─────────────────────────────────────────────────── */
+    .error-msg {
+      color: #7f1d1d; background: #fef2f2; border: 1px solid #fca5a5;
+      padding: .55rem .85rem; border-radius: 6px; font-size: .84rem; margin-top: .5rem;
+    }
+    .success-msg {
+      color: #1b4332; background: #d8f3dc; border: 1px solid #52b788;
+      padding: .55rem .85rem; border-radius: 6px; font-size: .84rem;
+    }
+
+    /* ── Verdict card ────────────────────────────────────────────────────── */
+    .verdict-card {
+      border-radius: 10px; padding: 1.5rem; margin-bottom: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.04);
+    }
+    .verdict-eligible { background: linear-gradient(135deg,#e8f5e9,#c8e6c9); border: 1px solid #a5d6a7; }
+    .verdict-flagged  { background: linear-gradient(135deg,#fffde7,#fff9c4); border: 1px solid #fff176; }
+    .verdict-hard_no  { background: linear-gradient(135deg,#fce4ec,#f8bbd0); border: 1px solid #f48fb1; }
+
+    .verdict-badge {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .35rem .95rem; border-radius: 20px;
+      font-size: .82rem; font-weight: 700; margin-bottom: .75rem;
+    }
+    .badge-eligible { background: #1b4332; color: #fff; }
+    .badge-flagged  { background: #78350f; color: #fff; }
+    .badge-hard_no  { background: #7f1d1d; color: #fff; }
+
+    .range-display {
+      font-size: 2.1rem; font-weight: 800; color: #1b4332;
+      letter-spacing: -1px; line-height: 1.1; margin: .4rem 0;
+    }
+    .range-unit { font-size: 1rem; font-weight: 600; }
+    .range-label { font-size: .82rem; color: #4a7c59; margin-bottom: .6rem; }
+
+    .badge-pill {
+      display: inline-block; padding: .2rem .6rem; border-radius: 4px;
+      font-size: .7rem; font-weight: 700; letter-spacing: .4px; margin-right: .35rem;
+    }
+    .pill-tier { background: #1a1a2e; color: #52b788; }
+    .pill-meth { background: #e8f5e9; color: #1b4332; }
+    .pill-warn { background: #78350f; color: #fff; }
+
+    .verdict-disclaimer {
+      font-size: .71rem; color: #666; margin-top: .8rem;
+      padding-top: .75rem; border-top: 1px solid rgba(0,0,0,.1); font-style: italic;
+    }
+    .verdict-summary {
+      font-size: .86rem; color: #444; margin: .4rem 0;
+    }
+
+    /* ── Map ─────────────────────────────────────────────────────────────── */
+    .map-card { padding: 0; overflow: hidden; border-radius: 10px; margin-bottom: 1.25rem;
+                box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.04); }
+    #map { height: 360px; }
+
+    /* ── Annual loss chart ───────────────────────────────────────────────── */
+    .loss-wrap { padding: .85rem 1.25rem 1.1rem; border-top: 1px solid #f0f0f0; }
+    .loss-title { font-size: .78rem; font-weight: 700; color: #555; margin-bottom: .5rem; }
+    .loss-chart { font-size: .69rem; }
+    .loss-row {
+      display: grid; grid-template-columns: 2.8rem 1fr 5.5rem;
+      gap: .25rem; align-items: center; margin-bottom: .22rem;
+    }
+    .loss-year { color: #888; text-align: right; font-variant-numeric: tabular-nums; }
+    .loss-bar-bg { background: #ebebeb; border-radius: 2px; height: 9px; overflow: hidden; }
+    .loss-bar { background: #ffab91; height: 100%; border-radius: 2px; }
+    .loss-bar.win { background: #e53935; }
+    .loss-val { color: #444; font-variant-numeric: tabular-nums; }
+    .loss-note { font-size: .67rem; color: #aaa; margin-top: .4rem; }
+
+    /* ── Narrative ───────────────────────────────────────────────────────── */
+    .narrative { font-size: .86rem; line-height: 1.7; color: #333; }
+    .narrative strong { color: #1a1a2e; }
+    .narrative hr { border: none; border-top: 1px solid #eee; margin: .85rem 0; }
+    .sources { font-size: .71rem; color: #aaa; margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #f0f0f0; }
+
+    /* ── Carrot ──────────────────────────────────────────────────────────── */
+    .carrot-card {
+      background: linear-gradient(135deg,#e8f5e9,#c8e6c9);
+      border: 1px solid #a5d6a7; border-radius: 10px;
+      padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .carrot-card .carrot-text { font-size: .88rem; color: #1b4332; line-height: 1.65; }
+
+    /* ── Lead gate ───────────────────────────────────────────────────────── */
+    .lead-gate { border: 2px solid #2d6a4f; }
+    .lead-gate h2 { color: #2d6a4f; border-bottom-color: #e8f5e9; }
+    .lead-gate .btn { width: 100%; text-align: center; margin-top: .35rem; }
+
+    /* ── Done step ───────────────────────────────────────────────────────── */
+    .done-card { text-align: center; padding: 2.5rem 1.5rem; }
+    .done-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .done-card h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: .5rem; border: none; }
+    .done-sub { color: #555; font-size: .9rem; margin-bottom: 1.25rem; }
+    .done-contact {
+      background: #e8f5e9; border-radius: 8px;
+      padding: 1rem 1.25rem; font-size: .88rem; color: #1b4332; line-height: 1.7;
+    }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>180Climate</h1>
-  <span>Carbon Pre-Feasibility Screening <strong>[PLACEHOLDER SLICE — WO-001]</strong></span>
+  <div class="logo">180°</div>
+  <div class="header-name">180Climate</div>
+  <span class="header-tag">Carbon Pre-Feasibility Screening</span>
 </header>
 
 <div class="container">
 
-  <!-- Step 1: Input form -->
+  <!-- ══ Step 1: Input ══════════════════════════════════════════════════════ -->
   <div id="step-form" class="step active">
+
+    <div style="text-align:center;margin:1.5rem 0 1.25rem">
+      <h2 style="font-size:1.45rem;font-weight:800;color:#1a1a2e">Carbon Pre-Feasibility Screening</h2>
+      <p style="color:#666;font-size:.88rem;margin-top:.35rem">
+        Free &middot; Indicative &middot; IPCC Tier 1 &middot; Not registry-grade
+      </p>
+    </div>
+
+    <!-- Light capture: contact -->
     <div class="card">
-      <h2>Step 1 — Concession details</h2>
+      <h2>Your details <span style="font-size:.75rem;font-weight:400;color:#999">— to see your result</span></h2>
+      <div class="grid2">
+        <div class="form-row">
+          <label>Name <span class="req">*</span></label>
+          <input id="name" type="text" placeholder="Jane Smith">
+        </div>
+        <div class="form-row">
+          <label>Email <span class="req">*</span></label>
+          <input id="email" type="email" placeholder="jane@example.com">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Company / organisation <span class="opt">(optional)</span></label>
+        <input id="company" type="text" placeholder="Forestry Co.">
+      </div>
+    </div>
 
-      <label>Your name *</label>
-      <input id="name" type="text" placeholder="Jane Smith" required>
+    <!-- Concession details -->
+    <div class="card">
+      <h2>Concession details</h2>
+      <div class="form-row">
+        <label>Concession / IUP name <span class="req">*</span></label>
+        <input id="iup_name" type="text" placeholder="PT Hutan Lestari">
+      </div>
+      <div class="form-row">
+        <label>IUP address / region <span class="opt">(optional)</span></label>
+        <input id="iup_address" type="text" placeholder="Kalimantan Tengah, Indonesia">
+      </div>
+      <div class="grid2">
+        <div class="form-row">
+          <label>Permit type <span class="req">*</span></label>
+          <select id="permit_type">
+            <option value="HTI">HTI — Timber Plantation (clear-fell)</option>
+            <option value="HA">HA — Natural Forest / Selective Logging</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Permit years remaining <span class="req">*</span></label>
+          <input id="permit_years" type="number" min="0" max="99" value="20">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Project type <span class="req">*</span></label>
+        <select id="project_type">
+          <option value="REDD">REDD+ — Reduced Emissions from Deforestation</option>
+          <option value="PEAT">PEAT — Avoided Peat Drainage / Subsidence</option>
+        </select>
+      </div>
+    </div>
 
-      <label>Your email *</label>
-      <input id="email" type="email" placeholder="jane@example.com" required>
-
-      <label>Company / organisation</label>
-      <input id="company" type="text" placeholder="Forestry Co.">
-
-      <label>Concession / IUP name *</label>
-      <input id="iup_name" type="text" placeholder="PT Hutan Lestari" required>
-
-      <label>IUP address / region</label>
-      <input id="iup_address" type="text" placeholder="Kalimantan Tengah">
-
-      <label>Permit type *</label>
-      <select id="permit_type">
-        <option value="HTI">HTI — Industrial Timber Plantation (clear-fell right)</option>
-        <option value="HA">HA — Natural Forest / Selective Logging right</option>
-      </select>
-
-      <label>Permit years remaining *</label>
-      <input id="permit_years" type="number" min="0" max="99" value="20">
-
-      <label>Project type *</label>
-      <select id="project_type">
-        <option value="REDD">REDD+ (Reduced Emissions from Deforestation)</option>
-        <option value="PEAT">PEAT (Avoided peat drainage/subsidence)</option>
-      </select>
-
-      <label>Concession location</label>
+    <!-- Location -->
+    <div class="card">
+      <h2>Concession location</h2>
       <div class="tabs">
         <div class="tab active" onclick="switchTab('coords')">Coordinates</div>
         <div class="tab" onclick="switchTab('geojson')">GeoJSON polygon</div>
       </div>
       <div id="tab-coords" class="tab-content active">
-        <input id="coords" type="text" placeholder="e.g. -0.5,117.5 (lat,lng)">
-        <div style="font-size:.78rem;color:#888">Single point: enter lat,lng. Full polygon: paste GeoJSON in the other tab.</div>
+        <div class="form-row">
+          <input id="coords" type="text" placeholder="lat, lng — e.g. 0.9, 117.15">
+          <div style="font-size:.74rem;color:#999;margin-top:.25rem">
+            Single centroid point (lat, lon). For a polygon boundary use the GeoJSON tab.
+          </div>
+        </div>
       </div>
       <div id="tab-geojson" class="tab-content">
-        <textarea id="geojson_payload" placeholder='{"type":"Polygon","coordinates":[[[117,0],[118,0],[118,-1],[117,-1],[117,0]]]}' rows="5"></textarea>
+        <div class="form-row">
+          <textarea id="geojson_payload"
+            placeholder='{"type":"Polygon","coordinates":[[[117,1],[117.3,1],[117.3,0.8],[117,0.8],[117,1]]]}' rows="5"></textarea>
+          <div style="font-size:.74rem;color:#999;margin-top:.25rem">
+            Paste a GeoJSON Polygon. Coordinates in [longitude, latitude] order (WGS-84).
+          </div>
+        </div>
       </div>
 
       <div id="form-error" class="error-msg" style="display:none"></div>
-      <br>
-      <button id="btn-submit" onclick="submitCarbon()">Screen this concession →</button>
-    </div>
-  </div>
-
-  <!-- Step 2: Results -->
-  <div id="step-result" class="step">
-    <div class="card">
-      <h2>Carbon Pre-Feasibility Result</h2>
-      <div id="verdict-badge" class="verdict-badge"></div>
-      <div class="estimate-range" id="estimate-range"></div>
-      <div class="disclaimer" id="disclaimer-text"></div>
-    </div>
-
-    <div class="card" style="padding:0;overflow:hidden">
-      <div id="map"></div>
-    </div>
-
-    <div class="card">
-      <h2>Indicative Narrative</h2>
-      <div class="narrative" id="narrative-text"></div>
-      <div class="data-sources" id="data-sources"></div>
-    </div>
-
-    <div class="card carrot" id="carrot-text"></div>
-
-    <div class="card">
-      <h2>Get the full report</h2>
-      <p style="font-size:.88rem;margin-bottom:1rem">
-        Fill in your details to receive the full pre-feasibility report — PDF download
-        with detailed methodology notes, financial model indicators, and next steps.
-      </p>
-
-      <label>Mobile (optional)</label>
-      <input id="lead-mobile" type="tel" placeholder="+62 ...">
-
-      <div id="lead-error" class="error-msg" style="display:none"></div>
-      <button id="btn-lead" onclick="submitLead()">Send me the full report →</button>
-    </div>
-  </div>
-
-  <!-- Step 3: Confirmation -->
-  <div id="step-done" class="step">
-    <div class="card">
-      <div class="success-msg" style="font-size:1rem;padding:1rem">
-        ✓ Thank you. The 180Climate team has your details and will be in touch.
-        Your full report will be sent to <strong id="confirm-email"></strong>.
+      <div style="margin-top:.75rem">
+        <button class="btn" id="btn-submit" onclick="submitCarbon()">Screen this concession →</button>
       </div>
-      <br>
-      <p class="carrot" style="margin-top:.75rem">
-        Want to speak to someone now? Email <strong>info@180climate.net</strong> or
-        visit <strong>www.180climate.net</strong>.
+    </div>
+
+    <p style="font-size:.71rem;color:#bbb;text-align:center;margin-top:-.5rem;margin-bottom:1.5rem">
+      By submitting you agree to 180Climate using your details to follow up on this screening.
+    </p>
+
+  </div><!-- /step-form -->
+
+  <!-- ══ Step 2: Results ════════════════════════════════════════════════════ -->
+  <div id="step-result" class="step">
+
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <button class="btn btn-outline" onclick="showStep('step-form')">← New screening</button>
+      <span style="font-size:.88rem;color:#666;font-weight:600" id="result-title"></span>
+    </div>
+
+    <!-- Verdict + Range -->
+    <div id="verdict-card" class="verdict-card verdict-eligible">
+      <div id="verdict-badge" class="verdict-badge badge-eligible"></div>
+      <div id="range-display" class="range-display"></div>
+      <div id="range-label" class="range-label"></div>
+      <div id="tier-row" style="margin:.35rem 0"></div>
+      <div id="verdict-summary" class="verdict-summary" style="display:none"></div>
+      <div class="verdict-disclaimer" id="disclaimer-text"></div>
+    </div>
+
+    <!-- Map + annual loss chart -->
+    <div class="card map-card">
+      <div id="map"></div>
+      <div class="loss-wrap" id="loss-wrap" style="display:none">
+        <div class="loss-title">Annual forest loss — Hansen GFC-2022-v1.10</div>
+        <div class="loss-chart" id="loss-chart"></div>
+        <div class="loss-note" id="loss-note"></div>
+      </div>
+    </div>
+
+    <!-- Narrative -->
+    <div class="card">
+      <h2>Indicative Assessment</h2>
+      <div class="narrative" id="narrative-text"></div>
+      <div class="sources" id="data-sources"></div>
+    </div>
+
+    <!-- Carrot CTA -->
+    <div class="carrot-card">
+      <div class="carrot-text" id="carrot-text"></div>
+    </div>
+
+    <!-- Lead gate: full report -->
+    <div class="card lead-gate">
+      <h2>Get the detailed pre-feasibility report (PDF)</h2>
+      <p style="font-size:.88rem;color:#444;margin-bottom:1rem">
+        Receive a PDF report covering eligibility analysis, methodology route, financial
+        model indicators, and next steps tailored to your concession.
       </p>
+      <div class="form-row">
+        <label>Mobile <span class="opt">(optional)</span></label>
+        <input id="lead-mobile" type="tel" placeholder="+62 811 ...">
+      </div>
+      <div id="lead-company-row" class="form-row" style="display:none">
+        <label>Company <span class="opt">(optional)</span></label>
+        <input id="lead-company" type="text" placeholder="Your company name">
+      </div>
+      <div id="lead-error" class="error-msg" style="display:none"></div>
+      <button class="btn btn-full" id="btn-lead" onclick="submitLead()">Send me the full report →</button>
+    </div>
+
+  </div><!-- /step-result -->
+
+  <!-- ══ Step 3: Confirmation ═══════════════════════════════════════════════ -->
+  <div id="step-done" class="step">
+    <div class="card done-card">
+      <div class="done-icon">&#x2705;</div>
+      <h2>Thank you!</h2>
+      <p class="done-sub">
+        Your screening result and report request have been sent to<br>
+        <strong id="confirm-email"></strong>
+      </p>
+      <div class="done-contact">
+        The 180Climate team will be in touch shortly.<br><br>
+        Want to speak to someone now?<br>
+        Email <strong>info@180climate.net</strong> &nbsp;&middot;&nbsp; <strong>www.180climate.net</strong>
+      </div>
     </div>
   </div>
 
-</div>
+</div><!-- /container -->
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-let _map = null;
-let _result = null;
-let _inputCache = {};
-let _geoTab = 'coords';
+// ── State ──────────────────────────────────────────────────────────────────
+var _map = null;
+var _result = null;
+var _cache = {};   // input form cache
+var _geoTab = 'coords';
 
+// ── UI helpers ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
   _geoTab = tab;
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase().includes(tab)));
+  document.querySelectorAll('.tab').forEach(function(t) {
+    t.classList.toggle('active', t.textContent.toLowerCase().includes(tab));
+  });
   document.getElementById('tab-coords').classList.toggle('active', tab === 'coords');
   document.getElementById('tab-geojson').classList.toggle('active', tab === 'geojson');
 }
 
 function showStep(id) {
-  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.step').forEach(function(s) { s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function fmtN(n) { return n.toLocaleString('en', { maximumFractionDigits: 0 }); }
+
+// Simple markdown: **bold**, ---, newlines
+function md(text) {
+  return (text || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^---$/gm,'<hr>')
+    .replace(/\n/g,'<br>');
+}
+
+// ── Geo input ──────────────────────────────────────────────────────────────
 function buildGeo() {
   if (_geoTab === 'coords') {
-    const v = document.getElementById('coords').value.trim();
-    if (!v) throw new Error('Please enter coordinates (lat,lng) or paste a GeoJSON polygon.');
+    var v = document.getElementById('coords').value.trim();
+    if (!v) throw new Error('Enter coordinates (lat, lng) or use the GeoJSON tab for a polygon.');
     return { fmt: 'coords', payload: v };
   } else {
-    const v = document.getElementById('geojson_payload').value.trim();
-    if (!v) throw new Error('Please paste a GeoJSON polygon.');
-    try { JSON.parse(v); } catch(e) { throw new Error('Invalid JSON in GeoJSON field.'); }
-    return { fmt: 'geojson', payload: v };
+    var v2 = document.getElementById('geojson_payload').value.trim();
+    if (!v2) throw new Error('Paste a GeoJSON Polygon in the GeoJSON tab.');
+    try { JSON.parse(v2); } catch(e) { throw new Error('Invalid JSON — please paste a valid GeoJSON Polygon.'); }
+    return { fmt: 'geojson', payload: v2 };
   }
 }
 
+// ── Submit carbon form ─────────────────────────────────────────────────────
 async function submitCarbon() {
-  const errEl = document.getElementById('form-error');
+  var errEl = document.getElementById('form-error');
   errEl.style.display = 'none';
-  const btn = document.getElementById('btn-submit');
+  var btn = document.getElementById('btn-submit');
   btn.disabled = true; btn.textContent = 'Screening…';
 
   try {
-    const geo = buildGeo();
-    _inputCache = {
-      name: document.getElementById('name').value.trim(),
-      email: document.getElementById('email').value.trim(),
+    var geo = buildGeo();
+    _cache = {
+      name:    document.getElementById('name').value.trim(),
+      email:   document.getElementById('email').value.trim(),
       company: document.getElementById('company').value.trim(),
-      iup_name: document.getElementById('iup_name').value.trim(),
-      iup_address: document.getElementById('iup_address').value.trim() || '—',
+      iup_name:   document.getElementById('iup_name').value.trim(),
+      iup_address: document.getElementById('iup_address').value.trim() || 'Indonesia',
       permit_type: document.getElementById('permit_type').value,
-      permit_years_remaining: parseInt(document.getElementById('permit_years').value),
+      permit_years_remaining: parseInt(document.getElementById('permit_years').value, 10),
       project_type: document.getElementById('project_type').value,
-      geo,
+      geo: geo,
     };
-    if (!_inputCache.name) throw new Error('Name is required.');
-    if (!_inputCache.email) throw new Error('Email is required.');
-    if (!_inputCache.iup_name) throw new Error('Concession name is required.');
+    if (!_cache.name)     throw new Error('Name is required.');
+    if (!_cache.email)    throw new Error('Email is required.');
+    if (!_cache.iup_name) throw new Error('Concession name is required.');
 
-    const payload = {
-      contact: { name: _inputCache.name, email: _inputCache.email, company: _inputCache.company || null },
-      iup_name: _inputCache.iup_name,
-      iup_address: _inputCache.iup_address,
-      permit_type: _inputCache.permit_type,
-      permit_years_remaining: _inputCache.permit_years_remaining,
-      project_type: _inputCache.project_type,
-      geo,
+    var payload = {
+      contact: { name: _cache.name, email: _cache.email, company: _cache.company || null },
+      iup_name: _cache.iup_name,
+      iup_address: _cache.iup_address,
+      permit_type: _cache.permit_type,
+      permit_years_remaining: _cache.permit_years_remaining,
+      project_type: _cache.project_type,
+      geo: geo,
     };
 
-    const res = await fetch('/api/carbon', {
+    var res = await fetch('/api/carbon', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || 'API error — please try again.');
+      var err = await res.json().catch(function() { return {}; });
+      throw new Error(err.detail || ('Error ' + res.status + ' — please try again.'));
     }
     _result = await res.json();
     renderResult();
@@ -255,22 +477,59 @@ async function submitCarbon() {
   }
 }
 
+// ── Render result ──────────────────────────────────────────────────────────
 function renderResult() {
-  const r = _result;
+  var r = _result;
+  var ov = (r.map && r.map.loss_overlay) ? r.map.loss_overlay : {};
+  var verdict = ov.verdict || 'eligible';
+
+  // Result bar title
+  document.getElementById('result-title').textContent = _cache.iup_name;
+
+  // Verdict card colour
+  var vc = document.getElementById('verdict-card');
+  vc.className = 'verdict-card verdict-' + verdict;
 
   // Verdict badge
-  const badge = document.getElementById('verdict-badge');
-  const verdictKey = r.verdict.toLowerCase().includes('eligible') && !r.verdict.toLowerCase().includes('not')
-    ? 'eligible' : r.verdict.toLowerCase().includes('flagged') ? 'flagged' : 'hard_no';
-  badge.className = 'verdict-badge badge-' + verdictKey;
-  badge.textContent = r.verdict;
+  var icons   = { eligible: '✓', flagged: '⚠', hard_no: '✕' };
+  var labels  = { eligible: 'Eligible', flagged: 'Flagged — Review Required', hard_no: 'Not Eligible' };
+  var badgeEl = document.getElementById('verdict-badge');
+  badgeEl.className = 'verdict-badge badge-' + verdict;
+  badgeEl.textContent = (icons[verdict] || '•') + ' ' + (labels[verdict] || r.verdict);
 
-  // Estimate range from summary
-  document.getElementById('estimate-range').textContent = r.summary;
-  document.getElementById('disclaimer-text').textContent = r.disclaimer.text;
-  document.getElementById('narrative-text').textContent = r.narrative;
-  document.getElementById('carrot-text').textContent = r.carrot;
-  document.getElementById('data-sources').textContent = 'Data: ' + r.data_sources.join(' · ');
+  // Carbon range (eligible only)
+  var rangeEl = document.getElementById('range-display');
+  var rangeLblEl = document.getElementById('range-label');
+  if (verdict === 'eligible' && ov.quantity_low_tco2e != null && ov.quantity_high_tco2e != null) {
+    rangeEl.innerHTML = fmtN(ov.quantity_low_tco2e)
+      + ' – ' + fmtN(ov.quantity_high_tco2e)
+      + ' <span class="range-unit">tCO₂e</span>';
+    rangeLblEl.textContent = 'Indicative avoided emissions · project lifetime';
+  } else {
+    rangeEl.textContent = '';
+    rangeLblEl.textContent = '';
+  }
+
+  // Tier + methodology pills
+  var methLabel = _cache.permit_type === 'HTI'  ? 'APD (VM0009)'
+                : _cache.permit_type === 'HA'   ? 'IFM (VM0045 / VM0010)'
+                : 'PEAT — Tier 1';
+  document.getElementById('tier-row').innerHTML =
+    '<span class="badge-pill pill-tier">IPCC Tier 1</span>'
+    + '<span class="badge-pill pill-meth">' + methLabel + '</span>';
+
+  // Summary / reasons for non-eligible
+  var sumEl = document.getElementById('verdict-summary');
+  if (verdict !== 'eligible' && r.summary) {
+    sumEl.textContent = r.summary;
+    sumEl.style.display = 'block';
+  } else {
+    sumEl.style.display = 'none';
+  }
+
+  // Disclaimer
+  document.getElementById('disclaimer-text').textContent =
+    (r.disclaimer && r.disclaimer.text) ? r.disclaimer.text : '';
 
   // Map
   if (_map) { _map.remove(); _map = null; }
@@ -279,55 +538,124 @@ function renderResult() {
     attribution: '© OpenStreetMap contributors', maxZoom: 18,
   }).addTo(_map);
 
-  const bndry = r.map.boundary_geojson;
-  if (bndry.type === 'Point') {
-    const [lon, lat] = bndry.coordinates;
-    _map.setView([lat, lon], 10);
-    L.marker([lat, lon]).addTo(_map).bindPopup(_inputCache.iup_name).openPopup();
-  } else {
-    const layer = L.geoJSON(bndry, { style: { color: '#2d6a4f', weight: 2, fillOpacity: .15 } }).addTo(_map);
-    _map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+  var bndry = r.map ? r.map.boundary_geojson : null;
+  if (bndry) {
+    if (bndry.type === 'Point') {
+      var coords = bndry.coordinates;
+      _map.setView([coords[1], coords[0]], 11);
+      L.marker([coords[1], coords[0]]).addTo(_map).bindPopup(_cache.iup_name).openPopup();
+    } else {
+      var layer = L.geoJSON(bndry, {
+        style: { color: '#2d6a4f', weight: 2.5, fillColor: '#2d6a4f', fillOpacity: .12 }
+      }).addTo(_map);
+      _map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+    }
   }
 
-  // Loss overlay — simple legend (real tiles in WO-CARBON-001)
-  const loss = r.map.loss_overlay;
-  if (loss && loss.data) {
-    const total = Object.values(loss.data).reduce((a, b) => a + b, 0);
-    const info = L.control({ position: 'bottomright' });
-    info.onAdd = () => {
-      const d = L.DomUtil.create('div');
-      d.style.cssText = 'background:#fff;padding:6px 10px;border-radius:6px;font-size:11px;line-height:1.5';
-      d.innerHTML = `<b>Forest loss (stub)</b><br>Total 2001–2023: ${total.toLocaleString(undefined,{maximumFractionDigits:0})} ha<br><i>Real tiles: WO-CARBON-001</i>`;
+  // Map legend: loss summary
+  if (ov.data) {
+    var winYears = Object.keys(ov.data).filter(function(y) {
+      var yr = parseInt(y, 10); return yr >= 2016 && yr <= 2022;
+    });
+    var winTotal = winYears.reduce(function(s, y) { return s + (ov.data[y] || 0); }, 0);
+    var winAvg   = winYears.length ? winTotal / winYears.length : 0;
+
+    var legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function() {
+      var d = L.DomUtil.create('div');
+      d.style.cssText = 'background:rgba(255,255,255,.93);padding:8px 12px;border-radius:6px;'
+        + 'font-size:11px;line-height:1.6;max-width:185px;box-shadow:0 1px 5px rgba(0,0,0,.18)';
+      d.innerHTML = '<strong>Forest Loss 2016–22</strong>'
+        + '<br>Avg: ' + winAvg.toFixed(0) + ' ha/yr'
+        + '<br>Total: ' + fmtN(winTotal) + ' ha'
+        + (ov.area_ha ? '<br>Concession: ' + fmtN(ov.area_ha) + ' ha' : '')
+        + '<br><span style="color:#aaa;font-size:10px">Hansen GFC-2022-v1.10</span>';
       return d;
     };
-    info.addTo(_map);
+    legend.addTo(_map);
   }
+
+  // Annual loss chart
+  renderLossChart(ov.data || null);
+
+  // Narrative
+  document.getElementById('narrative-text').innerHTML = md(r.narrative || '');
+  document.getElementById('carrot-text').textContent  = r.carrot || '';
+  document.getElementById('data-sources').textContent =
+    r.data_sources && r.data_sources.length
+      ? 'Sources: ' + r.data_sources.join(' · ')
+      : '';
+
+  // Show company field in lead form if user didn't provide one
+  document.getElementById('lead-company-row').style.display =
+    _cache.company ? 'none' : 'block';
 }
 
+// ── Annual loss bar chart ──────────────────────────────────────────────────
+function renderLossChart(data) {
+  var wrap  = document.getElementById('loss-wrap');
+  var el    = document.getElementById('loss-chart');
+  var noteEl= document.getElementById('loss-note');
+  if (!data || !el) { wrap.style.display = 'none'; return; }
+
+  var years = Object.keys(data).map(function(y) { return parseInt(y, 10); })
+    .sort(function(a,b) { return a - b; });
+  if (!years.length) { wrap.style.display = 'none'; return; }
+
+  var vals   = years.map(function(y) { return data[String(y)] || 0; });
+  var maxVal = Math.max.apply(null, vals.concat([1]));
+  var winSet = {};
+  years.forEach(function(y) { if (y >= 2016 && y <= 2022) winSet[y] = true; });
+  var winVals = years.filter(function(y) { return winSet[y]; })
+    .map(function(y) { return data[String(y)] || 0; });
+  var winAvg  = winVals.length
+    ? winVals.reduce(function(s,v) { return s+v; }, 0) / winVals.length : 0;
+
+  el.innerHTML = years.map(function(y) {
+    var v   = data[String(y)] || 0;
+    var pct = (v / maxVal * 100).toFixed(1);
+    var win = winSet[y] ? ' win' : '';
+    return '<div class="loss-row">'
+      + '<span class="loss-year">' + y + '</span>'
+      + '<div class="loss-bar-bg"><div class="loss-bar' + win + '" style="width:' + pct + '%"></div></div>'
+      + '<span class="loss-val">' + (v > 0 ? v.toFixed(0) + ' ha' : '—') + '</span>'
+      + '</div>';
+  }).join('');
+
+  noteEl.innerHTML =
+    '<span style="display:inline-block;width:10px;height:7px;background:#e53935;border-radius:1px;'
+    + 'margin-right:4px;vertical-align:middle"></span>'
+    + '2016–2022 averaging window (avg ' + winAvg.toFixed(0) + ' ha/yr used in estimate)';
+
+  wrap.style.display = 'block';
+}
+
+// ── Submit lead (full report gate) ─────────────────────────────────────────
 async function submitLead() {
-  const errEl = document.getElementById('lead-error');
+  var errEl = document.getElementById('lead-error');
   errEl.style.display = 'none';
-  const btn = document.getElementById('btn-lead');
+  var btn = document.getElementById('btn-lead');
   btn.disabled = true; btn.textContent = 'Sending…';
 
   try {
-    const summary = _result ? _result.summary : '';
-    const body = {
-      name: _inputCache.name,
-      email: _inputCache.email,
-      mobile: document.getElementById('lead-mobile').value.trim(),
-      company: _inputCache.company,
-      iup_name: _inputCache.iup_name,
-      permit_type: _inputCache.permit_type,
-      payload_summary: summary,
+    var company = _cache.company
+      || document.getElementById('lead-company').value.trim();
+    var body = {
+      name:    _cache.name,
+      email:   _cache.email,
+      mobile:  document.getElementById('lead-mobile').value.trim(),
+      company: company,
+      iup_name:    _cache.iup_name,
+      permit_type: _cache.permit_type,
+      payload_summary: _result ? _result.summary : '',
     };
-    const res = await fetch('/api/lead', {
+    var res = await fetch('/api/lead', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error('Could not submit lead — please email info@180climate.net directly.');
-    document.getElementById('confirm-email').textContent = _inputCache.email;
+    if (!res.ok) throw new Error('Could not submit — please email info@180climate.net directly.');
+    document.getElementById('confirm-email').textContent = _cache.email;
     showStep('step-done');
   } catch(e) {
     errEl.textContent = e.message; errEl.style.display = 'block';
