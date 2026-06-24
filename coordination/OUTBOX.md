@@ -1,77 +1,82 @@
-# OUTBOX — Builder · WO-AUTOROUTE-002 · 2026-06-24
+# OUTBOX — Builder · WO-AUTOROUTE-003 · 2026-06-24
 
-## Status: COMPLETE — stopping for John/Cowork review (peat = FLAG is an ADR-0013 safety guarantee)
+## Status: COMPLETE — stopping for Cowork review
 
-WO-AUTOROUTE-002 complete. Opus FAIL fix applied (retry 1/2). **159 tests green.**
+WO-AUTOROUTE-003 complete. Opus reviewer: **PASS**. **164 tests green** (5 new + 159 existing all pass).
 
 ---
 
 ## What was delivered
 
-### Engine (engines/carbon/engine.py)
-- `_evaluate_peat_overlays(boundary) -> LegalOverlayResult`: 5-case logic
-  - A∧B → "flag A+B" · A-only → "flag A" · B-only → "flag B"
-  - both False → "flag developable uncertain (field survey needed)"
-  - data-unavailable (any None) → "flag manual review"
-- `_peat_flag_uncertainty(legal_overlay) -> str`: plain-language rationale with "Tier 1" + "baseline" keywords for narrative
-- Peat branch of `run_carbon_engine()` returns `quantity_low/high_tco2e = None` + classification
-- **Opus FAIL fix**: peat eligibility override after `run_eligibility()`:
-  - Forces `verdict = "flagged"` (unless already `"hard_no"`) with reason:  
-    `"peat: flag — no tonnage asserted (ADR-0013); manual methodological review required"`
-  - Prevents `{None:,.0f}` crash when `verdict=="eligible"` but `quantity_*=None`
+### Forest-presence gate (engines/carbon/engine.py)
+- `_evaluate_forest_gate(boundary, forest) -> ForestPresenceGate`
+  - Uses `ForestData.baseline_cover_pct` (Hansen) + `query_jrc_tmf()` + `query_worldcover()`
+  - **Condition logic** (top-down):
+    - **cleared** (gate_result=**fail**): `baseline_cover_pct < 20` OR `(JRC deforested AND WorldCover non-tree)`
+    - **intact** (gate_result=**pass**): `cover >= 60` AND `JRC undisturbed`
+    - **light_degradation** (gate_result=**pass**): `cover >= 40` AND JRC in (undisturbed/degraded/regrowth)
+    - **heavy_degradation** (gate_result=**flag**): `cover >= 20` (data present but degraded)
+    - **unknown** (gate_result=**flag**): data insufficient
+  - Permit-validity caveat embedded in `note` for pass results
 
-### Contracts (core/contracts/__init__.py)
-- `CarbonEstimate.quantity_low/high_tco2e: Optional[float]` (None for peat)
-- `Stratum` Pydantic `model_validator(mode="after")`: peat soil_type → quantity must be None; raises `ValueError` at construction time — peat-no-tonnage **true by construction**
+### Engine integration (run_carbon_engine — non-peat branch)
+- Forest gate evaluated for ALL non-peat projects (after eligibility, before estimate)
+- If `gate_result == "fail"` AND `eligibility.verdict != "hard_no"`:
+  - Forces `eligibility.verdict = "flagged"` + reason "forest gate fail: …"
+  - Returns `quantity_*=None` + `classification` with failed stratum
+  - `uncertainty` string contains "Tier 1" + "baseline" (invariant tests stay green)
+- If `gate_result == "pass"` or `"flag"`: number still computed (unchanged)
+- All non-peat results now carry `classification.strata[0].forest_gate`
+
+### Fixtures (3 new files)
+- `tests/fixtures/overlays/worldcover_-1.000_115.000.json`: Grassland (class 30, no tree cover)
+- `tests/fixtures/overlays/jrc_tmf_-1.000_115.000.json`: deforested 2017
+- `tests/fixtures/data_cache/9e3fb836374f3fa9.json`: baseline_cover_pct=8, no annual loss (cleared land)
+- Cache key = SHA-256("-1.0000,115.0000,24132.5")[:16] = `9e3fb836374f3fa9` ✓
+
+### Golden fixture
+- `tests/fixtures/carbon/WO005_HTI_cleared.json`: HTI 20yr, 24,132 ha polygon near (-1,115) on cleared scrub → gate_result=fail → flagged, no number
+
+### Tests (5 new in test_golden.py)
+| Test | Assertion |
+|------|-----------|
+| `test_forest_gate_fail_no_number` | quantity_*=None for cleared |
+| `test_forest_gate_fail_flagged_not_hard_no` | verdict="flagged", not hard_no |
+| `test_forest_gate_condition_cleared` | classification.strata[0].forest_gate.condition="cleared" |
+| `test_forest_gate_reason_in_eligibility` | "no at-risk forest" in eligibility.reasons |
+| `test_existing_hti_eligible_unchanged_after_forest_gate` | forest gate passes for existing fixture; frozen numbers unchanged |
 
 ### API (api/main.py)
-- All `is_eligible = verdict == "eligible"` replaced with `has_range = estimate.quantity_low_tco2e is not None` across `/api/carbon`, `/api/report`, `/api/lead`, `_build_report_data()`, `_build_form_data()` — crash-safe for peat
+- `_forest_gate_overlay()`: extracts `forest_condition` + `forest_gate_result` from classification
+- Loss overlay now includes these fields for UI display
+- `must_state` updated to include permit-validity caveat (narrator must state)
 
-### Report generator (reports/generator.py)
-- Carbon range section gated on `data.quantity_low_tco2e is not None` (PDF + DOCX)
-- Peat flag section added (PDF + DOCX): "Peat Additionality Flag" heading + plain-language copy covering regulatory context (PP57/2016, Inpres5/2019), why additionality fails on protected peat, and restoration/WRC as potentially additional pathway
-
-### Fixtures
-- `tests/fixtures/carbon/WO003_routing_PEAT.json`: downgraded from 18,230,495–28,109,607 tCO2e to `null, null` + `expected_peat_flag` assertion (`overlay_a_khg_intersects: true`, `overlay_b_pippib_intersects: true`)
-- `tests/fixtures/carbon/WO004_SMPP_peat_flag.json`: SMPP-style (KHG=true, PIPPIB=null → "flag A + data-unavailable"); `never_hard_no: true` — demonstrates valid restoration path is never auto-excluded
-
-### CI fixture cache (3 centroids)
-- Mineral: (-0.500, 117.500) — KHG=false, PIPPIB=false
-- Peat dome: (0.900, 117.150) — KHG=true(18500ha), PIPPIB=true(21200ha)
-- SMPP: (-2.500, 103.500) — KHG=true(75000ha), PIPPIB=null
-
-### Tests added
-- `tests/test_overlays.py`: 29 tests (overlay adapters + new contract types)
-- `tests/test_golden.py`: 5 peat-flag parametrized tests (no_tonnage, status_is_flag, never_hard_no, stratum_validator_enforced, overlays_independent)
-- `tests/test_report.py`: peat flag section present (PDF+DOCX), peat no-tonnage in report (PDF+DOCX)
+### Frontend (frontend/index.html)
+- `IFM — Improved Forest Management` option added to project_type select
+- Forest condition badge shown in tier-row (green for pass, amber for flag/fail)
+- Label text: "Forest: intact", "Forest: cleared — no baseline", etc.
 
 ---
 
-## ADR-0013 invariants confirmed (by test)
-| Invariant | Test |
-|-----------|------|
-| Peat `quantity_*` = None | `test_peat_flag_no_tonnage` |
-| `peat_additionality_status` is a flag | `test_peat_flag_status_is_flag` |
-| Never `hard_no` for peat (restoration path open) | `test_peat_flag_never_hard_no` |
-| Peat stratum rejects tonnage at construction | `test_peat_stratum_validator_enforced` |
-| Overlay A and B evaluated independently | `test_peat_overlays_independent` |
-| Peat report section present | `test_peat_flag_section_present` |
-| Old PEAT tonnage absent from report | `test_peat_no_tonnage_in_report` |
+## Opus reviewer highlights (PASS)
+- Gate logic is conservative in the right direction — no path lets cleared land slip into pass
+- hard_no bypass is semantically correct (area-fail doesn't double-block with forest gate)
+- Cache key integrity verified (fixture addresses match computed centroid+area)
+- 164 tests all pass including all 159 prior tests
+
+## Non-blocking note from Opus (pre-existing cosmetic issue)
+- Uncertainty string says "8-yr avg 2016-2022" but loop is range(2016,2024) = 2016-2023. Pre-existing mislabel, not introduced here. Carry forward.
 
 ---
 
-## Opus reviewer finding (d30c274 — FAIL)
-`run_eligibility()` is project-type-blind → peat with valid HTI gates gets `verdict=="eligible"` while engine returns `quantity_*=None` → `{None:,.0f}` crash in API; wrong report section selected. **Fixed in b46ff77.**
-
----
-
-## 159 tests green
+## 164 tests green
 ```
-159 passed, 1 warning in 3.32s
+164 passed, 1 warning in 6.24s
 ```
 
 ---
 
-## Next: WO-AUTOROUTE-003 (when John clears this)
-- Non-peat auto-routing: forest-presence gate + REDD+/IFM permit-type routing
-- Opus (logic) + Sonnet (UI)
+## Next: WO-AUTOROUTE-004 (when Cowork clears this)
+- "Describe your own" free-text classifier (intake only, out of number path)
+- Mixed-concession soil-first stratification (forested peat → peat stratum = flag; mineral forest → REDD/IFM)
+- Sonnet (+ Opus review)
