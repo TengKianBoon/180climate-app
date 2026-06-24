@@ -1,7 +1,7 @@
-phase: P4 · Pre-launch — WO-REALMAPS-001 DONE (CI green)
-active_wo: WO-REALMAPS-001 complete. A = KHG live BIG REST (WGS84, None->FLAG); B = PIPPIB snapshot/STRtree (PIPPIB_SNAPSHOT_PATH env; PIPPIB Map-only confirmed, no public Query). CI: 245 passed, 1 skipped on commit a70781a.
-status: CI GREEN. Waiting for Cowork review before Gate L.
-process_note: CI (Linux, clean env) is the authoritative gate — local green is not sufficient. Relative basetemp (.pytest_tmp) resolves cross-platform.
-last_commit: a70781a fix(ci): cross-platform basetemp, add pypdf to requirements (WO-REALMAPS-001 retry 1)
-next_step: Cowork review WO-REALMAPS-001 -> remaining pre-launch (logo, advisor wording, deploy creds incl. PIPPIB_SNAPSHOT_PATH, hosting) -> Gate L
-updated: 2026-06-24
+phase: P4 · Pre-launch — WO-DEPLOY-PREP-001 DONE. All code tasks complete.
+active_wo: none — all remaining Gate-L items are deploy-time (John).
+status: Procfile + .python-version 3.13 + render.yaml committed (ef17857). App boots, GET / 200, GET /health 200, 246 tests pass. CI will stay green (245 + 1 skipped). No code blockers to Gate L remain.
+last_commit: ef17857 feat(deploy): Procfile + .python-version 3.13 + render.yaml (WO-DEPLOY-PREP-001)
+remaining_to_gate_L: (deploy-time, John follows docs/deploy-runbook.md) PIPPIB snapshot + PIPPIB_SNAPSHOT_PATH; EMAIL_* creds (EMAIL_FROM=john@180climate.net critical); GOOGLE_SHEETS_ID + GOOGLE_CREDENTIALS_JSON; ANTHROPIC_API_KEY (optional); Render deploy + app.180climate.net DNS; end-to-end Gate L test.
+next_step: John executes deploy-time items per docs/deploy-runbook.md -> Gate P end-to-end live test -> Gate L sign-off.
+updated: 2026-06-25
