@@ -1,4 +1,5 @@
 # JOURNAL — append-only episodic log (feeds the Dreaming/consolidation pass)
+- 2026-06-24 · WO-AUTOROUTE-004 complete (Sonnet): intake classifier (classifier/intake.py, one LLM call at input boundary only), mixed-concession soil-first stratification (run_mixed_stratification in engine), out-of-scope CTA flow, frontend "describe your own" + description textarea, narrator shows mineral range for mixed-flagged. 167 tests green (+3 new). Stopping for Cowork review.
 
 - 2026-06-23 · Cowork stood up coordination/ mailbox + self-contained board
 - 2026-06-23 · Orchestration redesigned goal-first (docs/orchestration-v2.md)

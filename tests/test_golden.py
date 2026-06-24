@@ -537,3 +537,116 @@ def test_existing_hti_eligible_unchanged_after_forest_gate():
         f"REGRESSION: HTI eligible quantity_high changed after forest gate wiring. "
         f"Expected {exp['quantity_high_tco2e']:,.0f}, got {estimate.quantity_high_tco2e:,.0f}"
     )
+
+
+# ── WO-AUTOROUTE-004: classifier exclusion + mixed stratification ─────────────
+
+def test_number_path_deterministic_classifier_excluded():
+    """Number path is classifier-free: engine.py must not import from classifier/.
+
+    Asserts two things:
+    1. engines/carbon/engine.py source does not contain 'classifier' (structural)
+    2. run_carbon_engine() is deterministic (same input → same output twice)
+    """
+    engine_src = (
+        Path(__file__).parent.parent / "engines" / "carbon" / "engine.py"
+    ).read_text(encoding="utf-8")
+    # Check for import statements only — the word "classifier" may appear in docstrings/comments
+    assert "from classifier" not in engine_src, (
+        "INVARIANT VIOLATION (ADR-0013-auto-routing): engine.py must not import "
+        "from classifier/ — the number/verdict path must remain deterministic."
+    )
+    assert "import classifier" not in engine_src, (
+        "INVARIANT VIOLATION (ADR-0013-auto-routing): engine.py must not import "
+        "classifier — the number/verdict path must remain deterministic."
+    )
+
+    case = _load("WO002_HTI_eligible.json")
+    inp = _make_input(case["input"])
+    b = parse_geo(inp.geo)
+    f = query_forest_data(b)
+    e1 = run_carbon_engine(inp, b, f)
+    e2 = run_carbon_engine(inp, b, f)
+    assert e1.quantity_low_tco2e == e2.quantity_low_tco2e, (
+        "Determinism violation: quantity_low differs between runs"
+    )
+    assert e1.quantity_high_tco2e == e2.quantity_high_tco2e, (
+        "Determinism violation: quantity_high differs between runs"
+    )
+    assert e1.eligibility.verdict == e2.eligibility.verdict, (
+        "Determinism violation: verdict differs between runs"
+    )
+
+
+MIXED_FIXTURES = ["WO006_mixed_concession.json"]
+
+
+@pytest.mark.parametrize("fixture_name", MIXED_FIXTURES)
+def test_mixed_stratification_peat_flag_mineral_number(fixture_name: str):
+    """ADR-0013-auto-routing: mixed concession → peat stratum flag+no-number; mineral has range."""
+    from engines.carbon.engine import run_mixed_stratification
+
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_mixed_stratification(inp, boundary, forest)
+    exp = case["expected_mixed"]
+
+    assert estimate.classification is not None, "Mixed concession must have classification"
+    assert estimate.classification.dominant_soil == exp["dominant_soil"], (
+        f"Expected dominant_soil={exp['dominant_soil']!r}, got {estimate.classification.dominant_soil!r}"
+    )
+    strata = estimate.classification.strata
+    assert len(strata) == 2, f"Expected 2 strata for mixed concession, got {len(strata)}"
+
+    peat_s = next((s for s in strata if s.soil_type == "peat"), None)
+    mineral_s = next((s for s in strata if s.soil_type == "mineral"), None)
+    assert peat_s is not None, "No peat stratum found in mixed classification"
+    assert mineral_s is not None, "No mineral stratum found in mixed classification"
+
+    assert peat_s.quantity_low_tco2e is None, (
+        f"INVARIANT VIOLATION (ADR-0013): peat stratum must have quantity_low=None, "
+        f"got {peat_s.quantity_low_tco2e}"
+    )
+    assert peat_s.quantity_high_tco2e is None, (
+        f"INVARIANT VIOLATION (ADR-0013): peat stratum must have quantity_high=None, "
+        f"got {peat_s.quantity_high_tco2e}"
+    )
+    assert peat_s.eligibility_verdict == "flagged"
+
+    if exp.get("mineral_has_range"):
+        assert mineral_s.quantity_low_tco2e is not None, (
+            "Mineral stratum must have a range for this mixed fixture"
+        )
+        assert mineral_s.quantity_high_tco2e is not None
+        assert mineral_s.quantity_low_tco2e < mineral_s.quantity_high_tco2e, (
+            "Mineral stratum range must be quantity_low < quantity_high"
+        )
+        assert estimate.quantity_low_tco2e == mineral_s.quantity_low_tco2e, (
+            "CarbonEstimate.quantity_low must match mineral stratum quantity_low"
+        )
+
+    assert estimate.eligibility.verdict == exp["overall_verdict"], (
+        f"Expected overall verdict={exp['overall_verdict']!r}, "
+        f"got {estimate.eligibility.verdict!r}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", MIXED_FIXTURES)
+def test_mixed_stratum_areas_sum_to_boundary(fixture_name: str):
+    """ADR-0013: sum of stratum areas must equal the total boundary area (no double-counting)."""
+    from engines.carbon.engine import run_mixed_stratification
+
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_mixed_stratification(inp, boundary, forest)
+
+    if estimate.classification and estimate.classification.dominant_soil == "mixed":
+        total_stratum = sum(s.area_ha for s in estimate.classification.strata)
+        assert abs(total_stratum - boundary.area_ha) < 1.0, (
+            f"Stratum areas {total_stratum:,.1f} ha don't sum to boundary {boundary.area_ha:,.1f} ha "
+            f"(each hectare must be in exactly one stratum — ADR-0013)"
+        )

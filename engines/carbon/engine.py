@@ -11,9 +11,14 @@ WO-AUTOROUTE-003 / ADR-0013-auto-routing: forest-presence gate for non-peat REDD
   HTI on cleared/scrub land → gate_result=fail → flagged, no number.
   Forest condition drives MethodologyRoute context (intact/light → pass; heavy → flag).
   REDD+/IFM routing by permit type + condition remains: HTI→APD, HA→IFM.
+WO-AUTOROUTE-004 / ADR-0013-auto-routing: run_mixed_stratification() added for
+  soil-first mixed-concession stratification (called from API only — never inside
+  run_carbon_engine()). Intake classifier in classifier/intake.py (separate module,
+  never imported here — determinism invariant preserved).
 
 Determinism invariant: pure functions + typed models; NO LLM calls here.
-The only LLM call in the product is in narrative/.
+The only permitted product LLM calls are in narrative/ (rendering) and classifier/
+(intake boundary — never imported by this module).
 
 Methodology routing (ADR-0001 / ADR-0012 / ADR-0013):
   project_type PEAT → FLAG, never a tonnage (ADR-0013); VM0027 inactivated 2023 — never cite
@@ -501,6 +506,150 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
         forest=forest,
         quantity_low_tco2e=low,
         quantity_high_tco2e=high,
+        uncertainty=unc,
+        quality=quality,
+        classification=classification,
+    )
+
+
+def run_mixed_stratification(
+    inp: CarbonInput,
+    boundary: Boundary,
+    forest: ForestData,
+    min_stratum_ha: float = 1000.0,
+) -> CarbonEstimate:
+    """Soil-first mixed-concession stratification (ADR-0013-auto-routing).
+
+    Checks KHG peat area. If both peat_area >= min_stratum_ha AND
+    mineral_area >= min_stratum_ha, creates two strata:
+      - peat stratum: flag, no tonnage (ADR-0013 peatland)
+      - mineral stratum: REDD/IFM estimate on mineral area
+
+    Falls back to run_carbon_engine() if not sufficiently mixed.
+    Never called by run_carbon_engine() — only from the API for 'other' projects.
+    Determinism invariant preserved: no LLM calls.
+    """
+    khg = query_khg(boundary)
+    peat_area = (
+        khg.area_ha
+        if (khg.intersects is True and khg.area_ha is not None)
+        else 0.0
+    )
+    mineral_area = boundary.area_ha - peat_area
+
+    if peat_area < min_stratum_ha or mineral_area < min_stratum_ha:
+        return run_carbon_engine(inp, boundary, forest)
+
+    # ── Peat stratum (ADR-0013: flag, no tonnage by construction) ─────────────
+    peat_meth = MethodologyRoute(
+        baseline_class="peat",
+        verra_family=(
+            "No settled active Verra method for avoided tropical-peat conversion as of 2026 — "
+            "route to be confirmed with methodology advisor."
+        ),
+        cited_methods=[],
+        is_planned=True,
+        additionality_basis="legal harvest right foregone",
+        notes="ADR-0013: peat stratum — flag, no tonnage. Never VM0027 / VM0048 / VM0007.",
+    )
+    peat_legal = _evaluate_peat_overlays(boundary)
+    peat_stratum = Stratum(
+        stratum_id="peat",
+        area_ha=peat_area,
+        soil_type="peat",
+        methodology=peat_meth,
+        legal_overlay=peat_legal,
+        eligibility_verdict="flagged",
+        eligibility_reasons=[
+            f"peat stratum (ADR-0013): {peat_legal.peat_additionality_status}",
+        ],
+        quantity_low_tco2e=None,
+        quantity_high_tco2e=None,
+    )
+
+    # ── Mineral stratum (REDD/IFM) ────────────────────────────────────────────
+    eligibility = run_eligibility(inp, boundary)
+    methodology = build_methodology_route(inp)
+    forest_gate = _evaluate_forest_gate(boundary, forest)
+    quality = _quality_factors(inp, methodology)
+
+    project_years = min(inp.permit_years_remaining, _MAX_CREDITING_YR)
+    recent_years = [y for y in range(2016, 2024) if y in forest.annual_loss_ha]
+    if recent_years:
+        avg_annual_loss_ha = (
+            sum(forest.annual_loss_ha[y] for y in recent_years) / len(recent_years)
+        )
+    else:
+        avg_annual_loss_ha = sum(forest.annual_loss_ha.values()) / max(len(forest.annual_loss_ha), 1)
+
+    loss_rate_area = max(boundary.area_ha, 25_000.0)
+    loss_rate = avg_annual_loss_ha / loss_rate_area
+
+    if forest_gate.gate_result == "fail":
+        mineral_stratum = Stratum(
+            stratum_id="mineral",
+            area_ha=mineral_area,
+            soil_type="mineral",
+            methodology=methodology,
+            forest_gate=forest_gate,
+            eligibility_verdict="flagged",
+            eligibility_reasons=[f"forest gate fail: {forest_gate.note}"],
+        )
+        mineral_low: float | None = None
+        mineral_high: float | None = None
+        unc = (
+            f"Mixed-concession — mineral stratum ({mineral_area:,.0f} ha): "
+            f"forest gate fail — no at-risk forest confirmed. "
+            f"Peat stratum ({peat_area:,.0f} ha): flag (ADR-0013). "
+            f"Tier 1 baseline cannot be asserted without confirmed standing forest. "
+            f"Not registry-grade."
+        )
+    else:
+        mineral_low, mineral_high, unc_redd = _estimate_redd(
+            mineral_area, project_years, forest, loss_rate, methodology
+        )
+        mineral_stratum = Stratum(
+            stratum_id="mineral",
+            area_ha=mineral_area,
+            soil_type="mineral",
+            methodology=methodology,
+            forest_gate=forest_gate,
+            eligibility_verdict=eligibility.verdict,
+            eligibility_reasons=eligibility.reasons,
+            quantity_low_tco2e=mineral_low,
+            quantity_high_tco2e=mineral_high,
+        )
+        peat_unc = _peat_flag_uncertainty(peat_legal)
+        unc = (
+            f"Mixed-concession Tier 1 estimate — "
+            f"mineral stratum ({mineral_area:,.0f} ha): {unc_redd} "
+            f"| Peat stratum ({peat_area:,.0f} ha): {peat_unc}"
+        )
+
+    # ── Combined ──────────────────────────────────────────────────────────────
+    combined_reasons = peat_stratum.eligibility_reasons + mineral_stratum.eligibility_reasons
+    combined_eligibility = EligibilityResult(
+        gates=eligibility.gates,
+        verdict="flagged",  # always flagged when peat stratum present
+        reasons=combined_reasons,
+    )
+    classification = ProjectClassification(
+        strata=[peat_stratum, mineral_stratum],
+        dominant_soil="mixed",
+        auto_determined=True,
+        note=(
+            f"Soil-first stratification (ADR-0013): "
+            f"peat {peat_area:,.0f} ha (flag) + mineral {mineral_area:,.0f} ha (REDD/IFM). "
+            f"KHG intersect: {khg.intersects}."
+        ),
+    )
+
+    return CarbonEstimate(
+        eligibility=combined_eligibility,
+        methodology=methodology,
+        forest=forest,
+        quantity_low_tco2e=mineral_low,
+        quantity_high_tco2e=mineral_high,
         uncertainty=unc,
         quality=quality,
         classification=classification,

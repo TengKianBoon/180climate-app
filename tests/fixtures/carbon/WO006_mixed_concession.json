@@ -1,0 +1,23 @@
+{
+  "description": "Mixed peat and mineral forest HTI concession — soil-first stratification test (ADR-0013-auto-routing). Polygon near (-2.0, 113.0), ~49,228 ha. KHG: 15,000 ha peat (~30%); mineral: ~34,228 ha. Forest confirmed on mineral stratum (baseline cover 50%, JRC degraded => light_degradation). Expected: 2 strata, peat=flag+no-number, mineral=REDD range.",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Hutan Campuran Kalimantan",
+    "iup_address": "Kalimantan Tengah, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[112.90,-1.90],[113.10,-1.90],[113.10,-2.10],[112.90,-2.10],[112.90,-1.90]]]}"
+    }
+  },
+  "expected_mixed": {
+    "dominant_soil": "mixed",
+    "peat_area_ha": 15000,
+    "mineral_area_min_ha": 30000,
+    "peat_has_no_tonnage": true,
+    "mineral_has_range": true,
+    "overall_verdict": "flagged"
+  }
+}

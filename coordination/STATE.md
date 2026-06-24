@@ -1,6 +1,6 @@
 phase: P4 · Pre-launch — ADR-0013 build
-active_wo: WO-AUTOROUTE-004 — "describe your own" classifier + mixed stratification (dispatched, Sonnet) · on main
-status: WO-003 (forest gate + REDD+/IFM routing) APPROVED — cleared land flags no number, no regression, 164 green. WO-004 dispatched; awaiting John go-ahead.
-last_commit: 4c0a88b chore(coordination): WO-AUTOROUTE-003 COMPLETE
-next_step: John pastes go-ahead → builder runs WO-AUTOROUTE-004 on main, STOPS for Cowork review
+active_wo: WO-AUTOROUTE-004 — COMPLETE, stopping for Cowork review
+status: WO-004 complete — classifier + mixed stratification + out-of-scope CTA. 167 tests green (164 existing all pass, +3 new). Stopping for Cowork review.
+last_commit: (pending — uncommitted)
+next_step: Cowork reviews WO-004; then WO-005 golden + re-verify → Gate (John + advisor)
 updated: 2026-06-24

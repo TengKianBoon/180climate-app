@@ -255,12 +255,21 @@
       </div>
       <div class="form-row">
         <label>Project type <span class="opt">(optional)</span></label>
-        <select id="project_type">
+        <select id="project_type" onchange="onProjectTypeChange()">
           <option value="">— auto-determined from land (default) —</option>
           <option value="REDD">REDD+ — Reduced Emissions from Deforestation</option>
           <option value="IFM">IFM — Improved Forest Management</option>
           <option value="PEAT">PEAT — Avoided Peat Drainage / Subsidence</option>
+          <option value="other">Other / Describe your own</option>
         </select>
+        <div id="project_type_desc_row" class="form-row" style="display:none;margin-top:.5rem">
+          <label>Describe your project <span class="opt">(optional)</span></label>
+          <textarea id="project_type_description" rows="3"
+            placeholder="e.g. Mixed forest concession with some peatland — HTI permit on Central Kalimantan island..."></textarea>
+          <div style="font-size:.74rem;color:#999;margin-top:.25rem">
+            We'll classify your project type automatically. Without a description we'll default to out-of-scope.
+          </div>
+        </div>
         <div style="font-size:.74rem;color:#999;margin-top:.25rem">We'll confirm project type and forest condition from your land data.</div>
       </div>
     </div>
@@ -440,6 +449,11 @@ function buildGeo() {
   }
 }
 
+function onProjectTypeChange() {
+  var v = document.getElementById('project_type').value;
+  document.getElementById('project_type_desc_row').style.display = (v === 'other') ? 'block' : 'none';
+}
+
 // ── Submit carbon form ─────────────────────────────────────────────────────
 async function submitCarbon() {
   var errEl = document.getElementById('form-error');
@@ -450,6 +464,7 @@ async function submitCarbon() {
   try {
     var geo = buildGeo();
     var rawProjectType = document.getElementById('project_type').value || 'REDD';
+    var rawDesc = document.getElementById('project_type_description') ? document.getElementById('project_type_description').value.trim() : '';
     _cache = {
       name:    document.getElementById('name').value.trim(),
       email:   document.getElementById('email').value.trim(),
@@ -460,6 +475,7 @@ async function submitCarbon() {
       permit_type: document.getElementById('permit_type').value,
       permit_years_remaining: parseInt(document.getElementById('permit_years').value, 10),
       project_type: rawProjectType,
+      project_type_description: rawProjectType === 'other' ? rawDesc : null,
       geo: geo,
     };
     if (!_cache.name)     throw new Error('Name is required.');
@@ -474,6 +490,7 @@ async function submitCarbon() {
       permit_type: _cache.permit_type,
       permit_years_remaining: _cache.permit_years_remaining,
       project_type: _cache.project_type,
+      project_type_description: _cache.project_type_description || null,
       geo: geo,
     };
 
@@ -502,6 +519,30 @@ function renderResult() {
   var ov = (r.map && r.map.loss_overlay) ? r.map.loss_overlay : {};
   var verdict = ov.verdict || 'eligible';
 
+  // Handle out-of-scope (classifier couldn't map to REDD/IFM/PEAT)
+  if (r.engine === 'out_of_scope' || r.verdict === 'out_of_scope') {
+    document.getElementById('result-title').textContent = _cache.iup_name || 'Your concession';
+    document.getElementById('verdict-card').className = 'verdict-card verdict-out-of-scope';
+    document.getElementById('verdict-badge').className = 'verdict-badge badge-flagged';
+    document.getElementById('verdict-badge').textContent = '• Out of Scope';
+    document.getElementById('range-display').textContent = '';
+    document.getElementById('range-label').textContent = '';
+    document.getElementById('tier-row').innerHTML = '';
+    document.getElementById('verdict-summary').textContent = r.apology || '';
+    document.getElementById('verdict-summary').style.display = 'block';
+    // Show CTA
+    var ctaEl = document.getElementById('narrative-text');
+    if (ctaEl) {
+      ctaEl.innerHTML = '<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:1rem;margin-top:.75rem">'
+        + '<strong>Next step:</strong> ' + (r.cta || '') + '<br><br>'
+        + '<a href="mailto:' + (r.cta_email || 'info@180climate.net') + '" style="color:#2d6a4f;font-weight:700">'
+        + (r.cta_email || 'info@180climate.net') + '</a>'
+        + (r.lead_captured ? '<br><span style="font-size:.8rem;color:#666;margin-top:.5rem;display:block">✓ Your details have been recorded — we'll follow up.</span>' : '')
+        + '</div>';
+    }
+    return;
+  }
+
   // Result bar title
   document.getElementById('result-title').textContent = _cache.iup_name;
 
@@ -519,11 +560,14 @@ function renderResult() {
   // Carbon range (eligible only)
   var rangeEl = document.getElementById('range-display');
   var rangeLblEl = document.getElementById('range-label');
-  if (verdict === 'eligible' && ov.quantity_low_tco2e != null && ov.quantity_high_tco2e != null) {
+  if (ov.quantity_low_tco2e != null && ov.quantity_high_tco2e != null) {
     rangeEl.innerHTML = fmtN(ov.quantity_low_tco2e)
       + ' – ' + fmtN(ov.quantity_high_tco2e)
       + ' <span class="range-unit">tCO₂e</span>';
-    rangeLblEl.textContent = 'Indicative avoided emissions · project lifetime';
+    var isMixed = ov.classifier_category && verdict === 'flagged';
+    rangeLblEl.textContent = isMixed
+      ? 'Indicative avoided emissions · mineral stratum · project lifetime'
+      : 'Indicative avoided emissions · project lifetime';
   } else {
     rangeEl.textContent = '';
     rangeLblEl.textContent = '';

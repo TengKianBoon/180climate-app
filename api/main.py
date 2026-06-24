@@ -25,7 +25,7 @@ from core.contracts import (
 )
 from core.geo import parse_geo
 from core.forest import query_forest_data
-from engines.carbon.engine import run_carbon_engine
+from engines.carbon.engine import run_carbon_engine, run_mixed_stratification
 from narrative.narrator import generate_narrative
 from api.email import send_lead_email
 from api.sheets import append_lead
@@ -178,8 +178,163 @@ def index() -> HTMLResponse:
 
 # ── Carbon screening ──────────────────────────────────────────────────────────
 
+def _capture_out_of_scope_lead(inp: CarbonInput, classifier_result: Any, boundary: Any = None) -> None:
+    """Capture lead for out-of-scope submissions (email + Sheet, best-effort)."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+    filename_base = make_filename()
+    area_ha = round(boundary.area_ha, 1) if boundary is not None else None
+    geo_summary = _geometry_summary(boundary) if boundary is not None else "—"
+    form_data = {
+        "timestamp": ts,
+        "name": inp.contact.name,
+        "email": inp.contact.email,
+        "mobile": inp.contact.mobile or "",
+        "company": inp.contact.company or "",
+        "iup_name": inp.iup_name,
+        "iup_address": inp.iup_address,
+        "permit_type": inp.permit_type,
+        "permit_years_remaining": inp.permit_years_remaining,
+        "project_type": "other",
+        "payload_summary": (
+            f"Out of scope — description: {(inp.project_type_description or '')[:200]}; "
+            f"classifier: {classifier_result.rationale}"
+        ),
+        "area_ha": area_ha,
+        "geometry_summary": geo_summary,
+        "verdict": "out_of_scope",
+        "quantity_low_tco2e": None,
+        "quantity_high_tco2e": None,
+    }
+    _deliver(form_data, b"", filename_base)
+
+
+def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
+    """Handle project_type='other': classify description, route to known type or out-of-scope."""
+    from classifier.intake import classify_project
+
+    description = inp.project_type_description or ""
+    classifier_result = classify_project(description=description, permit_type=inp.permit_type)
+
+    _OUT_OF_SCOPE_APOLOGY = (
+        "Thank you for your interest in a carbon project with 180Climate. "
+        "Based on your description, this project doesn't clearly fit our current "
+        "REDD+, IFM, or peatland screening criteria. We'd be glad to discuss your "
+        "situation directly — every concession has unique characteristics that "
+        "automated screening may not capture."
+    )
+    _OUT_OF_SCOPE_CTA = (
+        "Please reach out to us: email info@180climate.net or WhatsApp "
+        "+60 11-XXXX XXXX. We'll review your concession details personally."
+    )
+
+    if classifier_result.category == "out_of_scope":
+        boundary = None
+        try:
+            boundary = parse_geo(inp.geo)
+        except Exception:
+            pass
+        _capture_out_of_scope_lead(inp, classifier_result, boundary)
+        return JSONResponse(content={
+            "engine": "out_of_scope",
+            "verdict": "out_of_scope",
+            "verdict_label": "Out of scope — project does not match current screening criteria",
+            "apology": _OUT_OF_SCOPE_APOLOGY,
+            "cta": _OUT_OF_SCOPE_CTA,
+            "cta_email": "info@180climate.net",
+            "classifier_rationale": classifier_result.rationale,
+            "lead_captured": True,
+        })
+
+    # Classified to known category (REDD / IFM / PEAT)
+    classified_type = classifier_result.category
+    try:
+        boundary = parse_geo(inp.geo)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    forest = query_forest_data(boundary)
+    classified_inp = inp.model_copy(update={"project_type": classified_type})
+
+    if classified_type in ("REDD", "IFM"):
+        estimate = run_mixed_stratification(classified_inp, boundary, forest)
+    else:
+        estimate = run_carbon_engine(classified_inp, boundary, forest)
+
+    # Tag the classification with the original description
+    if estimate.classification is not None:
+        estimate = estimate.model_copy(update={
+            "classification": estimate.classification.model_copy(update={
+                "user_project_type_override": f"described as: {description[:100]}",
+            })
+        })
+
+    narr_req = NarrativeRequest(
+        engine="carbon",
+        payload=estimate.model_dump(),
+        must_state=[
+            "legal harvest right foregone",
+            "permit-validity: Indonesian permits may overlap or face One-Map disputes — advisor-confirm",
+            f"project type auto-classified from description as: {classified_type}",
+        ],
+    )
+    narr = generate_narrative(narr_req)
+
+    has_range = estimate.quantity_low_tco2e is not None
+    if has_range:
+        is_mixed = (
+            estimate.classification is not None
+            and estimate.classification.dominant_soil == "mixed"
+        )
+        if is_mixed:
+            summary = (
+                f"Mixed concession — mineral stratum: "
+                f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
+                f" (lifetime) · peat stratum: flag (ADR-0013)"
+            )
+        else:
+            summary = (
+                f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
+                f" (lifetime) · IPCC Tier 1 · {estimate.methodology.verra_family}"
+            )
+    else:
+        reasons = "; ".join(estimate.eligibility.reasons)
+        summary = f"Screening issues: {reasons}"
+
+    result = EngineResult(
+        engine="carbon",
+        verdict=_VERDICT_LABELS.get(estimate.eligibility.verdict, estimate.eligibility.verdict),
+        summary=summary,
+        map=MapOverlay(
+            base_tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            boundary_geojson=boundary.geojson,
+            loss_overlay={
+                "type": "annual_loss_series",
+                "data": {str(y): v for y, v in forest.annual_loss_ha.items()},
+                "quantity_low_tco2e": estimate.quantity_low_tco2e if has_range else None,
+                "quantity_high_tco2e": estimate.quantity_high_tco2e if has_range else None,
+                "verdict": estimate.eligibility.verdict,
+                "area_ha": round(boundary.area_ha, 1),
+                "baseline_class": estimate.methodology.baseline_class,
+                "verra_family": estimate.methodology.verra_family,
+                "additionality_basis": estimate.methodology.additionality_basis,
+                "classifier_category": classified_type,
+                "classifier_confidence": classifier_result.confidence,
+                **_forest_gate_overlay(estimate),
+            },
+        ),
+        narrative=narr.text,
+        disclaimer=Disclaimer(text=_DISCLAIMER_TEXT, kind="carbon_non_binding"),
+        carrot=_CARROT,
+        data_sources=forest.data_sources,
+    )
+    return JSONResponse(content=result.model_dump())
+
+
 @app.post("/api/carbon", response_model=None)
 def carbon(inp: CarbonInput) -> JSONResponse:
+    if inp.project_type == "other":
+        return _handle_other_project_type(inp)
+
     try:
         boundary = parse_geo(inp.geo)
     except ValueError as exc:

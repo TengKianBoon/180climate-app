@@ -11,7 +11,7 @@ WO-CARBON-005 / WO-CARBON-006:
   - Co-dominant REDD uncertainties: baseline AND carbon density.
   - "Engage 180Climate" CTA at end.
 
-This module is the ONLY place where LLM calls will ever be made (determinism invariant).
+LLM calls in this product: narrative/ (template — currently no live call) and classifier/ (intake boundary only — NEVER in number path). The number/verdict path remains deterministic.
 """
 from __future__ import annotations
 from core.contracts import (
@@ -82,6 +82,10 @@ def generate_narrative(request: NarrativeRequest) -> NarrativeResult:
     low = estimate.quantity_low_tco2e
     high = estimate.quantity_high_tco2e
     unc = estimate.uncertainty
+    is_mixed = (
+        estimate.classification is not None
+        and estimate.classification.dominant_soil == "mixed"
+    )
 
     # ── Verdict block ─────────────────────────────────────────────────────────
     if elig.verdict == "eligible":
@@ -103,9 +107,16 @@ def generate_narrative(request: NarrativeRequest) -> NarrativeResult:
             "the above. Contact 180Climate to discuss what changes would alter this assessment."
         )
 
-    # ── Carbon estimate block (eligible only — suppress for hard_no / flagged) ─
-    if elig.verdict == "eligible":
+    # ── Carbon estimate block ─────────────────────────────────────────────────
+    # Show range for eligible OR mixed-concession flagged (mineral stratum has a number).
+    # Suppress for hard_no / flagged (non-mixed) — do not present a tempting number.
+    if low is not None:
         baseline_class = meth.baseline_class
+        range_label = (
+            "**Indicative Carbon Range (mineral stratum — peat stratum separately flagged)**"
+            if is_mixed
+            else "**Indicative Carbon Range**"
+        )
         if baseline_class == "peat":
             basis_note = (
                 "This figure is a deliberately conservative floor derived from IPCC Tier-1 default "
@@ -143,7 +154,7 @@ def generate_narrative(request: NarrativeRequest) -> NarrativeResult:
             )
 
         estimate_block = f"""
-**Indicative Carbon Range**
+{range_label}
 Estimated avoided emissions: {low:,.0f} – {high:,.0f} tCO₂e (project lifetime).
 Uncertainty: {unc}
 
