@@ -1,6 +1,6 @@
-phase: P3 · Productize (carbon → shippable v1)
-active_wo: WO-CARBON-009 — COMPLETE · GATE P READY
-status: STOPPED — 116 tests green; awaiting John to wire real SMTP + Sheets creds + verify end-to-end
-last_commit: (see git log — pushed to origin/main)
-next_step: John wires host env creds → verifies real email + Sheet → signs GATE P → dispatch Gate L work order (pre-launch-backlog.md)
+phase: P3 · Productize — CARBON V1 BUILD COMPLETE
+active_wo: none — holding for Cowork pre-launch scoping
+status: GATE P SIGNED by John (2026-06-24). Carbon v1 build functionally complete: engine + frontend + PDF/DOCX report + lead delivery (email+Sheet). Real SMTP+Sheets creds wired at deploy (Gate L). 116 tests green.
+last_commit: de04839 feat(lead): WO-CARBON-009 lead delivery pipeline (GATE P READY)
+next_step: Cowork scopes pre-launch backlog (docs/pre-launch-backlog.md) → dispatches next WO → Gate L
 updated: 2026-06-24
