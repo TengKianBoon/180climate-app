@@ -21,3 +21,4 @@ coordination/evidence/outbox_emails.jsonl
 coordination/evidence/outbox_leads.jsonl
 .DS_Store
 Thumbs.db
+.pytest_tmp/

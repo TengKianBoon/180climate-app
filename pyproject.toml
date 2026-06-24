@@ -7,8 +7,8 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 tmp_path_retention_count = 0
 tmp_path_retention_policy = "none"
-# Redirect pytest tmp dirs to avoid WinError 5 on AppData/Local/Temp/pytest-of-User
-addopts = "--basetemp=C:/dev/180climate-app/.pytest_tmp"
+# Cross-platform basetemp: relative path works on both Windows and Linux CI
+addopts = "--basetemp=.pytest_tmp"
 markers = [
     "network: live network test — skipped in CI (set CI=true to skip)",
 ]
