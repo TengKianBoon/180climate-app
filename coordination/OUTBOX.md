@@ -1,89 +1,58 @@
-# OUTBOX — Builder · WO-AUTOROUTE-005 · 2026-06-24
+# OUTBOX — Builder · WO-REALMAPS-001 · 2026-06-24
 
-## Status: COMPLETE — GATE-AR READY (stopping for John + advisor sign-off)
-
-WO-AUTOROUTE-005 complete. **231 tests green** (167 existing all pass, +64 new).
+## Status: COMPLETE — stopping for Cowork review
 
 ---
 
 ## What was delivered
 
-### New golden carbon fixtures (5)
-- `tests/fixtures/carbon/WO007_PEAT_Aonly.json`: PEAT, HTI, -1.5/112.0 polygon — KHG intersects, PIPPIB no intersection → "flag — A:" status
-- `tests/fixtures/carbon/WO007_PEAT_Bonly.json`: PEAT, HTI, -3.5/110.0 polygon — KHG no intersection, PIPPIB intersects → "flag — B:" status
-- `tests/fixtures/carbon/WO007_PEAT_neither.json`: PEAT, HTI, -4.0/108.0 polygon — both overlays no intersection → "possibly developable peat" status
-- `tests/fixtures/carbon/WO008_forest_intact.json`: REDD, HTI, -0.5/116.0 polygon — 75% cover, JRC undisturbed → intact, pass, number computed
-- `tests/fixtures/carbon/WO008_forest_heavy.json`: REDD, HTI, -1.5/115.0 polygon — 30% cover, JRC degraded → heavy_degradation, flag, number still computed
+### Overlay A — KHG fungsi-lindung (BIG One Map) — LIVE
+`core/overlays/khg.py` now does a real BIG ArcGIS REST spatial intersect query:
+- Endpoint: BIG One Map MapServer/48, WGS84/4326, Query+Data capable
+- Query: `where=feg_50k='Fungsi Lindung E.G.'`, polygon geometry from concession boundary
+- Fields captured: `kode_khg`, `peat_thick` → included in `OverlayIntersection.note`
+- SSL: `verify=False` (Indonesian government CA chain — expected)
+- Timeout: 10s; any failure → `intersects=None` → FLAG (ADR-0013 invariant)
+- Kill-switch: set `KHG_DISABLE_LIVE=true` to disable (e.g., for CI environments without committed fixture)
 
-### New data cache fixtures (5)
-Cache keys computed from actual UTM-projected area (shapely/pyproj), not nominal:
-- `d67cc15689b40193.json`: Peat A-only centroid (-1.5000, 112.0000, 49195.6 ha)
-- `e74d7830034b5964.json`: Peat B-only centroid (-3.5000, 110.0000, 49122.6 ha)
-- `1d5d7f387cb0c771.json`: Peat neither centroid (-4.0000, 108.0000, 49215.3 ha)
-- `cf72ac513d9218d5.json`: Forest intact centroid (-0.5000, 116.0000, 49210.2 ha)
-- `e1bd28d27ac80cd1.json`: Forest heavy centroid (-1.5000, 115.0000, 49240.9 ha)
+### Overlay B — PIPPIB moratorium — SNAPSHOT ONLY
+`core/overlays/pippib.py` now supports local GeoJSON snapshot query:
+- Live REST query NOT possible (exhaustive 2026-06-24 probe — see below)
+- Set `PIPPIB_SNAPSHOT_PATH=/path/to/PIPPIB_2026_I.geojson` for real intersection check
+- Loads once per process into shapely STRtree (fast in-memory spatial index)
+- Category field `PIPPIB` captured: PIPPIB GAMBUT / PIPPIB KAWASAN / PIPPIB PRIMER
+- Without env var → `intersects=None` → FLAG (conservative, safe)
 
-### New overlay fixtures (10)
-- `khg_-1.500_112.000.json` + `pippib_-1.500_112.000.json`: Peat A-only (KHG=true, PIPPIB=false)
-- `khg_-3.500_110.000.json` + `pippib_-3.500_110.000.json`: Peat B-only (KHG=false, PIPPIB=true)
-- `khg_-4.000_108.000.json` + `pippib_-4.000_108.000.json`: Peat neither (both false)
-- `worldcover_-0.500_116.000.json` + `jrc_tmf_-0.500_116.000.json`: Forest intact (78% cover, undisturbed)
-- `worldcover_-1.500_115.000.json` + `jrc_tmf_-1.500_115.000.json`: Forest heavy (32% cover, degraded)
+### PIPPIB endpoint probe findings (2026-06-24) — critical for John
+Every public endpoint tested returns Map-only capability or requires auth:
+- `geoportal.menlhk.go.id/…/PIPPIB_AR_250K/MapServer/0` → capabilities: "Map", /query returns 400
+- All 16 PIPPIB portal items → Map Services only, no FeatureServer with data
+- `identify` operation → 0 results (view-only)
+- WFS/WCS → 400
+- `geoportal.kehutanan.go.id`, `gis.kehutanan.go.id` → DNS not resolving
+- `sigap.kehutanan.go.id` → non-JSON responses
+- `pippib_h` service → "Map,Query,Data" in metadata, but /query returns "Bad login user" (auth required)
+- Current live period: **PIPPIB 2026 Periode I** (updated from 2025 II — confirms the 6-monthly cycle)
 
-### Tests/test_golden.py (+57 new parametrized test cases)
-New test functions with parametrization:
-- `test_peat_overlay_combo_no_tonnage` (3 params): all peat overlay combos produce no tonnage (ADR-0013)
-- `test_peat_overlay_combo_status_matches` (3 params): correct peat_additionality_status text per combo
-- `test_peat_overlay_combo_overlays_independent` (3 params): A and B stored separately
-- `test_peat_overlay_combo_never_hard_no` (3 params): never "hard_no", always "flagged"
-- `test_forest_gate_condition_and_result` (2 params): condition and gate_result verified
-- `test_forest_gate_variant_has_number` (2 params): pass/flag gates compute number
-- `test_forest_gate_variant_eligibility` (2 params): eligibility verdict verified
-- `test_all_peat_no_forbidden_phrases` (5 params): full sweep of 5 peat fixtures
-- `test_all_redd_no_forbidden_phrases` (8 params): full sweep of 8 REDD fixtures
-- `test_all_fixtures_is_planned_and_additionality_correct` (13 params): all 13 fixtures
-- `test_all_peat_never_vm0027_vm0048_vm0007` (5 params): methodology invariant sweep
-- `test_all_redd_never_vm0048_vm0007` (8 params): methodology invariant sweep
+**Action needed from John (deploy-time):**
+1. Download PIPPIB current snapshot from geoportal.menlhk.go.id (web UI download button)
+2. Convert SHP → GeoJSON: `ogr2ogr -f GeoJSON PIPPIB_2026_I.geojson PIPPIB_AR_250K.shp`
+3. Host in deploy environment's data dir
+4. Set `PIPPIB_SNAPSHOT_PATH=/path/to/PIPPIB_2026_I.geojson`
+**Until then: every peat concession shows PIPPIB=data unavailable → FLAG (conservative).**
 
-### tests/test_classifier.py (new file, 7 tests)
-Unit tests for classifier/intake.py — all deterministic (no real LLM calls):
-- Empty/whitespace description → out_of_scope
-- No ANTHROPIC_API_KEY → out_of_scope fallback (never raises)
-- ClassifierResult accepts all 4 valid category literals
-- ClassifierResult rejects invalid categories via Pydantic ValidationError
-- ClassifierResult defaults verified
-- Classifier never raises on any input (tested with 4 edge-case descriptions)
+### Tests
+- `tests/test_overlay_adapters.py` (new): 14 deterministic unit tests + 1 network-marked live smoke test
+- 1 network smoke test: `pytest tests/ -m network` — checks KHG live endpoint is up; skipped when `CI=true`
+- All 245 tests pass (231 existing + 14 new)
 
-### Bug fix: test_golden.py _load() encoding
-`_load()` updated to use `encoding="utf-8"` — prevents Windows cp1252 misreading of em dash characters in fixture files containing Unicode strings.
-
-### Gate pack documents
-- `coordination/GATE.md`: GATE-AR READY pack (replaces previous Gate C content)
-- `docs/adr-0013-build-gate-pack.md`: self-contained gate pack for John + advisor
+### pyproject.toml changes
+- Added `--basetemp=C:/dev/180climate-app/.pytest_tmp` to fix Windows PermissionError on pytest-of-User tmp dir
+- Registered `network` mark to suppress PytestUnknownMarkWarning
 
 ---
 
-## Key decisions
-
-1. **Actual vs nominal area_ha for cache keys**: The WO spec listed nominal area values (49219.8, etc.) but pyproj/shapely UTM computation gives different values (~49195 ha for a 0.2°×0.2° box near -1.5°). Cache keys were computed from actual shapely areas — this is correct behavior (the cache uses real computed boundary.area_ha).
-
-2. **`_load()` encoding fix**: Read fixtures with `encoding='utf-8'` — prevents Windows cp1252 garbling of Unicode em dashes in peat_additionality_status strings. Safe: all fixtures are UTF-8.
-
-3. **`is_tree_cover` excluded from worldcover fixtures**: It is a `@property` on `WorldCoverResult`, not a constructor field. Only `land_class`, `label`, `tree_cover_pct`, `note` are stored in fixtures.
-
-4. **Forest intact condition**: 75% cover + JRC "undisturbed" → `condition="intact"`, `gate_result="pass"` — number computed, verdict="eligible". Confirmed from engine logic (cover >= 60 AND undisturbed).
-
-5. **Forest heavy condition**: 30% cover + JRC "degraded" → falls through to `cover_pct >= 20` branch → `condition="heavy_degradation"`, `gate_result="flag"` — number still computed. Eligibility gates all pass → verdict="eligible".
-
----
-
-## 231 tests green
-```
-231 passed, 1 warning in 5.34s
-```
-
----
-
-## Open questions for reviewer
-1. The five data cache keys differ from what the WO spec specified (spec used nominal areas). The correct keys are the ones derived from actual shapely UTM computation. Is this understood and accepted?
-2. WO008_forest_heavy expects `eligibility_verdict = "eligible"` — this is because forest gate "flag" does not change eligibility (only "fail" does). The existing `test_forest_gate_variant_eligibility` assertion confirms this. Is this the intended behavior?
+## Open items for deploy (not code blockers)
+1. PIPPIB snapshot download + `PIPPIB_SNAPSHOT_PATH` env var (John action, deploy-time)
+2. `KHG_DISABLE_LIVE=true` not needed in production (CI fixtures cover all committed test cases)
+3. Verify KHG live query on a real peat concession during UAT (one SMPP-area polygon)

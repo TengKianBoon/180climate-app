@@ -5,3 +5,10 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+tmp_path_retention_count = 0
+tmp_path_retention_policy = "none"
+# Redirect pytest tmp dirs to avoid WinError 5 on AppData/Local/Temp/pytest-of-User
+addopts = "--basetemp=C:/dev/180climate-app/.pytest_tmp"
+markers = [
+    "network: live network test — skipped in CI (set CI=true to skip)",
+]

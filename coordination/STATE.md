@@ -1,6 +1,6 @@
-phase: P4 · Pre-launch — Gate-AR SIGNED, working pre-launch backlog
-active_wo: Pre-launch backlog (docs/pre-launch-backlog.md)
-status: Gate-AR signed by John 2026-06-24. Proceeding through pre-launch items. Next: SMTP SSL/STARTTLS support (api/email.py, item 4a), then brand logo swap when John provides brand/180climate-logo.png.
-last_commit: 40befba fix(engine): forest gate flag (heavy_degradation) forces verdict=flagged; number still indicative
-next_step: Pre-launch items — see docs/pre-launch-backlog.md. Logo blocked on John providing brand/180climate-logo.png.
+phase: P4 · Pre-launch — WO-REALMAPS-001 complete; Overlay A (KHG) live, Overlay B (PIPPIB) snapshot
+active_wo: WO-REALMAPS-001 COMPLETE — awaiting Cowork review
+status: KHG live REST query implemented (BIG One Map, WGS84, Query+Data capable). PIPPIB: no live REST endpoint available (Map-only on all probed endpoints — exhaustive 2026-06-24 probe); snapshot query via PIPPIB_SNAPSHOT_PATH env var + shapely STRtree. None→FLAG invariant maintained. 245 tests green.
+last_commit: <fill in after commit>
+next_step: Cowork review -> John approval -> remaining pre-launch (logo, advisor wording, deploy creds) -> Gate L
 updated: 2026-06-24
