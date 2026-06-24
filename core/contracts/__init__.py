@@ -1,7 +1,7 @@
 # core/contracts/__init__.py — the shared constitution. Change ONLY via ADR + Gate C.
 from __future__ import annotations
 from typing import Literal, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 # ---------- Shared ----------
 class ContactInfo(BaseModel):
@@ -129,6 +129,18 @@ class Stratum(BaseModel):
     quantity_low_tco2e: Optional[float] = None
     quantity_high_tco2e: Optional[float] = None
 
+    @model_validator(mode="after")
+    def _peat_must_have_no_tonnage(self) -> "Stratum":
+        """ADR-0013: peat stratum must never carry a tonnage — by construction."""
+        if self.soil_type == "peat":
+            if self.quantity_low_tco2e is not None or self.quantity_high_tco2e is not None:
+                raise ValueError(
+                    "ADR-0013 invariant violated: peat stratum must never carry a "
+                    "tonnage (quantity_low_tco2e and quantity_high_tco2e must be None). "
+                    "Peat routes to a flag, not a number."
+                )
+        return self
+
 class ProjectClassification(BaseModel):
     """Per-stratum project classification; replaces single project_type (ADR-0013)."""
     strata: list[Stratum]
@@ -141,8 +153,8 @@ class CarbonEstimate(BaseModel):
     eligibility: EligibilityResult
     methodology: MethodologyRoute
     forest: ForestData
-    quantity_low_tco2e: float
-    quantity_high_tco2e: float                # a RANGE, never a single false-precise number
+    quantity_low_tco2e: Optional[float]       # None for peat (ADR-0013: peat=flag, never a tonnage)
+    quantity_high_tco2e: Optional[float]      # a RANGE for non-peat; None for peat
     uncertainty: str
     quality: QualityFactors
     classification: Optional[ProjectClassification] = None  # ADR-0013; None = not yet classified

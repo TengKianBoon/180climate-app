@@ -259,9 +259,8 @@ RANGE_FIXTURES = [
 def test_golden_ranges(fixture_name: str):
     """WO-CARBON-004: frozen range values must match engine output exactly (determinism oracle).
 
-    These values are pinned for Gate M review. If the formula changes, regenerate with:
-      python -c "from engines.carbon.engine import ...; print(estimate.quantity_low_tco2e)"
-    and update the fixture's expected_range block.
+    WO-AUTOROUTE-002: peat fixture now has null quantities (flag, not a number).
+    Non-peat fixtures still assert exact frozen range values.
     """
     case = _load(fixture_name)
     if "expected_range" not in case:
@@ -272,17 +271,33 @@ def test_golden_ranges(fixture_name: str):
     forest = query_forest_data(boundary)
     estimate = run_carbon_engine(inp, boundary, forest)
 
-    assert estimate.quantity_low_tco2e == exp["quantity_low_tco2e"], (
-        f"{fixture_name}: quantity_low_tco2e expected {exp['quantity_low_tco2e']:,.0f}, "
-        f"got {estimate.quantity_low_tco2e:,.0f}"
-    )
-    assert estimate.quantity_high_tco2e == exp["quantity_high_tco2e"], (
-        f"{fixture_name}: quantity_high_tco2e expected {exp['quantity_high_tco2e']:,.0f}, "
-        f"got {estimate.quantity_high_tco2e:,.0f}"
-    )
-    assert estimate.quantity_low_tco2e < estimate.quantity_high_tco2e, (
-        "INVARIANT VIOLATION (ADR-0009): estimate must be a range, not a single value"
-    )
+    exp_low = exp["quantity_low_tco2e"]
+    exp_high = exp["quantity_high_tco2e"]
+
+    if exp_low is None:
+        # Peat flag — assert no tonnage (ADR-0013)
+        assert estimate.quantity_low_tco2e is None, (
+            f"{fixture_name}: peat must have quantity_low_tco2e=None, "
+            f"got {estimate.quantity_low_tco2e}"
+        )
+        assert estimate.quantity_high_tco2e is None, (
+            f"{fixture_name}: peat must have quantity_high_tco2e=None, "
+            f"got {estimate.quantity_high_tco2e}"
+        )
+    else:
+        # Non-peat — assert exact frozen range
+        assert estimate.quantity_low_tco2e == exp_low, (
+            f"{fixture_name}: quantity_low_tco2e expected {exp_low:,.0f}, "
+            f"got {estimate.quantity_low_tco2e:,.0f}"
+        )
+        assert estimate.quantity_high_tco2e == exp_high, (
+            f"{fixture_name}: quantity_high_tco2e expected {exp_high:,.0f}, "
+            f"got {estimate.quantity_high_tco2e:,.0f}"
+        )
+        assert estimate.quantity_low_tco2e < estimate.quantity_high_tco2e, (
+            "INVARIANT VIOLATION (ADR-0009): non-peat estimate must be a range"
+        )
+
     assert "Tier 1" in estimate.uncertainty, (
         f"{fixture_name}: IPCC Tier 1 label missing from uncertainty band"
     )
@@ -290,7 +305,7 @@ def test_golden_ranges(fixture_name: str):
 
 @pytest.mark.parametrize("fixture_name", RANGE_FIXTURES)
 def test_uncertainty_contains_ipcc_tier(fixture_name: str):
-    """ADR-0009: uncertainty band must cite an IPCC Tier label."""
+    """ADR-0009: uncertainty band must cite an IPCC Tier label (and baseline for non-peat)."""
     case = _load(fixture_name)
     if "expected_range" not in case:
         pytest.skip(f"No expected_range in {fixture_name}")
@@ -301,6 +316,112 @@ def test_uncertainty_contains_ipcc_tier(fixture_name: str):
     assert "Tier 1" in estimate.uncertainty, (
         f"IPCC Tier label missing from uncertainty_band in {fixture_name}"
     )
+    # Peat flag uncertainty uses "baseline" via the regulatory-surplus explanation
     assert "baseline" in estimate.uncertainty.lower() or "dominant uncertainty" in estimate.uncertainty.lower(), (
         f"Dominant uncertainty (baseline) not mentioned in uncertainty_band for {fixture_name}"
     )
+
+
+# ── WO-AUTOROUTE-002: peat flag tests ────────────────────────────────────────
+
+PEAT_FLAG_FIXTURES = [
+    "WO003_routing_PEAT.json",
+    "WO004_SMPP_peat_flag.json",
+]
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_FLAG_FIXTURES)
+def test_peat_flag_no_tonnage(fixture_name: str):
+    """ADR-0013 invariant: peat must NEVER emit a tonnage — quantity_*=None by construction."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.quantity_low_tco2e is None, (
+        f"INVARIANT VIOLATION (ADR-0013): peat must have quantity_low_tco2e=None "
+        f"(got {estimate.quantity_low_tco2e} for {fixture_name})"
+    )
+    assert estimate.quantity_high_tco2e is None, (
+        f"INVARIANT VIOLATION (ADR-0013): peat must have quantity_high_tco2e=None "
+        f"(got {estimate.quantity_high_tco2e} for {fixture_name})"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_FLAG_FIXTURES)
+def test_peat_flag_status_is_flag(fixture_name: str):
+    """ADR-0013: peat_additionality_status must start with 'flag' for all peat concessions."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.classification is not None, (
+        f"{fixture_name}: peat estimate must have classification"
+    )
+    assert len(estimate.classification.strata) >= 1
+    peat_strata = [s for s in estimate.classification.strata if s.soil_type == "peat"]
+    assert peat_strata, f"{fixture_name}: no peat stratum in classification"
+    stratum = peat_strata[0]
+    assert stratum.legal_overlay is not None, "peat stratum must have legal_overlay"
+    status = stratum.legal_overlay.peat_additionality_status
+    assert "flag" in status, (
+        f"INVARIANT VIOLATION (ADR-0013): peat_additionality_status must contain 'flag', "
+        f"got: {status!r}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_FLAG_FIXTURES)
+def test_peat_flag_never_hard_no(fixture_name: str):
+    """ADR-0013 fail-safe: peat routes to 'flagged', NEVER 'hard_no' (don't auto-exclude SMPP class)."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.eligibility.verdict != "hard_no", (
+        f"INVARIANT VIOLATION (ADR-0013): peat concession must never be 'hard_no' — "
+        f"valid restoration/WRC pathway may exist (e.g. VCS1899 class). "
+        f"Got verdict={estimate.eligibility.verdict!r} for {fixture_name}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_FLAG_FIXTURES)
+def test_peat_stratum_validator_enforced(fixture_name: str):
+    """Pydantic validator on Stratum prevents peat tonnage by construction."""
+    from core.contracts import Stratum
+    import pytest as _pytest
+    with _pytest.raises(Exception):
+        Stratum(
+            stratum_id="peat_bad",
+            area_ha=10_000.0,
+            soil_type="peat",
+            quantity_low_tco2e=1_000_000.0,   # must raise — peat cannot have a tonnage
+            quantity_high_tco2e=2_000_000.0,
+        )
+
+
+@pytest.mark.parametrize("fixture_name", PEAT_FLAG_FIXTURES)
+def test_peat_overlays_independent(fixture_name: str):
+    """ADR-0013: the two overlays A and B are always evaluated independently — not collapsed."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.classification is not None
+    peat_strata = [s for s in estimate.classification.strata if s.soil_type == "peat"]
+    stratum = peat_strata[0]
+    lor = stratum.legal_overlay
+    assert lor is not None
+    # Verify the two overlays are separate fields (never collapsed to one bool)
+    assert hasattr(lor, "overlay_a_khg"), "Overlay A must be a separate field"
+    assert hasattr(lor, "overlay_b_pippib"), "Overlay B must be a separate field"
+    # Each is an OverlayIntersection — can independently be True, False, or None
+    from core.contracts import OverlayIntersection
+    assert isinstance(lor.overlay_a_khg, OverlayIntersection)
+    assert isinstance(lor.overlay_b_pippib, OverlayIntersection)

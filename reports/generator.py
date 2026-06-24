@@ -88,6 +88,30 @@ _DOMINANT_UNC = (
     "registry-grade planned-harvest baseline established at project design."
 )
 
+_PEAT_FLAG_HEADING = "Peat Additionality Flag"
+
+_PEAT_FLAG_INTRO = (
+    "No indicative carbon tonnage is shown for this concession. Peat parcels route to "
+    "a qualitative flag under 180Climate's methodology (ADR-0013), not an indicative number."
+)
+
+_PEAT_FLAG_LEGAL = (
+    "Why: on legally protected Indonesian peat, the avoided-conversion baseline fails the "
+    "Verra VCS regulatory-surplus test. Clearing is already legally prohibited under "
+    "PP 57/2016 (ecosystem function / fungsi lindung) and Inpres 5/2019 (PIPPIB moratorium); "
+    '"not clearing" is the mandated legal baseline, not an additional action. '
+    "Crediting the avoidance of an illegal act is not permissible under Verra AFOLU rules."
+)
+
+_PEAT_FLAG_PATHWAY = (
+    "This does not mean the concession is ineligible for carbon finance. A restoration or "
+    "peat rewetting (WRC) approach — where the without-project scenario is continued "
+    "oxidation and fire of already-drained peat — may be additionally claimable under a "
+    "methodology such as VM0007 (WRC component). That determination requires a site visit, "
+    "hydrology survey, and qualified methodology advisor. "
+    "Contact 180Climate to explore the restoration pathway."
+)
+
 
 # ── PDF ───────────────────────────────────────────────────────────────────────
 
@@ -192,11 +216,25 @@ def generate_pdf(data: ReportData) -> bytes:
         story.append(Spacer(1, 4))
         story.append(Paragraph("<b>Dominant uncertainty</b>", BODY))
         story.append(Paragraph(_DOMINANT_UNC, BODY))
+    elif data.baseline_class == "peat":
+        story.append(Paragraph(_PEAT_FLAG_INTRO, BODY))
     else:
         story.append(Paragraph(
             "Carbon estimate not shown — resolve eligibility issues before proceeding.",
             BODY))
     story.append(hr())
+
+    # ── Peat additionality flag (shown only for peat concessions) ─────────────
+    if data.baseline_class == "peat":
+        story.append(Paragraph(_PEAT_FLAG_HEADING, H2))
+        story.append(Paragraph(_PEAT_FLAG_LEGAL, BODY))
+        story.append(Spacer(1, 4))
+        story.append(Paragraph("<b>Overlay screening result:</b>", BODY))
+        unc_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
+        story.append(Paragraph(unc_clean, SMALL))
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(_PEAT_FLAG_PATHWAY, BODY))
+        story.append(hr())
 
     # ── Methodology ───────────────────────────────────────────────────────────
     story.append(Paragraph("Methodology (Indicative)", H2))
@@ -346,10 +384,22 @@ def generate_docx(data: ReportData) -> bytes:
 
         _body("Dominant uncertainty", bold=True)
         _body(_DOMINANT_UNC)
+    elif data.baseline_class == "peat":
+        _body(_PEAT_FLAG_INTRO, italic=True)
     else:
         _body("Carbon estimate not shown — resolve eligibility issues before proceeding.",
               italic=True)
     _hr()
+
+    # ── Peat additionality flag (shown only for peat concessions) ─────────────
+    if data.baseline_class == "peat":
+        _h2(_PEAT_FLAG_HEADING)
+        _body(_PEAT_FLAG_LEGAL)
+        _body("Overlay screening result:", bold=True)
+        unc_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
+        _body(unc_clean, italic=True, colour=(136, 136, 136), size=9)
+        _body(_PEAT_FLAG_PATHWAY)
+        _hr()
 
     # ── Methodology ───────────────────────────────────────────────────────────
     _h2("Methodology (Indicative)")

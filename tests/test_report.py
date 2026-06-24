@@ -129,6 +129,16 @@ class TestPdf:
         assert "5,816,578" not in text
         assert "8,309,397" not in text
 
+    def test_peat_flag_section_present(self, peat_data):
+        text = _pdf_text(generate_pdf(peat_data))
+        assert "Peat Additionality Flag" in text
+        assert "regulatory" in text.lower() or "legal" in text.lower()
+
+    def test_peat_no_tonnage_in_report(self, peat_data):
+        text = _pdf_text(generate_pdf(peat_data))
+        assert "18,230,495" not in text
+        assert "28,109,607" not in text
+
 
 # ── DOCX invariants ────────────────────────────────────────────────────────────
 
@@ -184,3 +194,16 @@ class TestDocx:
         result = generate_docx(peat_data)
         text = self._extract_text(result)
         assert "no settled" in text
+
+    def test_peat_flag_section_present(self, peat_data):
+        result = generate_docx(peat_data)
+        text = self._extract_text(result)
+        assert "Peat Additionality Flag" in text
+        assert "regulatory" in text.lower() or "legal" in text.lower()
+
+    def test_peat_no_tonnage_in_report(self, peat_data):
+        result = generate_docx(peat_data)
+        text = self._extract_text(result)
+        # Peat report must not contain a large numeric range
+        assert "18,230,495" not in text
+        assert "28,109,607" not in text

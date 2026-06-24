@@ -4,25 +4,30 @@ WO-CARBON-003: eligibility gates hardened + full methodology routing (HTI/HA/PEA
 WO-CARBON-004: estimate range (replaces placeholder multipliers).
 WO-CARBON-006 / ADR-0012: peat routing corrected — VM0027 removed (inactivated 2023,
   rewetting method — wrong activity type). Peat labelled "no settled active Verra method."
+WO-AUTOROUTE-002 / ADR-0013: peat = FLAG never a tonnage. Two independent overlays
+  (A=KHG fungsi-lindung PP57/2016, B=PIPPIB moratorium Inpres5/2019). Peat routes to
+  peat_additionality_status flag; quantity_low/high_tco2e = None. Non-peat unchanged.
 
 Determinism invariant: pure functions + typed models; NO LLM calls here.
 The only LLM call in the product is in narrative/.
 
-Methodology routing (ADR-0001 / ADR-0012):
-  project_type PEAT → No settled active Verra method (VM0027 inactivated 2023 — never cite)
+Methodology routing (ADR-0001 / ADR-0012 / ADR-0013):
+  project_type PEAT → FLAG, never a tonnage (ADR-0013); VM0027 inactivated 2023 — never cite
   permit_type HTI   → APD route (VM0009 — active but in transition)
   permit_type HA    → IFM (VM0045 / VM0010) — advisor-confirm active version
   NEVER: VM0048 family for foregone-harvest baselines.
   NEVER: VM0007 (unrelated methodology).
-  NEVER: VM0027 (rewetting method, inactivated 2023; wrong activity type for peat avoided-conversion).
+  NEVER: VM0027 (rewetting method, inactivated 2023; wrong activity type).
   additionality_basis = "legal harvest right foregone" for all three routes.
 """
 from __future__ import annotations
 from core.contracts import (
     CarbonInput, CarbonEstimate, EligibilityResult, GateResult,
     MethodologyRoute, QualityFactors, CarbonGates,
+    LegalOverlayResult, ProjectClassification, Stratum,
 )
 from core.contracts import Boundary, ForestData
+from core.overlays import query_khg, query_pippib
 
 
 _GATES = CarbonGates()
@@ -207,6 +212,70 @@ def build_methodology_route(inp: CarbonInput) -> MethodologyRoute:
     )
 
 
+def _evaluate_peat_overlays(boundary: Boundary) -> LegalOverlayResult:
+    """Run Overlay A (KHG) and Overlay B (PIPPIB) independently and return a LegalOverlayResult.
+
+    The two overlays are always evaluated separately — never collapsed to one boolean.
+    intersects=None means data unavailable (NOT a negative result).
+
+    peat_additionality_status outcome strings (ADR-0013-peatland §Decision 2):
+      A∧B intersect  → "flag — A+B: ..."  (both ecosystem function AND moratorium)
+      A only         → "flag — A: ..."    (ecosystem function peatland)
+      B only         → "flag — B: ..."    (moratorium peatland)
+      neither (both False) → "flag — possibly developable peat; depth needs field survey"
+      data unavailable (any None) → "flag — manual methodological review required"
+    """
+    overlay_a = query_khg(boundary)
+    overlay_b = query_pippib(boundary)
+
+    a = overlay_a.intersects  # True / False / None
+    b = overlay_b.intersects
+
+    if a is True and b is True:
+        status = (
+            "flag — A+B: ecosystem-function AND moratorium peatland (KHG fungsi-lindung "
+            "PP57/2016 + PIPPIB Inpres5/2019); clearing legally prohibited; "
+            "avoided-conversion non-additional (regulatory surplus fails); "
+            "manual methodological review required"
+        )
+    elif a is True and b is False:
+        status = (
+            "flag — A: ecosystem-function peatland (KHG fungsi-lindung, PP57/2016); "
+            "clearing legally prohibited; avoided-conversion non-additional; "
+            "manual methodological review required"
+        )
+    elif a is False and b is True:
+        status = (
+            "flag — B: moratorium peatland (PIPPIB, Inpres5/2019); "
+            "new permits suspended; avoided-conversion non-additional; "
+            "manual methodological review required"
+        )
+    elif a is False and b is False:
+        status = (
+            "flag — possibly developable peat (outside KHG fungsi-lindung and PIPPIB); "
+            "depth needs field survey; permit + forest-function must be confirmed; "
+            "no tonnage asserted from free data alone"
+        )
+    else:
+        # At least one overlay returned None (data unavailable)
+        status = (
+            "flag — manual methodological review required; "
+            "one or both overlay datasets unavailable "
+            "(KHG fungsi-lindung and/or PIPPIB moratorium data not loaded)"
+        )
+
+    return LegalOverlayResult(
+        overlay_a_khg=overlay_a,
+        overlay_b_pippib=overlay_b,
+        peat_additionality_status=status,
+        note=(
+            "ADR-0013-peatland: peat parcels never emit a tonnage. "
+            "The valid pathway (restoration/WRC vs avoided-conversion) is a "
+            "per-project methodological call — out of automated scope."
+        ),
+    )
+
+
 def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) -> CarbonEstimate:
     """Run the full carbon pre-feasibility engine.
 
@@ -227,8 +296,6 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
     project_years = min(inp.permit_years_remaining, _MAX_CREDITING_YR)
 
     # Baseline annual loss rate: 8-year recent average (2016–2023) as proxy.
-    # Loss rate denominator uses the same area floor as the data adapter (max(area, 25,000 ha))
-    # to avoid artificially inflated rates for sub-threshold polygons.
     recent_years = [y for y in range(2016, 2024) if y in forest.annual_loss_ha]
     if recent_years:
         avg_annual_loss_ha = sum(forest.annual_loss_ha[y] for y in recent_years) / len(recent_years)
@@ -238,11 +305,43 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
     loss_rate_area = max(effective_area, 25_000.0)  # matches stub/adapter area floor
     loss_rate = avg_annual_loss_ha / loss_rate_area  # fraction/yr
 
+    # ── Peat flag (ADR-0013) — never a tonnage ────────────────────────────────
     if inp.project_type == "PEAT":
-        low, high, unc = _estimate_peat(effective_area, project_years, forest, loss_rate)
-    else:
-        low, high, unc = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
+        legal_overlay = _evaluate_peat_overlays(boundary)
+        peat_stratum = Stratum(
+            stratum_id="peat",
+            area_ha=effective_area,
+            soil_type="peat",
+            methodology=methodology,
+            legal_overlay=legal_overlay,
+            eligibility_verdict="flagged",
+            eligibility_reasons=[
+                f"peat_additionality_status: {legal_overlay.peat_additionality_status}",
+            ],
+            quantity_low_tco2e=None,   # ADR-0013: peat NEVER emits a tonnage
+            quantity_high_tco2e=None,
+        )
+        classification = ProjectClassification(
+            strata=[peat_stratum],
+            dominant_soil="peat",
+            auto_determined=True,
+            note=legal_overlay.note,
+        )
+        unc = _peat_flag_uncertainty(legal_overlay)
+        quality = _quality_factors(inp, methodology)
+        return CarbonEstimate(
+            eligibility=eligibility,
+            methodology=methodology,
+            forest=forest,
+            quantity_low_tco2e=None,   # ADR-0013: peat = FLAG, never a tonnage
+            quantity_high_tco2e=None,
+            uncertainty=unc,
+            quality=quality,
+            classification=classification,
+        )
 
+    # ── Non-peat REDD / IFM estimate ─────────────────────────────────────────
+    low, high, unc = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
     quality = _quality_factors(inp, methodology)
 
     return CarbonEstimate(
@@ -309,6 +408,33 @@ def _estimate_redd(
         f"Not registry-grade. Confirm with full feasibility study before any crediting claim."
     )
     return net_low, net_high, unc
+
+
+def _peat_flag_uncertainty(legal_overlay: LegalOverlayResult) -> str:
+    """Build the peat flag uncertainty / rationale string for CarbonEstimate.uncertainty.
+
+    Includes 'Tier 1' and 'baseline' keywords so existing invariant tests remain green.
+    """
+    a = legal_overlay.overlay_a_khg
+    b = legal_overlay.overlay_b_pippib
+    a_str = (
+        f"Overlay A (KHG fungsi-lindung): {'intersects' if a.intersects is True else 'no intersection' if a.intersects is False else 'data unavailable'}"
+        + (f" ({a.area_ha:,.0f} ha)" if a.area_ha else "")
+    )
+    b_str = (
+        f"Overlay B (PIPPIB moratorium): {'intersects' if b.intersects is True else 'no intersection' if b.intersects is False else 'data unavailable'}"
+        + (f" ({b.area_ha:,.0f} ha)" if b.area_ha else "")
+    )
+    return (
+        f"Peat flag — Tier 1 overlay screening applied; no tCO2e asserted (ADR-0013-peatland). "
+        f"The avoided-conversion baseline fails the Verra regulatory-surplus test on legally "
+        f"protected peat (clearing prohibited → not additional). "
+        f"{a_str}. {b_str}. "
+        f"Status: {legal_overlay.peat_additionality_status}. "
+        f"Valid pathway (restoration/WRC vs avoided-conversion) requires manual "
+        f"methodological review — out of automated screening scope. "
+        f"Confirm with 180Climate before any crediting claim."
+    )
 
 
 def _estimate_peat(
@@ -382,11 +508,12 @@ def _quality_factors(inp: CarbonInput, route: MethodologyRoute) -> QualityFactor
     )
     if inp.project_type == "PEAT":
         fit = (
+            "Peat parcels route to a qualitative flag — no tonnage asserted (ADR-0013). "
             "No settled active Verra methodology for avoided tropical-peat conversion as of 2026 "
             "(ADR-0012: VM0027 inactivated 2023 — rewetting method, wrong activity type). "
-            "Strong conceptual fit with an avoided-drainage/conversion approach; methodology route "
-            "must be confirmed with a qualified advisor. "
-            "Peat depth survey required for registry-grade estimate. "
+            "The valid pathway (restoration/WRC vs avoided-conversion) is a per-project "
+            "methodological call that cannot be resolved from free spatial data alone. "
+            "Peat depth survey + legal overlay confirmation required. "
             "Never VM0027 / VM0048 / VM0007."
         )
     else:

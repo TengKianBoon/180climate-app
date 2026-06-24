@@ -1,5 +1,5 @@
 {
-  "description": "PEAT project (HTI permit, 20 yr, large polygon) → no settled active Verra method (ADR-0012: VM0027 inactivated 2023 — rewetting method); never VM0027/VM0048/VM0007 (ADR-0001/0012)",
+  "description": "PEAT project (HTI permit, 20 yr, large polygon) → peat flag, never a tonnage (ADR-0013). Two overlays: A=KHG intersects (0.900,117.150 CI fixture), B=PIPPIB intersects. Status: flag A+B. Downgraded from 18M–28M tCO2e golden range (WO-AUTOROUTE-002 2026-06-24).",
   "input": {
     "contact": {"name": "Test User", "email": "test@example.com"},
     "iup_name": "PT Kalimantan Peat Conservation",
@@ -20,10 +20,20 @@
     "cited_methods_must_not_contain": ["VM0027", "VM0048", "VM0007"],
     "cited_methods_must_be_empty": true
   },
+  "expected_peat_flag": {
+    "quantity_low_tco2e": null,
+    "quantity_high_tco2e": null,
+    "peat_additionality_status_contains": "flag",
+    "classification_dominant_soil": "peat",
+    "classification_strata_count": 1,
+    "classification_stratum_soil_type": "peat",
+    "overlay_a_khg_intersects": true,
+    "overlay_b_pippib_intersects": true
+  },
   "expected_range": {
-    "quantity_low_tco2e": 18230495.0,
-    "quantity_high_tco2e": 28109607.0,
-    "ipcc_tier": "Tier 1",
-    "freeze_note": "WO-CARBON-001b — re-frozen 2026-06-24 with real Hansen GFC-2022-v1.10 pixel loss data (stub replaced; methodology/framing unchanged). Dominant: peat drainage EF 9–13 tCO2/ha/yr; secondary: AGB+BGB (IPCC 2006 peat_swamp 409.3 tCO2/ha). Was: 12277761–19605702 (peat AGB secondary term lifted by real biomass density)."
+    "quantity_low_tco2e": null,
+    "quantity_high_tco2e": null,
+    "ipcc_tier_in_uncertainty": true,
+    "freeze_note": "WO-AUTOROUTE-002 2026-06-24: downgraded from 18230495–28109607 (WO-CARBON-001b) to peat flag. ADR-0013-peatland: avoided-conversion non-additional on protected peat. CI overlays: A=KHG intersects (18500 ha), B=PIPPIB intersects (21200 ha) → flag A+B."
   }
 }

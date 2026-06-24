@@ -1,0 +1,30 @@
+{
+  "description": "SMPP-style fixture: deep peat dome (Sumatra) → flag, NEVER excluded (ADR-0013 fail-safe). KHG A=intersects (dome); PIPPIB B=ambiguous (intersects=null). Engine: peat_tCO2e=null, flag A + data-unavailable. Manual review would identify: ARR/WRC restoration pathway (VCS1899 class) potentially additional — valid route NOT auto-excluded. Demonstrates the flag correctly defers, not rejects.",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Sumatra Merang Conservation Style",
+    "iup_address": "Sumatera Selatan, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "PEAT",
+    "geo": {
+      "fmt": "coords",
+      "payload": "-2.5,103.5"
+    }
+  },
+  "expected_methodology": {
+    "baseline_class": "peat",
+    "is_planned": true,
+    "additionality_basis": "legal harvest right foregone",
+    "cited_methods_must_be_empty": true,
+    "verra_family_must_not_contain": ["VM0027", "VM0048", "VM0007"]
+  },
+  "expected_peat_flag": {
+    "quantity_low_tco2e": null,
+    "quantity_high_tco2e": null,
+    "peat_additionality_status_contains": "flag",
+    "overlay_a_khg_intersects": true,
+    "overlay_b_pippib_intersects": null,
+    "never_hard_no": true
+  }
+}
