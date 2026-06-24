@@ -44,7 +44,7 @@ class CachedAdapter:
         key = self._key(boundary)
         cache_file = self._dir / f"{key}.json"
         if cache_file.exists():
-            return ForestData(**json.loads(cache_file.read_text()))
+            return ForestData(**json.loads(cache_file.read_text(encoding="utf-8")))
         result = self._inner.query(boundary)
-        cache_file.write_text(result.model_dump_json(indent=2))
+        cache_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
         return result

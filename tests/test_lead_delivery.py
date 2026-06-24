@@ -162,7 +162,7 @@ class TestLeadEndpoint:
     def test_no_secrets_in_payload(self, ci_outbox):
         """Outbox must not contain SMTP password or credential keys."""
         client.post("/api/lead", json=_GOLDEN_LEAD)
-        content = (ci_outbox / "outbox_emails.jsonl").read_text()
+        content = (ci_outbox / "outbox_emails.jsonl").read_text(encoding="utf-8")
         assert "EMAIL_PASSWORD" not in content
         assert "GOOGLE_CREDENTIALS_JSON" not in content
         assert "AKIA" not in content  # AWS key pattern

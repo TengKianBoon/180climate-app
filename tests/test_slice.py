@@ -22,7 +22,7 @@ from engines.carbon.engine import run_carbon_engine, run_eligibility, build_meth
 from api.main import app
 
 _GOLDEN_PATH = Path(__file__).parent / "fixtures" / "carbon" / "WO001_golden.json"
-_GOLDEN = json.loads(_GOLDEN_PATH.read_text())
+_GOLDEN = json.loads(_GOLDEN_PATH.read_text(encoding="utf-8"))
 
 client = TestClient(app)
 

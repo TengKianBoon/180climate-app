@@ -1,36 +1,36 @@
-{
-  "annual_loss_ha": {
-    "2001": 2654.92,
-    "2002": 3887.96,
-    "2003": 2251.8,
-    "2004": 4293.17,
-    "2005": 4912.83,
-    "2006": 2670.64,
-    "2007": 8987.99,
-    "2008": 4912.99,
-    "2009": 15233.62,
-    "2010": 4067.49,
-    "2011": 5348.94,
-    "2012": 22524.34,
-    "2013": 8162.24,
-    "2014": 11878.73,
-    "2015": 13033.48,
-    "2016": 21008.06,
-    "2017": 12200.22,
-    "2018": 12561.05,
-    "2019": 5855.14,
-    "2020": 7494.64,
-    "2021": 4853.82,
-    "2022": 4976.49
-  },
-  "baseline_cover_pct": 61.5,
-  "loss_after_2020_ha": 9830.31,
-  "data_sources": [
-    "GFW/Hansen GFC-2022-v1.10 lossyear pixel read (tile 00N_110E, 30 m, public GCS, no auth)",
-    "Biomass: IPCC (2006) Guidelines for National GHG Inventories, Vol. 4 AFOLU, Table 4.7 — Southeast Asia tropical forest defaults — Tier-1 fallback (set DENSITY_COG_URL to enable ESA CCI / GEDI read)"
-  ],
-  "uncertainty_band": "Tier 1 indicative screening — Hansen GFC-2022-v1.10 pixel loss rate (30 m, tile 00N_110E); baseline harvest rate from IUP permit not yet verified — dominant uncertainty. Not registry-grade.",
-  "peat_present": null,
-  "peat_depth_proxy_m": null,
-  "biomass_tco2_per_ha": 657.1
+{
+  "annual_loss_ha": {
+    "2001": 2654.92,
+    "2002": 3887.96,
+    "2003": 2251.8,
+    "2004": 4293.17,
+    "2005": 4912.83,
+    "2006": 2670.64,
+    "2007": 8987.99,
+    "2008": 4912.99,
+    "2009": 15233.62,
+    "2010": 4067.49,
+    "2011": 5348.94,
+    "2012": 22524.34,
+    "2013": 8162.24,
+    "2014": 11878.73,
+    "2015": 13033.48,
+    "2016": 21008.06,
+    "2017": 12200.22,
+    "2018": 12561.05,
+    "2019": 5855.14,
+    "2020": 7494.64,
+    "2021": 4853.82,
+    "2022": 4976.49
+  },
+  "baseline_cover_pct": 61.5,
+  "loss_after_2020_ha": 9830.31,
+  "data_sources": [
+    "GFW/Hansen GFC-2022-v1.10 lossyear pixel read (tile 00N_110E, 30 m, public GCS, no auth)",
+    "Biomass: IPCC (2006) Guidelines for National GHG Inventories, Vol. 4 AFOLU, Table 4.7 â€” Southeast Asia tropical forest defaults â€” Tier-1 fallback (set DENSITY_COG_URL to enable ESA CCI / GEDI read)"
+  ],
+  "uncertainty_band": "Tier 1 indicative screening â€” Hansen GFC-2022-v1.10 pixel loss rate (30 m, tile 00N_110E); baseline harvest rate from IUP permit not yet verified â€” dominant uncertainty. Not registry-grade.",
+  "peat_present": null,
+  "peat_depth_proxy_m": null,
+  "biomass_tco2_per_ha": 657.1
 }

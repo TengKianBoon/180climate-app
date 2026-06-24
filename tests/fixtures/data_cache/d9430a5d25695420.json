@@ -1,36 +1,36 @@
-{
-  "annual_loss_ha": {
-    "2001": 156.9,
-    "2002": 76.05,
-    "2003": 14.48,
-    "2004": 161.16,
-    "2005": 94.17,
-    "2006": 191.36,
-    "2007": 158.99,
-    "2008": 274.99,
-    "2009": 1031.6,
-    "2010": 1880.66,
-    "2011": 2937.5,
-    "2012": 3032.14,
-    "2013": 2574.15,
-    "2014": 3529.54,
-    "2015": 3303.49,
-    "2016": 6072.33,
-    "2017": 1700.53,
-    "2018": 1530.32,
-    "2019": 1461.86,
-    "2020": 990.47,
-    "2021": 1035.7,
-    "2022": 849.92
-  },
-  "baseline_cover_pct": 70.7,
-  "loss_after_2020_ha": 1885.62,
-  "data_sources": [
-    "GFW/Hansen GFC-2022-v1.10 lossyear pixel read (tile 10N_110E, 30 m, public GCS, no auth)",
-    "ESA CCI Biomass v3.0 2018 (CEDA public, tile N10E110, 100 m; concession mean 155 tDM/ha -> 266 tCO2/ha)"
-  ],
-  "uncertainty_band": "Tier 1 indicative screening — Hansen GFC-2022-v1.10 pixel loss rate (30 m, tile 10N_110E); baseline harvest rate from IUP permit not yet verified — dominant uncertainty. Not registry-grade.",
-  "peat_present": null,
-  "peat_depth_proxy_m": null,
-  "biomass_tco2_per_ha": 266.5
+{
+  "annual_loss_ha": {
+    "2001": 156.9,
+    "2002": 76.05,
+    "2003": 14.48,
+    "2004": 161.16,
+    "2005": 94.17,
+    "2006": 191.36,
+    "2007": 158.99,
+    "2008": 274.99,
+    "2009": 1031.6,
+    "2010": 1880.66,
+    "2011": 2937.5,
+    "2012": 3032.14,
+    "2013": 2574.15,
+    "2014": 3529.54,
+    "2015": 3303.49,
+    "2016": 6072.33,
+    "2017": 1700.53,
+    "2018": 1530.32,
+    "2019": 1461.86,
+    "2020": 990.47,
+    "2021": 1035.7,
+    "2022": 849.92
+  },
+  "baseline_cover_pct": 70.7,
+  "loss_after_2020_ha": 1885.62,
+  "data_sources": [
+    "GFW/Hansen GFC-2022-v1.10 lossyear pixel read (tile 10N_110E, 30 m, public GCS, no auth)",
+    "ESA CCI Biomass v3.0 2018 (CEDA public, tile N10E110, 100 m; concession mean 155 tDM/ha -> 266 tCO2/ha)"
+  ],
+  "uncertainty_band": "Tier 1 indicative screening â€” Hansen GFC-2022-v1.10 pixel loss rate (30 m, tile 10N_110E); baseline harvest rate from IUP permit not yet verified â€” dominant uncertainty. Not registry-grade.",
+  "peat_present": null,
+  "peat_depth_proxy_m": null,
+  "biomass_tco2_per_ha": 266.5
 }
