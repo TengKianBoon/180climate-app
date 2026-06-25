@@ -56,7 +56,7 @@ class ReportData:
         if self.quantity_low_tco2e is None or self.quantity_high_tco2e is None:
             return "Not shown — resolve eligibility issues before estimate."
         return (
-            f"{self.quantity_low_tco2e:,.0f} – {self.quantity_high_tco2e:,.0f} tCO₂e"
+            f"{self.quantity_low_tco2e:,.0f} – {self.quantity_high_tco2e:,.0f} tCO2e"
         )
 
     def methodology_short(self) -> str:

@@ -299,12 +299,12 @@ def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
         if is_mixed:
             summary = (
                 f"Mixed concession — mineral stratum: "
-                f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
+                f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO2e"
                 f" (lifetime) · peat stratum: flag (ADR-0013)"
             )
         else:
             summary = (
-                f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
+                f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO2e"
                 f" (lifetime) · IPCC Tier 1 · {estimate.methodology.verra_family}"
             )
     else:
@@ -367,7 +367,7 @@ def carbon(inp: CarbonInput) -> JSONResponse:
     has_range = estimate.quantity_low_tco2e is not None
     if has_range:
         summary = (
-            f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
+            f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO2e"
             f" (lifetime) · IPCC Tier 1 · {estimate.methodology.verra_family}"
         )
     else:
@@ -504,7 +504,7 @@ def report(
     has_range = estimate.quantity_low_tco2e is not None
     if has_range:
         summary = (
-            f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO₂e"
+            f"{estimate.quantity_low_tco2e:,.0f} – {estimate.quantity_high_tco2e:,.0f} tCO2e"
             f" (lifetime) · IPCC Tier 1 · {estimate.methodology.verra_family}"
         )
     else:

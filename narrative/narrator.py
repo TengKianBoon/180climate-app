@@ -121,7 +121,7 @@ def generate_narrative(request: NarrativeRequest) -> NarrativeResult:
             basis_note = (
                 "This figure is a deliberately conservative floor derived from IPCC Tier-1 default "
                 "emission factors for tropical drained peatland (IPCC 2013 Wetlands Supplement "
-                "Table 2.1: 9–13 tCO₂-eq/ha/yr). The peat drainage emission factor used here is "
+                "Table 2.1: 9–13 tCO2-eq/ha/yr). The peat drainage emission factor used here is "
                 "conservative; deeply-drained plantation peat is often higher. "
                 "The buffer deduction (20–30%) is a placeholder for the AFOLU non-permanence "
                 "risk-tool output — the actual VCS buffer requires project-specific inputs. "
@@ -136,7 +136,7 @@ def generate_narrative(request: NarrativeRequest) -> NarrativeResult:
             basis_note = (
                 "This figure is a deliberately conservative floor derived from OBSERVED forest loss "
                 "(8-year satellite average loss rate, 2016–2023) and IPCC 2006 Table 4.7 SE-Asia "
-                "default biomass (657.1 tCO₂/ha for lowland moist tropical forest). "
+                "default biomass (657.1 tCO2/ha for lowland moist tropical forest). "
                 "It is NOT the APD/IFM (VM0009) planned-harvest baseline — the registry-grade "
                 "baseline is established and independently justified only at registry grade, "
                 "based on the documented planned harvest rate from the IUP permit, "
@@ -155,7 +155,7 @@ def generate_narrative(request: NarrativeRequest) -> NarrativeResult:
 
         estimate_block = f"""
 {range_label}
-Estimated avoided emissions: {low:,.0f} – {high:,.0f} tCO₂e (project lifetime).
+Estimated avoided emissions: {low:,.0f} – {high:,.0f} tCO2e (project lifetime).
 Uncertainty: {unc}
 
 **Basis for this figure**

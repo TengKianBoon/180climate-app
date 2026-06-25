@@ -561,7 +561,7 @@ function renderResult() {
   if (ov.quantity_low_tco2e != null && ov.quantity_high_tco2e != null) {
     rangeEl.innerHTML = fmtN(ov.quantity_low_tco2e)
       + ' – ' + fmtN(ov.quantity_high_tco2e)
-      + ' <span class="range-unit">tCO₂e</span>';
+      + ' <span class="range-unit">tCO2e</span>';
     var isMixed = ov.classifier_category && verdict === 'flagged';
     rangeLblEl.textContent = isMixed
       ? 'Indicative avoided emissions · mineral stratum · project lifetime'
