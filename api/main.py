@@ -35,13 +35,21 @@ app = FastAPI(title="180Climate Pre-FS API", version="0.1.0-slice")
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 _DISCLAIMER_TEXT = (
-    "Indicative screening estimate only. Not registry-grade, not financial advice. "
-    "Confirm with a full feasibility study before any financial or crediting claim."
+    "Indicative Tier 1 screening only — not registry-grade, not financial advice. "
+    "We show a range (not a single number) and an IPCC Tier label rather than a "
+    "percentage, because no point-confidence would be defensible at this stage — "
+    "the true value depends on field-measured carbon density, the "
+    "baseline/counterfactual, and (for peat) depth and drainage, established by a "
+    "site visit and full methodology application."
 )
 _CARROT = (
-    "This free screening replaces a ~SGD 12K paid pre-feasibility study. "
-    "For a bankable feasibility — site visit, accredited methodology, financial model, "
-    "Verra registration, and market access — contact info@180climate.net."
+    "This free screening already routes your concession to the appropriate "
+    "accredited Verra methodology, at an indicative IPCC Tier 1 level — "
+    "a first read that a paid pre-feasibility study (~SGD 12K) would otherwise begin. "
+    "To take it to a bankable, registry-grade carbon project — field validation, "
+    "full methodology application, a financial model, independent third-party "
+    "verification, Verra registration, and market access — talk to 180Climate "
+    "at info@180climate.net."
 )
 _VERDICT_LABELS = {
     "eligible": "Eligible — indicative carbon project opportunity identified",
@@ -82,6 +90,8 @@ def _build_report_data(
     boundary,           # type: ignore[no-untyped-def]
     estimate,           # type: ignore[no-untyped-def]
     filename_base: str | None = None,
+    narrative: str = "",
+    forest_data=None,   # type: ignore[no-untyped-def]
 ) -> ReportData:
     # Use quantity presence as the range guard — peat has qty=None regardless of verdict
     has_range = estimate.quantity_low_tco2e is not None
@@ -106,6 +116,14 @@ def _build_report_data(
         additionality_basis=estimate.methodology.additionality_basis,
         uncertainty=estimate.uncertainty,
         area_ha=boundary.area_ha,
+        quality=estimate.quality,
+        narrative=narrative,
+        forest_baseline_cover_pct=forest_data.baseline_cover_pct if forest_data is not None else None,
+        forest_annual_loss_ha=dict(forest_data.annual_loss_ha) if forest_data is not None else {},
+        forest_loss_after_2020_ha=forest_data.loss_after_2020_ha if forest_data is not None else None,
+        forest_peat_present=forest_data.peat_present if forest_data is not None else None,
+        forest_biomass_tco2_per_ha=forest_data.biomass_tco2_per_ha if forest_data is not None else None,
+        data_sources=list(forest_data.data_sources) if forest_data is not None else [],
         **({"filename_base": filename_base} if filename_base else {}),
     )
 
@@ -482,7 +500,13 @@ def lead(req: LeadRequest) -> dict[str, Any]:
                 "quantity_high_tco2e": estimate.quantity_high_tco2e if has_range else None,
             })
 
-            rdata = _build_report_data(carbon_inp, boundary, estimate, filename_base)
+            lead_narr_req = NarrativeRequest(
+                engine="carbon",
+                payload=estimate.model_dump(),
+                must_state=["legal harvest right foregone"],
+            )
+            lead_narr = generate_narrative(lead_narr_req)
+            rdata = _build_report_data(carbon_inp, boundary, estimate, filename_base, lead_narr.text, forest)
             docx_bytes = generate_docx(rdata)
         except Exception:
             pass  # best-effort DOCX; email still sent without attachment
@@ -506,8 +530,15 @@ def report(
     forest   = query_forest_data(boundary)
     estimate = run_carbon_engine(inp, boundary, forest)
 
+    narr_req = NarrativeRequest(
+        engine="carbon",
+        payload=estimate.model_dump(),
+        must_state=["legal harvest right foregone"],
+    )
+    narr = generate_narrative(narr_req)
+
     filename_base = make_filename()
-    rdata = _build_report_data(inp, boundary, estimate, filename_base)
+    rdata = _build_report_data(inp, boundary, estimate, filename_base, narr.text, forest)
 
     has_range = estimate.quantity_low_tco2e is not None
     if has_range:

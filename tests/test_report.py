@@ -7,6 +7,7 @@ baseline-dominant-uncertainty present, Engage CTA present).
 import io
 import pytest
 
+from core.contracts import QualityFactors
 from reports.generator import ReportData, generate_pdf, generate_docx, make_filename
 
 
@@ -34,6 +35,26 @@ def hti_eligible_data() -> ReportData:
         uncertainty="Low–medium; observed-loss floor; IPCC Tier 1",
         area_ha=73_787.0,
         filename_base="2606241200",
+        quality=QualityFactors(
+            additionality="Strong — legal harvest right foregone under active HTI permit",
+            permanence="Moderate — 30-year project maximum; IUP renewal risk",
+            leakage="Low–moderate — concession-wide approach limits activity shifting",
+            methodology_fit="High — planned deforestation baseline (APD / VM0009)",
+        ),
+        narrative=(
+            "The concession appears eligible for a carbon project under current "
+            "screening criteria.\n\n"
+            "Indicative Carbon Range: 5,816,578 – 8,309,397 tCO2e (project lifetime).\n\n"
+            "Engage 180Climate — talk to us at info@180climate.net."
+        ),
+        forest_baseline_cover_pct=82.5,
+        forest_annual_loss_ha={2016: 150.0, 2017: 180.0, 2018: 210.0,
+                               2019: 160.0, 2020: 140.0, 2021: 170.0, 2022: 190.0},
+        forest_loss_after_2020_ha=500.0,
+        forest_peat_present=False,
+        forest_biomass_tco2_per_ha=266.5,
+        data_sources=["GFW/Hansen GFC-2022-v1.10", "ESA CCI Biomass v3.0 2018",
+                      "KHG (KLHK)", "PIPPIB 2026 Periode I"],
     )
 
 
@@ -139,6 +160,41 @@ class TestPdf:
         assert "18,230,495" not in text
         assert "28,109,607" not in text
 
+    def test_quality_factors_present(self, hti_eligible_data):
+        text = _pdf_text(generate_pdf(hti_eligible_data))
+        assert "Quality Factors" in text
+        assert "Additionality" in text
+        assert "Permanence" in text
+        assert "Leakage" in text
+
+    def test_forest_summary_present(self, hti_eligible_data):
+        text = _pdf_text(generate_pdf(hti_eligible_data))
+        assert "Forest Data Summary" in text
+        assert "82.5" in text or "Baseline" in text
+
+    def test_narrative_present(self, hti_eligible_data):
+        text = _pdf_text(generate_pdf(hti_eligible_data))
+        assert "Assessment Narrative" in text
+
+    def test_data_sources_present(self, hti_eligible_data):
+        text = _pdf_text(generate_pdf(hti_eligible_data))
+        assert "Data Sources" in text
+        assert "Hansen" in text
+
+    def test_new_cta_wording(self, hti_eligible_data):
+        text = _pdf_text(generate_pdf(hti_eligible_data))
+        assert "registry-grade" in text
+        assert "accredited Verra methodology" in text or "accredited" in text
+
+    def test_no_accredited_methodology_trust_risk(self, hti_eligible_data):
+        text = _pdf_text(generate_pdf(hti_eligible_data))
+        assert "accredited methodology selection" not in text
+
+    def test_no_percentage_confidence(self, hti_eligible_data):
+        text = _pdf_text(generate_pdf(hti_eligible_data))
+        assert "% confidence" not in text
+        assert "% accuracy" not in text
+
 
 # ── DOCX invariants ────────────────────────────────────────────────────────────
 
@@ -207,3 +263,37 @@ class TestDocx:
         # Peat report must not contain a large numeric range
         assert "18,230,495" not in text
         assert "28,109,607" not in text
+
+    def test_quality_factors_present(self, hti_eligible_data):
+        result = generate_docx(hti_eligible_data)
+        text = self._extract_text(result)
+        assert "Quality Factors" in text
+        assert "Additionality" in text
+        assert "Permanence" in text
+
+    def test_forest_summary_present(self, hti_eligible_data):
+        result = generate_docx(hti_eligible_data)
+        text = self._extract_text(result)
+        assert "Forest Data Summary" in text
+        assert "82.5" in text or "Baseline" in text
+
+    def test_narrative_present(self, hti_eligible_data):
+        result = generate_docx(hti_eligible_data)
+        text = self._extract_text(result)
+        assert "Assessment Narrative" in text
+
+    def test_data_sources_present(self, hti_eligible_data):
+        result = generate_docx(hti_eligible_data)
+        text = self._extract_text(result)
+        assert "Data Sources" in text
+        assert "Hansen" in text
+
+    def test_new_cta_wording(self, hti_eligible_data):
+        result = generate_docx(hti_eligible_data)
+        text = self._extract_text(result)
+        assert "registry-grade" in text
+
+    def test_no_accredited_methodology_trust_risk(self, hti_eligible_data):
+        result = generate_docx(hti_eligible_data)
+        text = self._extract_text(result)
+        assert "accredited methodology selection" not in text

@@ -22,14 +22,19 @@ from core.contracts import (
 _DISCLAIMER = (
     "Indicative Tier 1 screening only — not registry-grade, not financial advice. "
     "This figure uses IPCC default values and a proxy loss rate; it is not a verified "
-    "avoided-emissions claim. Confirm with a full feasibility study, accredited methodology, "
-    "and independent third-party verification before any financial or crediting claim."
+    "avoided-emissions claim. Confirm with a full feasibility study — registry-grade "
+    "methodology application and independent third-party verification — before any "
+    "financial or crediting claim."
 )
 
 _ENGAGE_CTA = (
-    "**Engage 180Climate** — if this concession is a candidate for a carbon project, "
-    "the next step is a structured feasibility scoping with 180Climate. "
-    "Contact: info@180climate.net"
+    "**Engage 180Climate** — This free screening already routes your concession to the "
+    "appropriate accredited Verra methodology, at an indicative IPCC Tier 1 level — "
+    "a first read that a paid pre-feasibility study (~SGD 12K) would otherwise begin. "
+    "To take it to a bankable, registry-grade carbon project — field validation, "
+    "full methodology application, a financial model, independent third-party "
+    "verification, Verra registration, and market access — talk to 180Climate "
+    "at info@180climate.net."
 )
 
 _METHODOLOGY_NOTE = {
@@ -177,7 +182,7 @@ Uncertainty: {unc}
 {estimate_block}
 {meth_note}
 
-**Important:** Field validation, an accredited methodology selection, and independent third-party verification are required before any creditable or financial claim. The baseline / counterfactual and carbon density are co-dominant uncertainties for REDD projects; peat depth and drainage intensity are co-dominant for PEAT projects.
+**Important:** Field validation, full (registry-grade) methodology application, and independent third-party verification are required before any creditable or financial claim. The baseline / counterfactual and carbon density are co-dominant uncertainties for REDD projects; peat depth and drainage intensity are co-dominant for PEAT projects.
 
 {_DISCLAIMER}
 

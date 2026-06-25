@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 _LOGO_PATH = Path(__file__).parent.parent / "brand" / "180climate-logo.png"
 # Logo dimensions: 314×282 px → aspect ratio ≈ 1.113
@@ -49,6 +49,15 @@ class ReportData:
     uncertainty: str
     area_ha: float
     filename_base: str = field(default_factory=make_filename)
+    # Comprehensive report additions (WO-REPORT-001)
+    quality: Optional[Any] = field(default=None)
+    narrative: str = field(default="")
+    forest_baseline_cover_pct: Optional[float] = field(default=None)
+    forest_annual_loss_ha: dict = field(default_factory=dict)
+    forest_loss_after_2020_ha: Optional[float] = field(default=None)
+    forest_peat_present: Optional[bool] = field(default=None)
+    forest_biomass_tco2_per_ha: Optional[float] = field(default=None)
+    data_sources: list = field(default_factory=list)
 
     # --- derived helpers ---
 
@@ -73,15 +82,18 @@ class ReportData:
 _DISCLAIMER = (
     "Indicative Tier 1 screening only — not registry-grade, not financial advice. "
     "This figure uses IPCC default values and a proxy loss rate; it is not a verified "
-    "avoided-emissions claim. Confirm with a full feasibility study, accredited "
-    "methodology, and independent third-party verification before any financial or "
-    "crediting claim."
+    "avoided-emissions claim. Confirm with a full feasibility study — registry-grade "
+    "methodology application and independent third-party verification — before any "
+    "financial or crediting claim."
 )
 
 _ENGAGE_CTA = (
-    "If this concession is a candidate for a carbon project, the next step is a "
-    "structured feasibility scoping with 180Climate: site visit, accredited methodology "
-    "selection and baseline, financial model, Verra registration, and market access.\n\n"
+    "This free screening already routes your concession to the appropriate accredited "
+    "Verra methodology, at an indicative IPCC Tier 1 level — a first read that a paid "
+    "pre-feasibility study (~SGD 12K) would otherwise begin.\n\n"
+    "To take it to a bankable, registry-grade carbon project — field validation, full "
+    "methodology application, a financial model, independent third-party verification, "
+    "Verra registration, and market access — talk to 180Climate.\n\n"
     "Contact: info@180climate.net\n"
     "Website: www.180climate.net"
 )
@@ -264,6 +276,63 @@ def generate_pdf(data: ReportData) -> bytes:
         SMALL))
     story.append(hr())
 
+    # ── Quality factors ───────────────────────────────────────────────────────
+    if data.quality:
+        story.append(Paragraph("Quality Factors", H2))
+        for label, value in [
+            ("Additionality", data.quality.additionality),
+            ("Permanence", data.quality.permanence),
+            ("Leakage", data.quality.leakage),
+            ("Methodology fit", data.quality.methodology_fit),
+        ]:
+            story.append(Paragraph(f"<b>{label}:</b> {value}", BODY))
+        story.append(hr())
+
+    # ── Forest data summary ───────────────────────────────────────────────────
+    story.append(Paragraph("Forest Data Summary", H2))
+    _forest_rows = []
+    if data.forest_baseline_cover_pct is not None:
+        _forest_rows.append(("Baseline canopy cover",
+                             f"{data.forest_baseline_cover_pct:.1f}%"))
+    if data.forest_annual_loss_ha:
+        _yrs = sorted(data.forest_annual_loss_ha.keys())
+        _tot = sum(data.forest_annual_loss_ha.values())
+        _avg = _tot / len(_yrs) if _yrs else 0
+        _forest_rows.append(("Annual loss rate (avg)",
+                             f"{_avg:,.0f} ha/yr ({_yrs[0]}–{_yrs[-1]})"))
+        _win = [y for y in _yrs if 2016 <= y <= 2022]
+        if _win:
+            _wa = sum(data.forest_annual_loss_ha[y] for y in _win) / len(_win)
+            _forest_rows.append(("Loss rate (2016–2022 avg, used in estimate)",
+                                f"{_wa:,.0f} ha/yr"))
+    if data.forest_loss_after_2020_ha is not None:
+        _forest_rows.append(("Loss after Dec 2020",
+                             f"{data.forest_loss_after_2020_ha:,.0f} ha"))
+    if data.forest_peat_present is not None:
+        _forest_rows.append(("Peat presence (proxy)",
+                             "Yes" if data.forest_peat_present else "No"))
+    if data.forest_biomass_tco2_per_ha is not None:
+        _forest_rows.append(("Biomass density",
+                             f"{data.forest_biomass_tco2_per_ha:,.1f} tCO2/ha"))
+    if not _forest_rows:
+        story.append(Paragraph("Not available at screening stage.", SMALL))
+    for _k, _v in _forest_rows:
+        story.append(Paragraph(f"<b>{_k}:</b> {_v}", BODY))
+    story.append(hr())
+
+    # ── Assessment narrative ──────────────────────────────────────────────────
+    if data.narrative:
+        story.append(Paragraph("Assessment Narrative", H2))
+        _narr_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.narrative)
+        _narr_clean = re.sub(r"^---$", "", _narr_clean, flags=re.MULTILINE)
+        for _line in _narr_clean.split("\n"):
+            _line = _line.strip()
+            if _line:
+                story.append(Paragraph(_line, BODY))
+            else:
+                story.append(Spacer(1, 4))
+        story.append(hr())
+
     # ── Uncertainty ───────────────────────────────────────────────────────────
     story.append(Paragraph("Uncertainty Band", H2))
     # Strip any markdown artifacts before rendering in PDF
@@ -275,6 +344,13 @@ def generate_pdf(data: ReportData) -> bytes:
     story.append(Paragraph("Disclaimer", H2))
     story.append(Paragraph(_DISCLAIMER, SMALL))
     story.append(hr())
+
+    # ── Data sources ──────────────────────────────────────────────────────────
+    if data.data_sources:
+        story.append(Paragraph("Data Sources", H2))
+        for _src in data.data_sources:
+            story.append(Paragraph(f"• {_src}", BODY))
+        story.append(hr())
 
     # ── Engage 180Climate CTA ────────────────────────────────────────────────
     story.append(Paragraph("Engage 180Climate", H2))
@@ -435,6 +511,60 @@ def generate_docx(data: ReportData) -> bytes:
     )
     _hr()
 
+    # ── Quality factors ───────────────────────────────────────────────────────
+    if data.quality:
+        _h2("Quality Factors")
+        for _label, _value in [
+            ("Additionality", data.quality.additionality),
+            ("Permanence", data.quality.permanence),
+            ("Leakage", data.quality.leakage),
+            ("Methodology fit", data.quality.methodology_fit),
+        ]:
+            _kv(_label, _value)
+        _hr()
+
+    # ── Forest data summary ───────────────────────────────────────────────────
+    _h2("Forest Data Summary")
+    _has_fd = False
+    if data.forest_baseline_cover_pct is not None:
+        _kv("Baseline canopy cover", f"{data.forest_baseline_cover_pct:.1f}%")
+        _has_fd = True
+    if data.forest_annual_loss_ha:
+        _yrs = sorted(data.forest_annual_loss_ha.keys())
+        _tot = sum(data.forest_annual_loss_ha.values())
+        _avg = _tot / len(_yrs) if _yrs else 0
+        _kv("Annual loss rate (avg)", f"{_avg:,.0f} ha/yr ({_yrs[0]}–{_yrs[-1]})")
+        _win = [y for y in _yrs if 2016 <= y <= 2022]
+        if _win:
+            _wa = sum(data.forest_annual_loss_ha[y] for y in _win) / len(_win)
+            _kv("Loss rate (2016–2022 avg, used in estimate)", f"{_wa:,.0f} ha/yr")
+        _has_fd = True
+    if data.forest_loss_after_2020_ha is not None:
+        _kv("Loss after Dec 2020", f"{data.forest_loss_after_2020_ha:,.0f} ha")
+        _has_fd = True
+    if data.forest_peat_present is not None:
+        _kv("Peat presence (proxy)", "Yes" if data.forest_peat_present else "No")
+        _has_fd = True
+    if data.forest_biomass_tco2_per_ha is not None:
+        _kv("Biomass density", f"{data.forest_biomass_tco2_per_ha:,.1f} tCO2/ha")
+        _has_fd = True
+    if not _has_fd:
+        _body("Not available at screening stage.", italic=True, colour=(136, 136, 136), size=9)
+    _hr()
+
+    # ── Assessment narrative ──────────────────────────────────────────────────
+    if data.narrative:
+        _h2("Assessment Narrative")
+        _narr_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.narrative)
+        _narr_clean = re.sub(r"^---$", "", _narr_clean, flags=re.MULTILINE)
+        for _line in _narr_clean.split("\n"):
+            _line = _line.strip()
+            if _line:
+                _body(_line)
+            else:
+                doc.add_paragraph()
+        _hr()
+
     # ── Uncertainty ───────────────────────────────────────────────────────────
     _h2("Uncertainty Band")
     unc_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
@@ -445,6 +575,13 @@ def generate_docx(data: ReportData) -> bytes:
     _h2("Disclaimer")
     _body(_DISCLAIMER, italic=True, colour=(136, 136, 136), size=9)
     _hr()
+
+    # ── Data sources ──────────────────────────────────────────────────────────
+    if data.data_sources:
+        _h2("Data Sources")
+        for _src in data.data_sources:
+            _body(f"• {_src}")
+        _hr()
 
     # ── Engage 180Climate CTA ────────────────────────────────────────────────
     _h2("Engage 180Climate")
