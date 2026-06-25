@@ -1,49 +1,45 @@
-# OUTBOX — Builder · WO-DEPLOY-PREP-001 · 2026-06-25
+# OUTBOX — Builder · WO-LOGO-001 · 2026-06-25
 
-## Status: COMPLETE — STOPPED for Cowork review
+## Status: CI GREEN ✅ — STOPPED for Cowork review
 
 ---
 
-## Delivered
+## CI confirmation
 
-### Procfile
-```
-web: uvicorn api.main:app --host 0.0.0.0 --port $PORT
-```
+- **Run:** https://github.com/TengKianBoon/180climate-app/actions/runs/28137789067
+- **Commit:** edc562f
+- **Result:** ✅ 245 passed, 1 skipped, 1 warning in 3.20s
 
-### .python-version
-```
-3.13
-```
-(Matches `actions/setup-python@v5` → `python-version: "3.13"` in `.github/workflows/ci.yml`.)
+---
 
-### render.yaml
-Render Blueprint for one-click deploy. All env vars listed as `sync: false` placeholders — **no secrets, no values**. Full list: `PIPPIB_SNAPSHOT_PATH`, `EMAIL_HOST/PORT/USE_SSL/USER/PASSWORD/FROM`, `GOOGLE_SHEETS_ID`, `GOOGLE_CREDENTIALS_JSON`, `ANTHROPIC_API_KEY`. See `docs/deploy-runbook.md` for what to fill in.
+## What was delivered
+
+### brand/180climate-logo.png
+Canonical asset committed (314×282 px, RGBA transparent background, 35 KB).
+Stray root file `180climate logo 2.png` deleted (was untracked — no git rm needed).
+
+### Surface 1 — funnel header (`frontend/index.html`)
+- Replaced `<div class="logo">180°</div>` with `<img class="logo-img" src="/brand/logo.png" alt="180Climate" height="40">`
+- Removed redundant `<div class="header-name">180Climate</div>` (wordmark is in the image)
+- Replaced `.logo { font-size: 1.5rem... }` + `.header-name { ... }` CSS with `.logo-img { height: 40px; width: auto; display: block; }`
+- New route `GET /brand/logo.png` in `api/main.py` serves the PNG file
+
+### Surface 2 — report header (`reports/generator.py`)
+- **PDF:** logo embedded via reportlab `Image` at 1.6 cm tall (width auto-computed from aspect 314/282 ≈ 1.113)
+- **DOCX:** logo embedded via `run.add_picture()` at `Inches(0.55)` tall (python-docx preserves aspect)
+- Graceful text fallback in both if `brand/180climate-logo.png` is missing at runtime
 
 ---
 
 ## Verification
 
-- App boots via Procfile command: **`python -m uvicorn api.main:app --host 0.0.0.0 --port 8001`** → `Application startup complete.`
-- `GET /` → **200** (funnel HTML)
-- `GET /health` → **200** `{"status":"ok"}`
-- **246 tests pass** locally (245 + 1 network smoke; CI will show 245 + 1 skipped — same as before)
-- No app logic / number / contract changes
-
----
-
-## Commit
-
-- `ef17857` feat(deploy): Procfile + .python-version 3.13 + render.yaml (WO-DEPLOY-PREP-001)
-
----
-
-## Next (John's deploy-time actions)
-
-Follow `docs/deploy-runbook.md` in order:
-1. PIPPIB 2026 I shapefile → GeoJSON → `PIPPIB_SNAPSHOT_PATH`
-2. Hostinger SMTP creds (`EMAIL_*`, critical: `EMAIL_FROM=john@180climate.net`)
-3. Google Sheets service account (`GOOGLE_SHEETS_ID`, `GOOGLE_CREDENTIALS_JSON`)
-4. Anthropic API key (optional, `ANTHROPIC_API_KEY`)
-5. Render → new Web Service from GitHub → set env vars → deploy → custom domain `app.180climate.net` → Wix CNAME
-6. End-to-end Gate L test (§8 in runbook)
+| Check | Result |
+|---|---|
+| `GET /brand/logo.png` | 200 · `image/png` · 35,237 bytes |
+| `GET /` contains `logo-img` class | ✅ |
+| `GET /` no `header-name` div | ✅ (removed) |
+| `GET /` no `180°` text | ✅ (removed) |
+| PDF generated | ✅ 47,321 bytes (logo embedded) |
+| DOCX generated | ✅ 72,730 bytes (logo embedded) |
+| CI 245 + 1 skipped | ✅ |
+| No contract / number change | ✅ |
