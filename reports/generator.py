@@ -15,7 +15,12 @@ import io
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
+
+_LOGO_PATH = Path(__file__).parent.parent / "brand" / "180climate-logo.png"
+# Logo dimensions: 314×282 px → aspect ratio ≈ 1.113
+_LOGO_ASPECT = 314 / 282
 
 
 def make_filename() -> str:
@@ -165,8 +170,15 @@ def generate_pdf(data: ReportData) -> bytes:
     story = []
 
     # ── Header ────────────────────────────────────────────────────────────────
-    story.append(Paragraph("180Climate", ParagraphStyle(
-        "Brand", parent=H1, fontSize=22, textColor=green, fontName="Helvetica-Bold")))
+    if _LOGO_PATH.exists():
+        from reportlab.platypus import Image as RLImage
+        logo_h = 1.6 * cm
+        logo_w = logo_h * _LOGO_ASPECT
+        story.append(RLImage(str(_LOGO_PATH), width=logo_w, height=logo_h))
+        story.append(Spacer(1, 4))
+    else:
+        story.append(Paragraph("180Climate", ParagraphStyle(
+            "Brand", parent=H1, fontSize=22, textColor=green, fontName="Helvetica-Bold")))
     story.append(Paragraph("Carbon Pre-Feasibility Report", ParagraphStyle(
         "Sub", parent=H1, fontSize=13, textColor=navy, spaceBefore=0)))
     story.append(Spacer(1, 6))
@@ -335,7 +347,14 @@ def generate_docx(data: ReportData) -> bytes:
         pPr.append(pBdr)
 
     # ── Header ────────────────────────────────────────────────────────────────
-    _h1("180Climate", colour=(45, 106, 79))
+    if _LOGO_PATH.exists():
+        from docx.shared import Inches as _Inches
+        p = doc.add_paragraph()
+        run = p.add_run()
+        run.add_picture(str(_LOGO_PATH), height=_Inches(0.55))
+        doc.add_paragraph()  # spacer
+    else:
+        _h1("180Climate", colour=(45, 106, 79))
     _h1("Carbon Pre-Feasibility Report", colour=(26, 26, 46))
 
     for key, val in [

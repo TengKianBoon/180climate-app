@@ -176,6 +176,17 @@ def index() -> HTMLResponse:
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
 
 
+_BRAND = Path(__file__).parent.parent / "brand"
+
+
+@app.get("/brand/logo.png")
+def brand_logo() -> Response:
+    logo = _BRAND / "180climate-logo.png"
+    if not logo.exists():
+        raise HTTPException(status_code=404, detail="Logo not found")
+    return Response(content=logo.read_bytes(), media_type="image/png")
+
+
 # ── Carbon screening ──────────────────────────────────────────────────────────
 
 def _capture_out_of_scope_lead(inp: CarbonInput, classifier_result: Any, boundary: Any = None) -> None:
