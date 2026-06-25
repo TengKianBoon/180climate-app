@@ -4,189 +4,225 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>180Climate — Carbon Pre-Feasibility Screening</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.ico">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
+    :root {
+      --green: #15913A;
+      --green-deep: #0E7A30;
+      --green-bright: #1DB03C;
+      --lime: #8FC71B;
+      --ink: #13212E;
+      --muted: #3C4651;
+      --line: #D6DDE4;
+      --line-soft: #E7ECF0;
+      --page: #F3F5F8;
+      --surface: #FFFFFF;
+      --radius: 12px;
+      --shadow: 0 1px 2px rgba(16,32,48,.05), 0 1px 3px rgba(16,32,48,.04);
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; line-height: 1.5; }
+    body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--page); color: var(--ink); line-height: 1.55; -webkit-font-smoothing: antialiased; }
 
-    /* ── Header ──────────────────────────────────────────────────────────── */
+    /* ── Top stripe ───────────────────────────────────────────────────────── */
+    .topbar { height: 3px; background: linear-gradient(90deg, var(--lime), var(--green-bright)); }
+
+    /* ── Header ───────────────────────────────────────────────────────────── */
     header {
-      background: #1a1a2e; color: #fff; padding: .85rem 2rem;
-      display: flex; align-items: center; gap: .75rem;
+      background: var(--surface); border-bottom: 1px solid var(--line-soft);
+      padding: .7rem 2rem; display: flex; align-items: center; gap: 1rem;
       position: sticky; top: 0; z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0,0,0,.35);
     }
-    .logo-img { height: 40px; width: auto; display: block; }
-    .header-tag {
-      margin-left: auto; font-size: .78rem; opacity: .5;
-      display: none;
-    }
-    @media(min-width:580px) { .header-tag { display: block; } }
+    .logo-img { height: 66px; width: auto; display: block; }
+    .header-tag { margin-left: auto; font-size: .8rem; font-weight: 500; color: var(--muted); display: none; }
+    @media(min-width: 580px) { .header-tag { display: block; } }
 
-    /* ── Layout ──────────────────────────────────────────────────────────── */
-    .container { max-width: 920px; margin: 2rem auto; padding: 0 1rem; }
+    /* ── Layout ───────────────────────────────────────────────────────────── */
+    .container { max-width: 780px; margin: 2.25rem auto; padding: 0 1.25rem; }
 
-    /* ── Cards ───────────────────────────────────────────────────────────── */
+    /* ── Hero ─────────────────────────────────────────────────────────────── */
+    .hero { text-align: center; margin-bottom: 2rem; }
+    .hero h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+    .hero p { margin-top: .4rem; font-size: .95rem; color: var(--muted); }
+    .hero .pills { margin-top: .75rem; display: flex; gap: .4rem; justify-content: center; flex-wrap: wrap; }
+
+    /* ── Cards ────────────────────────────────────────────────────────────── */
     .card {
-      background: #fff; border-radius: 10px; padding: 1.5rem;
-      margin-bottom: 1.25rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.04);
+      background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 1.6rem 1.75rem; margin-bottom: 1.25rem;
     }
     .card h2 {
-      font-size: .95rem; font-weight: 700; margin-bottom: 1rem; color: #1a1a2e;
-      padding-bottom: .5rem; border-bottom: 1px solid #f0f0f0;
+      font-size: 1.05rem; font-weight: 700; color: var(--ink); letter-spacing: -.01em;
+      display: flex; align-items: center; gap: .55rem; margin-bottom: 1.25rem;
     }
+    .card h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green-bright); flex-shrink: 0; }
+    .card h2 .hint { margin-left: .2rem; font-size: .78rem; font-weight: 400; color: var(--muted); }
 
-    /* ── Form elements ───────────────────────────────────────────────────── */
-    .form-row { margin-bottom: .85rem; }
-    label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: .25rem; color: #444; }
-    .req { color: #c53030; }
-    .opt { color: #999; font-weight: 400; }
+    /* ── Form elements ────────────────────────────────────────────────────── */
+    .form-row { margin-bottom: 1.05rem; }
+    label { display: block; font-size: .82rem; font-weight: 600; color: #36444F; margin-bottom: .4rem; }
+    .req { color: #DC2626; }
+    .opt { color: #626B72; font-weight: 400; }
     input, select, textarea {
-      width: 100%; padding: .5rem .75rem; border: 1.5px solid #ddd; border-radius: 6px;
-      font-size: .9rem; background: #fafafa; transition: border-color .15s; color: #1a1a2e;
+      width: 100%; font-family: inherit; font-size: .95rem; color: var(--ink);
+      background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+      padding: .62rem .8rem; transition: border-color .15s, box-shadow .15s;
     }
+    input::placeholder, textarea::placeholder { color: #899096; }
     input:focus, select:focus, textarea:focus {
-      outline: none; border-color: #2d6a4f; background: #fff;
+      outline: none; border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(21,145,58,.15);
     }
     textarea { resize: vertical; min-height: 80px; font-family: monospace; font-size: .82rem; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-    @media(max-width:560px) { .grid2 { grid-template-columns: 1fr; } }
+    @media(max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+    .help { margin-top: .4rem; font-size: .77rem; color: var(--muted); }
 
-    /* ── Buttons ─────────────────────────────────────────────────────────── */
+    /* ── Buttons ──────────────────────────────────────────────────────────── */
     .btn {
-      background: #2d6a4f; color: #fff; border: none; padding: .7rem 1.75rem;
-      border-radius: 6px; font-size: .9rem; cursor: pointer; font-weight: 700;
-      transition: background .15s; display: inline-block;
+      background: var(--green); color: #fff; border: none; border-radius: 9px;
+      padding: .8rem 1.7rem; font-size: .95rem; font-weight: 600; font-family: inherit;
+      cursor: pointer; box-shadow: 0 1px 2px rgba(14,122,48,.25);
+      transition: background .15s, transform .05s; display: inline-block;
     }
-    .btn:hover { background: #1b4332; }
+    .btn:hover { background: var(--green-deep); }
+    .btn:active { transform: translateY(1px); }
     .btn:disabled { background: #aaa; cursor: not-allowed; }
     .btn-outline {
-      background: transparent; color: #2d6a4f;
-      border: 2px solid #2d6a4f; padding: .4rem .9rem; font-size: .82rem;
+      background: transparent; color: var(--green);
+      border: 2px solid var(--green); padding: .4rem .9rem; font-size: .82rem; box-shadow: none;
     }
-    .btn-outline:hover { background: #edf7f0; }
+    .btn-outline:hover { background: #E8F6EC; }
     .btn-full { width: 100%; text-align: center; }
 
-    /* ── Tabs ────────────────────────────────────────────────────────────── */
-    .tabs { display: flex; gap: .4rem; margin-bottom: .75rem; }
+    /* ── Tabs ─────────────────────────────────────────────────────────────── */
+    .tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
     .tab {
-      padding: .3rem .8rem; border: 1.5px solid #ddd; border-radius: 20px;
-      cursor: pointer; font-size: .78rem; font-weight: 600; background: #f0f0f0;
+      padding: .4rem .95rem; border: 1px solid var(--line); border-radius: 999px;
+      font-size: .8rem; font-weight: 600; color: var(--muted); background: #F7F9FB; cursor: pointer;
       transition: all .15s;
     }
-    .tab.active { background: #2d6a4f; color: #fff; border-color: #2d6a4f; }
+    .tab.active { background: var(--green); color: #fff; border-color: var(--green); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
-    /* ── Steps ───────────────────────────────────────────────────────────── */
+    /* ── Steps ────────────────────────────────────────────────────────────── */
     .step { display: none; }
     .step.active { display: block; }
 
-    /* ── Error / success ─────────────────────────────────────────────────── */
+    /* ── Error / success ──────────────────────────────────────────────────── */
     .error-msg {
       color: #7f1d1d; background: #fef2f2; border: 1px solid #fca5a5;
-      padding: .55rem .85rem; border-radius: 6px; font-size: .84rem; margin-top: .5rem;
+      padding: .55rem .85rem; border-radius: 8px; font-size: .84rem; margin-top: .5rem;
     }
     .success-msg {
-      color: #1b4332; background: #d8f3dc; border: 1px solid #52b788;
-      padding: .55rem .85rem; border-radius: 6px; font-size: .84rem;
+      color: var(--green); background: #E8F6EC; border: 1px solid #CDEBD5;
+      padding: .55rem .85rem; border-radius: 8px; font-size: .84rem;
     }
 
-    /* ── Verdict card ────────────────────────────────────────────────────── */
+    /* ── Hero / status pills ──────────────────────────────────────────────── */
+    .pill {
+      font-size: .9rem; font-weight: 600; color: var(--green); background: #E8F6EC;
+      border: 1px solid #CDEBD5; padding: .25rem .7rem; border-radius: 999px;
+    }
+
+    /* ── Verdict card ─────────────────────────────────────────────────────── */
     .verdict-card {
-      border-radius: 10px; padding: 1.5rem; margin-bottom: 1.25rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.04);
+      border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.25rem;
+      box-shadow: var(--shadow);
     }
     .verdict-eligible { background: linear-gradient(135deg,#e8f5e9,#c8e6c9); border: 1px solid #a5d6a7; }
     .verdict-flagged  { background: linear-gradient(135deg,#fffde7,#fff9c4); border: 1px solid #fff176; }
     .verdict-hard_no  { background: linear-gradient(135deg,#fce4ec,#f8bbd0); border: 1px solid #f48fb1; }
+    .verdict-out-of-scope { background: linear-gradient(135deg,#fffde7,#fff9c4); border: 1px solid #fff176; }
 
     .verdict-badge {
       display: inline-flex; align-items: center; gap: .4rem;
-      padding: .35rem .95rem; border-radius: 20px;
-      font-size: .82rem; font-weight: 700; margin-bottom: .75rem;
+      padding: .25rem .7rem; border-radius: 999px;
+      font-size: .9rem; font-weight: 600; margin-bottom: .75rem;
     }
-    .badge-eligible { background: #1b4332; color: #fff; }
+    .badge-eligible { background: var(--green); color: #fff; }
     .badge-flagged  { background: #78350f; color: #fff; }
     .badge-hard_no  { background: #7f1d1d; color: #fff; }
 
     .range-display {
-      font-size: 2.1rem; font-weight: 800; color: #1b4332;
+      font-size: 2.1rem; font-weight: 800; color: var(--green);
       letter-spacing: -1px; line-height: 1.1; margin: .4rem 0;
     }
     .range-unit { font-size: 1rem; font-weight: 600; }
-    .range-label { font-size: .82rem; color: #4a7c59; margin-bottom: .6rem; }
+    .range-label { font-size: .82rem; color: var(--muted); margin-bottom: .6rem; }
 
     .badge-pill {
       display: inline-block; padding: .2rem .6rem; border-radius: 4px;
       font-size: .7rem; font-weight: 700; letter-spacing: .4px; margin-right: .35rem;
     }
-    .pill-tier { background: #1a1a2e; color: #52b788; }
-    .pill-meth { background: #e8f5e9; color: #1b4332; }
+    .pill-tier { background: var(--ink); color: var(--green-bright); }
+    .pill-meth { background: #E8F6EC; color: var(--green); }
     .pill-warn { background: #78350f; color: #fff; }
 
     .verdict-disclaimer {
-      font-size: .71rem; color: #666; margin-top: .8rem;
+      font-size: .71rem; color: var(--muted); margin-top: .8rem;
       padding-top: .75rem; border-top: 1px solid rgba(0,0,0,.1); font-style: italic;
     }
-    .verdict-summary {
-      font-size: .86rem; color: #444; margin: .4rem 0;
-    }
+    .verdict-summary { font-size: .86rem; color: var(--ink); margin: .4rem 0; }
 
-    /* ── Map ─────────────────────────────────────────────────────────────── */
-    .map-card { padding: 0; overflow: hidden; border-radius: 10px; margin-bottom: 1.25rem;
-                box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.04); }
+    /* ── Map ──────────────────────────────────────────────────────────────── */
+    .map-card { padding: 0; overflow: hidden; border-radius: var(--radius); margin-bottom: 1.25rem;
+                border: 1px solid var(--line-soft); box-shadow: var(--shadow); }
     #map { height: 360px; }
 
-    /* ── Annual loss chart ───────────────────────────────────────────────── */
-    .loss-wrap { padding: .85rem 1.25rem 1.1rem; border-top: 1px solid #f0f0f0; }
-    .loss-title { font-size: .78rem; font-weight: 700; color: #555; margin-bottom: .5rem; }
+    /* ── Annual loss chart ────────────────────────────────────────────────── */
+    .loss-wrap { padding: .85rem 1.25rem 1.1rem; border-top: 1px solid var(--line-soft); }
+    .loss-title { font-size: .78rem; font-weight: 700; color: var(--muted); margin-bottom: .5rem; }
     .loss-chart { font-size: .69rem; }
     .loss-row {
       display: grid; grid-template-columns: 2.8rem 1fr 5.5rem;
       gap: .25rem; align-items: center; margin-bottom: .22rem;
     }
-    .loss-year { color: #888; text-align: right; font-variant-numeric: tabular-nums; }
-    .loss-bar-bg { background: #ebebeb; border-radius: 2px; height: 9px; overflow: hidden; }
+    .loss-year { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+    .loss-bar-bg { background: var(--line-soft); border-radius: 2px; height: 9px; overflow: hidden; }
     .loss-bar { background: #ffab91; height: 100%; border-radius: 2px; }
     .loss-bar.win { background: #e53935; }
-    .loss-val { color: #444; font-variant-numeric: tabular-nums; }
-    .loss-note { font-size: .67rem; color: #aaa; margin-top: .4rem; }
+    .loss-val { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .loss-note { font-size: .67rem; color: var(--muted); margin-top: .4rem; }
 
-    /* ── Narrative ───────────────────────────────────────────────────────── */
-    .narrative { font-size: .86rem; line-height: 1.7; color: #333; }
-    .narrative strong { color: #1a1a2e; }
-    .narrative hr { border: none; border-top: 1px solid #eee; margin: .85rem 0; }
-    .sources { font-size: .71rem; color: #aaa; margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #f0f0f0; }
+    /* ── Narrative ────────────────────────────────────────────────────────── */
+    .narrative { font-size: .86rem; line-height: 1.7; color: var(--muted); }
+    .narrative strong { color: var(--ink); }
+    .narrative hr { border: none; border-top: 1px solid var(--line-soft); margin: .85rem 0; }
+    .sources { font-size: .71rem; color: var(--muted); margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--line-soft); }
 
-    /* ── Carrot ──────────────────────────────────────────────────────────── */
+    /* ── Carrot ───────────────────────────────────────────────────────────── */
     .carrot-card {
-      background: linear-gradient(135deg,#e8f5e9,#c8e6c9);
-      border: 1px solid #a5d6a7; border-radius: 10px;
-      padding: 1.25rem 1.5rem; margin-bottom: 1.25rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      background: #E8F6EC; border: 1px solid #CDEBD5; border-radius: var(--radius);
+      padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; box-shadow: var(--shadow);
     }
-    .carrot-card .carrot-text { font-size: .88rem; color: #1b4332; line-height: 1.65; }
+    .carrot-card .carrot-text { font-size: .88rem; color: var(--green); line-height: 1.65; }
 
-    /* ── Lead gate ───────────────────────────────────────────────────────── */
-    .lead-gate { border: 2px solid #2d6a4f; }
-    .lead-gate h2 { color: #2d6a4f; border-bottom-color: #e8f5e9; }
+    /* ── Lead gate ────────────────────────────────────────────────────────── */
+    .lead-gate { border: 2px solid var(--green); }
+    .lead-gate h2 { color: var(--green); }
     .lead-gate .btn { width: 100%; text-align: center; margin-top: .35rem; }
 
-    /* ── Done step ───────────────────────────────────────────────────────── */
+    /* ── Done step ────────────────────────────────────────────────────────── */
     .done-card { text-align: center; padding: 2.5rem 1.5rem; }
     .done-icon { font-size: 3rem; margin-bottom: 1rem; }
-    .done-card h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: .5rem; border: none; }
-    .done-sub { color: #555; font-size: .9rem; margin-bottom: 1.25rem; }
+    .done-card h2 { display: block; font-size: 1.3rem; font-weight: 800; margin-bottom: .5rem; }
+    .done-sub { color: var(--muted); font-size: .9rem; margin-bottom: 1.25rem; }
     .done-contact {
-      background: #e8f5e9; border-radius: 8px;
-      padding: 1rem 1.25rem; font-size: .88rem; color: #1b4332; line-height: 1.7;
+      background: #E8F6EC; border-radius: 8px;
+      padding: 1rem 1.25rem; font-size: .88rem; color: var(--green); line-height: 1.7;
     }
+    .consent-note { font-size: .71rem; color: var(--muted); text-align: center; margin-top: -.5rem; margin-bottom: 1.5rem; }
   </style>
 </head>
 <body>
 
+<div class="topbar"></div>
 <header>
   <img src="/brand/logo.png" alt="180Climate" class="logo-img">
   <span class="header-tag">Carbon Pre-Feasibility Screening</span>
@@ -197,16 +233,20 @@
   <!-- ══ Step 1: Input ══════════════════════════════════════════════════════ -->
   <div id="step-form" class="step active">
 
-    <div style="text-align:center;margin:1.5rem 0 1.25rem">
-      <h2 style="font-size:1.45rem;font-weight:800;color:#1a1a2e">Carbon Pre-Feasibility Screening</h2>
-      <p style="color:#666;font-size:.88rem;margin-top:.35rem">
-        Free &middot; Indicative &middot; IPCC Tier 1 &middot; Not registry-grade
-      </p>
+    <div class="hero">
+      <h1>Carbon Pre-Feasibility Screening</h1>
+      <p>An indicative, IPCC Tier 1 screening for your forestry concession.</p>
+      <div class="pills">
+        <span class="pill">Free</span>
+        <span class="pill">Indicative</span>
+        <span class="pill">IPCC Tier 1</span>
+        <span class="pill">Not registry-grade</span>
+      </div>
     </div>
 
     <!-- Light capture: contact -->
     <div class="card">
-      <h2>Your details <span style="font-size:.75rem;font-weight:400;color:#999">— to see your result</span></h2>
+      <h2><span class="dot"></span>Your details<span class="hint">— to see your result</span></h2>
       <div class="grid2">
         <div class="form-row">
           <label>Name <span class="req">*</span></label>
@@ -229,7 +269,7 @@
 
     <!-- Concession details -->
     <div class="card">
-      <h2>Concession details</h2>
+      <h2><span class="dot"></span>Concession details</h2>
       <div class="form-row">
         <label>Concession / IUP name <span class="req">*</span></label>
         <input id="iup_name" type="text" placeholder="PT Hutan Lestari">
@@ -264,17 +304,17 @@
           <label>Describe your project <span class="opt">(optional)</span></label>
           <textarea id="project_type_description" rows="3"
             placeholder="e.g. Mixed forest concession with some peatland — HTI permit on Central Kalimantan island..."></textarea>
-          <div style="font-size:.74rem;color:#999;margin-top:.25rem">
+          <div class="help">
             We'll classify your project type automatically. Without a description we'll default to out-of-scope.
           </div>
         </div>
-        <div style="font-size:.74rem;color:#999;margin-top:.25rem">We'll confirm project type and forest condition from your land data.</div>
+        <div class="help">We'll confirm project type and forest condition from your land data.</div>
       </div>
     </div>
 
     <!-- Location -->
     <div class="card">
-      <h2>Concession location</h2>
+      <h2><span class="dot"></span>Concession location</h2>
       <div class="tabs">
         <div class="tab active" onclick="switchTab('coords')">Coordinates</div>
         <div class="tab" onclick="switchTab('geojson')">GeoJSON polygon</div>
@@ -282,7 +322,7 @@
       <div id="tab-coords" class="tab-content active">
         <div class="form-row">
           <input id="coords" type="text" placeholder="lat, lng — e.g. 0.9, 117.15">
-          <div style="font-size:.74rem;color:#999;margin-top:.25rem">
+          <div class="help">
             Single centroid point (lat, lon). For a polygon boundary use the GeoJSON tab.
           </div>
         </div>
@@ -291,7 +331,7 @@
         <div class="form-row">
           <textarea id="geojson_payload"
             placeholder='{"type":"Polygon","coordinates":[[[117,1],[117.3,1],[117.3,0.8],[117,0.8],[117,1]]]}' rows="5"></textarea>
-          <div style="font-size:.74rem;color:#999;margin-top:.25rem">
+          <div class="help">
             Paste a GeoJSON Polygon. Coordinates in [longitude, latitude] order (WGS-84).
           </div>
         </div>
@@ -303,7 +343,7 @@
       </div>
     </div>
 
-    <p style="font-size:.71rem;color:#bbb;text-align:center;margin-top:-.5rem;margin-bottom:1.5rem">
+    <p class="consent-note">
       By submitting you agree to 180Climate using your details to follow up on this screening.
     </p>
 
@@ -314,7 +354,7 @@
 
     <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
       <button class="btn btn-outline" onclick="showStep('step-form')">← New screening</button>
-      <span style="font-size:.88rem;color:#666;font-weight:600" id="result-title"></span>
+      <span style="font-size:.88rem;color:var(--muted);font-weight:600" id="result-title"></span>
     </div>
 
     <!-- Verdict + Range -->
@@ -339,7 +379,7 @@
 
     <!-- Narrative -->
     <div class="card">
-      <h2>Indicative Assessment</h2>
+      <h2><span class="dot"></span>Indicative Assessment</h2>
       <div class="narrative" id="narrative-text"></div>
       <div class="sources" id="data-sources"></div>
     </div>
@@ -351,21 +391,21 @@
 
     <!-- Report downloads (eligible only) -->
     <div class="card" id="report-dl-card" style="display:none">
-      <h2>Download your report</h2>
-      <p style="font-size:.88rem;color:#444;margin-bottom:.85rem">
+      <h2><span class="dot"></span>Download your report</h2>
+      <p style="font-size:.88rem;color:var(--muted);margin-bottom:.85rem">
         Range + IPCC Tier 1 + methodology + additionality + "Engage 180Climate" CTA.
       </p>
       <div style="display:flex;gap:.75rem;flex-wrap:wrap">
         <button class="btn" onclick="downloadReport('pdf')">Download PDF</button>
         <button class="btn btn-outline" onclick="downloadReport('docx')">Download DOCX</button>
       </div>
-      <div id="dl-status" style="font-size:.8rem;color:#666;margin-top:.5rem"></div>
+      <div id="dl-status" style="font-size:.8rem;color:var(--muted);margin-top:.5rem"></div>
     </div>
 
     <!-- Lead gate: full report -->
     <div class="card lead-gate">
       <h2>Get the detailed pre-feasibility report (PDF)</h2>
-      <p style="font-size:.88rem;color:#444;margin-bottom:1rem">
+      <p style="font-size:.88rem;color:var(--muted);margin-bottom:1rem">
         Receive a PDF report covering eligibility analysis, methodology route, financial
         model indicators, and next steps tailored to your concession.
       </p>
@@ -533,9 +573,9 @@ function renderResult() {
     if (ctaEl) {
       ctaEl.innerHTML = '<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:1rem;margin-top:.75rem">'
         + '<strong>Next step:</strong> ' + (r.cta || '') + '<br><br>'
-        + '<a href="mailto:' + (r.cta_email || 'info@180climate.net') + '" style="color:#2d6a4f;font-weight:700">'
+        + '<a href="mailto:' + (r.cta_email || 'info@180climate.net') + '" style="color:#15913A;font-weight:700">'
         + (r.cta_email || 'info@180climate.net') + '</a>'
-        + (r.lead_captured ? '<br><span style="font-size:.8rem;color:#666;margin-top:.5rem;display:block">✓ Your details have been recorded — we'll follow up.</span>' : '')
+        + (r.lead_captured ? '<br><span style="font-size:.8rem;color:var(--muted);margin-top:.5rem;display:block">✓ Your details have been recorded — we\'ll follow up.</span>' : '')
         + '</div>';
     }
     return;
@@ -622,7 +662,7 @@ function renderResult() {
       L.marker([coords[1], coords[0]]).addTo(_map).bindPopup(_cache.iup_name).openPopup();
     } else {
       var layer = L.geoJSON(bndry, {
-        style: { color: '#2d6a4f', weight: 2.5, fillColor: '#2d6a4f', fillOpacity: .12 }
+        style: { color: '#15913A', weight: 2.5, fillColor: '#15913A', fillOpacity: .12 }
       }).addTo(_map);
       _map.fitBounds(layer.getBounds(), { padding: [30, 30] });
     }

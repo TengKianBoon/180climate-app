@@ -144,7 +144,7 @@ def generate_pdf(data: ReportData) -> bytes:
 
     styles = getSampleStyleSheet()
     navy   = colors.HexColor("#1a1a2e")
-    green  = colors.HexColor("#2d6a4f")
+    green  = colors.HexColor("#15913A")
     grey   = colors.HexColor("#555555")
     ltgrey = colors.HexColor("#888888")
 
@@ -202,7 +202,7 @@ def generate_pdf(data: ReportData) -> bytes:
     # ── Eligibility verdict ───────────────────────────────────────────────────
     story.append(Paragraph("Eligibility Verdict", H2))
     verdict_colours = {
-        "eligible": colors.HexColor("#1b4332"),
+        "eligible": colors.HexColor("#15913A"),
         "flagged":  colors.HexColor("#78350f"),
         "hard_no":  colors.HexColor("#7f1d1d"),
     }
@@ -310,7 +310,7 @@ def generate_docx(data: ReportData) -> bytes:
     def _h2(text: str) -> None:
         p = doc.add_heading(text, level=2)
         for run in p.runs:
-            run.font.color.rgb = RGBColor(45, 106, 79)  # green
+            run.font.color.rgb = RGBColor(21, 145, 58)  # brand green
 
     def _body(text: str, bold: bool = False, italic: bool = False,
               colour: tuple | None = None, size: int = 10) -> None:
@@ -374,7 +374,7 @@ def generate_docx(data: ReportData) -> bytes:
     # ── Eligibility ───────────────────────────────────────────────────────────
     _h2("Eligibility Verdict")
     verdict_colours = {
-        "eligible": (27, 67, 50),
+        "eligible": (21, 145, 58),
         "flagged":  (120, 53, 15),
         "hard_no":  (127, 29, 29),
     }
@@ -389,7 +389,7 @@ def generate_docx(data: ReportData) -> bytes:
         run = p.add_run(data.range_str())
         run.font.size = Pt(18)
         run.bold = True
-        run.font.color.rgb = RGBColor(45, 106, 79)
+        run.font.color.rgb = RGBColor(21, 145, 58)
 
         _body("Project lifetime · IPCC Tier 1 Screening", italic=True,
               colour=(136, 136, 136), size=9)
