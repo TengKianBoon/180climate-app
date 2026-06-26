@@ -40,6 +40,7 @@ Methodology routing (ADR-0001 / ADR-0012 / ADR-0013 / ADR-0015):
   additionality_basis = "legal harvest right foregone" for all three routes.
 """
 from __future__ import annotations
+import math as _math
 from core.contracts import (
     CarbonInput, CarbonEstimate, EligibilityResult, GateResult,
     MethodologyRoute, QualityFactors, CarbonGates,
@@ -101,6 +102,22 @@ _PEAT_EF_CITATION = (
 # VCS non-permanence buffer pool deduction range
 _BUFFER_LOW = 0.20   # optimistic (low risk, well-managed)
 _BUFFER_HIGH = 0.30  # conservative (high risk, leakage potential)
+
+# ── ADR-0016 M1/M2: uncertainty propagation + density-fallback gating ─────────
+# M1 — default relative SEs for error budget (quadrature, then buffer separately)
+_CV_DENSITY_ESA_CCI = 0.20      # ESA CCI concession-level (no per-pixel SD layer in pre-launch)
+_CV_DENSITY_IPCC_DEFAULT = 0.30 # IPCC Tier-1 default — wide; no satellite AGB available
+# M2 — IFM quadrature components (pre-computed from TPTI + Pearson-2014 ranges)
+_IFM_INTENSITY_MID_M3_HA = (_IFM_INTENSITY_LOW_M3_HA + _IFM_INTENSITY_HIGH_M3_HA) / 2    # 33.0
+_IFM_TEF_MID_MG_C_M3 = (_IFM_TEF_LOW_MG_C_M3 + _IFM_TEF_HIGH_MG_C_M3) / 2              # 1.45
+_IFM_EF_CENTRAL_TCO2_HA = _IFM_INTENSITY_MID_M3_HA * _IFM_TEF_MID_MG_C_M3 * _C_TO_CO2  # ~175.45
+_CV_IFM_INTENSITY = (
+    (_IFM_INTENSITY_HIGH_M3_HA - _IFM_INTENSITY_LOW_M3_HA) / (2 * _IFM_INTENSITY_MID_M3_HA)
+)  # (40-26)/(2×33) ≈ 0.2121
+_CV_IFM_TEF = (
+    (_IFM_TEF_HIGH_MG_C_M3 - _IFM_TEF_LOW_MG_C_M3) / (2 * _IFM_TEF_MID_MG_C_M3)
+)  # (1.5-1.4)/(2×1.45) ≈ 0.0345
+_SIGMA_IFM = (_CV_IFM_INTENSITY**2 + _CV_IFM_TEF**2) ** 0.5  # ≈ 0.2149
 
 # VCS maximum crediting period (yr)
 _MAX_CREDITING_YR = 30
@@ -620,6 +637,66 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
                 reasons=eligibility.reasons + [f"mixed forest-origin: {mixed_note}"],
             )
 
+    # ── ADR-0016-M2: density-fallback gate (REDD/HTI only — IFM uses TEF, not AGB) ──
+    if inp.permit_type != "HA":
+        if forest.biomass_tco2_per_ha is None:
+            # No credible biomass source → FLAG, no number
+            no_biomass_note = (
+                "ADR-0016-M2: no credible biomass source (biomass_tco2_per_ha=None) — "
+                "a Tier 1 avoided-deforestation estimate cannot be asserted. "
+                "ESA CCI, GEDI, or a field AGB survey required before any crediting claim."
+            )
+            if eligibility.verdict != "hard_no":
+                eligibility = EligibilityResult(
+                    gates=eligibility.gates,
+                    verdict="flagged",
+                    reasons=eligibility.reasons + [no_biomass_note],
+                )
+            unc_nb = (
+                f"Tier 1 indicative screening — ADR-0016-M2: {no_biomass_note} "
+                f"Baseline cannot be computed without a density source. "
+                f"Not registry-grade."
+            )
+            return CarbonEstimate(
+                eligibility=eligibility,
+                methodology=methodology,
+                forest=forest,
+                quantity_low_tco2e=None,
+                quantity_high_tco2e=None,
+                uncertainty=unc_nb,
+                quality=quality,
+                classification=ProjectClassification(
+                    strata=[Stratum(
+                        stratum_id="mineral",
+                        area_ha=effective_area,
+                        soil_type="mineral",
+                        methodology=methodology,
+                        forest_gate=forest_gate,
+                        eligibility_verdict=eligibility.verdict,
+                        eligibility_reasons=eligibility.reasons,
+                    )],
+                    dominant_soil="mineral",
+                    auto_determined=True,
+                    note="ADR-0016-M2: no-biomass gate fired — no number asserted.",
+                ),
+            )
+
+        # M2: IPCC default → add loud flag to eligibility
+        _, is_ipcc_default, _ = _density_cv_info(forest)
+        if is_ipcc_default and eligibility.verdict not in ("hard_no", "flagged"):
+            ipcc_loud_note = (
+                f"ADR-0016-M2 DEFAULT DENSITY — HIGH UNCERTAINTY: "
+                f"no satellite AGB source; using IPCC 2006 Table 4.7 SE-Asia Tier-1 default "
+                f"({forest.biomass_tco2_per_ha:.0f} tCO2/ha). "
+                f"True forest AGB may differ significantly. "
+                f"Obtain ESA CCI, GEDI, or field AGB before any crediting claim."
+            )
+            eligibility = EligibilityResult(
+                gates=eligibility.gates,
+                verdict="flagged",
+                reasons=eligibility.reasons + [ipcc_loud_note],
+            )
+
     # ── ADR-0015-C2: Route to correct estimate formula ────────────────────────
     # HA → IFM selective-logging basis (Pearson 2014, not density×loss_rate)
     # HTI → APD (REDD, density×loss_rate; unchanged)
@@ -765,10 +842,18 @@ def run_mixed_stratification(
                     f"forest gate flag: {forest_gate.note}"
                 ],
             )
-        # ADR-0015-C2: route HA mineral stratum to IFM basis
+        # ADR-0015-C2 / ADR-0016-M2: route HA mineral stratum to IFM; HTI to REDD
         if inp.permit_type == "HA":
             mineral_low, mineral_high, unc_redd = _estimate_ifm(
                 mineral_area, project_years, methodology
+            )
+        elif forest.biomass_tco2_per_ha is None:
+            # ADR-0016-M2: no-biomass gate in mixed mineral stratum
+            mineral_low = None
+            mineral_high = None
+            unc_redd = (
+                "ADR-0016-M2: mineral stratum — no credible biomass source; "
+                "no avoided-deforestation number asserted."
             )
         else:
             mineral_low, mineral_high, unc_redd = _estimate_redd(
@@ -861,6 +946,27 @@ def _classify_forest_origin(boundary: Boundary, forest: ForestData) -> str:
     return "unknown"
 
 
+def _density_cv_info(forest: ForestData) -> tuple[float, bool, bool]:
+    """Return (cv_density, is_ipcc_default, has_esa_cci) for ADR-0016 M1/M2.
+
+    Priority:
+      1. biomass_uncertainty_pct field (from ESA CCI SD layer or field survey)
+      2. ESA CCI detected in data_sources → default concession-level CV 20%
+      3. IPCC Tier-1 default → wide CV 30% (triggers M2 loud flag)
+    """
+    # "ESA CCI Biomass v3.0" and "GEDI AGB" are success-path strings from the adapter.
+    # The IPCC fallback string contains "ESA CCI read failed" — must not match.
+    has_esa_cci = any(
+        "ESA CCI Biomass v3.0" in s or "GEDI AGB" in s
+        for s in forest.data_sources
+    )
+    if forest.biomass_uncertainty_pct is not None:
+        return forest.biomass_uncertainty_pct / 100.0, False, has_esa_cci
+    if has_esa_cci:
+        return _CV_DENSITY_ESA_CCI, False, True
+    return _CV_DENSITY_IPCC_DEFAULT, True, False
+
+
 def _estimate_ifm(
     area: float,
     years: int,
@@ -884,27 +990,46 @@ def _estimate_ifm(
     """
     harvested_area = area * min(1.0, years / _IFM_CYCLE_YR)
 
-    gross_low = harvested_area * _IFM_EF_LOW_TCO2_HA
-    gross_high = harvested_area * _IFM_EF_HIGH_TCO2_HA
+    # ADR-0016 M1: quadrature error budget for IFM
+    # "Density" analog = TEF (Pearson 2014); "rate" analog = TPTI extraction intensity.
+    # sigma = sqrt(CV_intensity² + CV_TEF²); buffer applied SEPARATELY and LABELLED.
+    sigma = _SIGMA_IFM  # pre-computed constant ≈ 0.2149
 
-    net_low = round(gross_low * (1 - _BUFFER_HIGH), 0)
-    net_high = round(gross_high * (1 - _BUFFER_LOW), 0)
+    central = harvested_area * _IFM_EF_CENTRAL_TCO2_HA
+
+    low_before_buf = central * max(0.0, 1.0 - sigma)
+    high_before_buf = central * (1.0 + sigma)
+
+    net_low = round(low_before_buf * (1 - _BUFFER_HIGH), 0)
+    net_high = round(high_before_buf * (1 - _BUFFER_LOW), 0)
 
     if net_low >= net_high:
         net_high = net_low + max(1.0, round(net_low * 0.1, 0))
 
     unc = (
-        f"Tier 1 indicative screening — IFM selective-logging basis ({_IFM_CITATION}); "
-        f"logging intensity {_IFM_INTENSITY_LOW_M3_HA:.0f}–{_IFM_INTENSITY_HIGH_M3_HA:.0f} m³/ha (TPTI band); "
-        f"TEF {_IFM_TEF_LOW_MG_C_M3}–{_IFM_TEF_HIGH_MG_C_M3} MgC/m³ (full incl. infrastructure); "
-        f"EF {_IFM_EF_LOW_TCO2_HA:.0f}–{_IFM_EF_HIGH_TCO2_HA:.0f} tCO2/ha per entry; "
-        f"TPTI cutting cycle {_IFM_CYCLE_YR} yr; n_entries=1 (one avoided entry in a {years}-yr period); "
-        f"harvested_area {harvested_area:,.0f} ha (= {area:,.0f} ha × min(1, {years}/{_IFM_CYCLE_YR})); "
-        f"buffer {int(_BUFFER_LOW*100)}–{int(_BUFFER_HIGH*100)}%. "
+        f"Tier 1 indicative screening — IFM basis (ADR-0015-C2 + ADR-0016 M1 error budget). "
+        f"Citation: {_IFM_CITATION}. "
+        f"n_entries=1 (one avoided entry in a {years}-yr period vs {_IFM_CYCLE_YR}-yr TPTI cycle). "
+        f"harvested_area {harvested_area:,.0f} ha (= {area:,.0f} ha × min(1, {years}/{_IFM_CYCLE_YR})). "
+        f"ADR-0016 M1 error budget (in quadrature): "
+        f"CV_intensity {_CV_IFM_INTENSITY*100:.1f}% (TPTI band "
+        f"{_IFM_INTENSITY_LOW_M3_HA:.0f}–{_IFM_INTENSITY_HIGH_M3_HA:.0f} m³/ha, "
+        f"mid {_IFM_INTENSITY_MID_M3_HA:.0f} m³/ha); "
+        f"CV_TEF {_CV_IFM_TEF*100:.1f}% (Pearson-2014 "
+        f"{_IFM_TEF_LOW_MG_C_M3}–{_IFM_TEF_HIGH_MG_C_M3} MgC/m³, "
+        f"mid {_IFM_TEF_MID_MG_C_M3} MgC/m³); "
+        f"EF_central {_IFM_EF_CENTRAL_TCO2_HA:.1f} tCO2/ha; "
+        f"combined sigma {sigma*100:.1f}%; "
+        f"central {central:,.0f} tCO2e; "
+        f"pre-buffer band [{low_before_buf:,.0f}–{high_before_buf:,.0f}] tCO2e. "
+        f"VCS non-permanence buffer deducted SEPARATELY: "
+        f"{int(_BUFFER_LOW*100)}–{int(_BUFFER_HIGH*100)}%. "
+        f"Net: [{net_low:,.0f}–{net_high:,.0f}] tCO2e. "
         f"Dominant uncertainty: IUP extraction intensity not verified from permit document; "
-        f"Pearson-2014 TEF is a regional default, not site-specific. "
+        f"Pearson-2014 TEF is a regional default (Indonesia/SE-Asia), not site-specific. "
         f"VM0010 (selective-logging baseline, excl. planted forests) — avoided-emissions-only "
         f"estimate is a conservative floor (VM0010 also credits continued-growth removals). "
+        f"GEDI/ICESat-2 space-LiDAR as secondary density source: pre-launch backlog. "
         f"VM0045 requires NFI/field data — not satellite-screenable at this stage. "
         f"Not registry-grade. Confirm with full feasibility study before any crediting claim."
     )
@@ -918,49 +1043,85 @@ def _estimate_redd(
     loss_rate: float,
     route: MethodologyRoute,
 ) -> tuple[float, float, str]:
-    """Avoided-emissions range for REDD (APD / IFM).
+    """Avoided-emissions range for REDD (APD).
 
-    Formula (transparent):
-      quantity = eligible_area [ha]
-               × baseline_loss_rate [ha/ha/yr]
-               × project_duration [yr]
-               × carbon_density [tCO2/ha]
-               × (1 − buffer_deduction)
+    ADR-0016 M1: uncertainty propagated in quadrature; buffer applied SEPARATELY.
 
-    Low estimate: conservative buffer (30%), loss rate × 0.8.
-    High estimate: optimistic buffer (20%), loss rate × 1.0.
-    IPCC Tier 1 — default biomass values; proxy loss rate.
+    Formula:
+      central = eligible_area × baseline_loss_rate × years × carbon_density
+      low_before_buf = central × (1 − sigma_combined)
+      high_before_buf = central × (1 + sigma_combined)
+      net_low  = low_before_buf  × (1 − buffer_high)   [separate, labelled]
+      net_high = high_before_buf × (1 − buffer_low)    [separate, labelled]
+
+    sigma_combined = sqrt(CV_density² + CV_loss²)
+      CV_density: from biomass_uncertainty_pct (ESA CCI SE) or source-based default
+      CV_loss: std/mean of Hansen annual-loss series 2016–2023
+
+    Caller ensures forest.biomass_tco2_per_ha is not None (M2 gate).
     """
-    carbon_density = forest.biomass_tco2_per_ha
+    carbon_density = forest.biomass_tco2_per_ha  # caller ensures non-None
 
-    gross_low = area * (loss_rate * 0.8) * years * carbon_density
-    gross_high = area * loss_rate * years * carbon_density
+    # M1: density CV
+    cv_density, is_ipcc_default, has_esa_cci = _density_cv_info(forest)
 
-    net_low = round(gross_low * (1 - _BUFFER_HIGH), 0)
-    net_high = round(gross_high * (1 - _BUFFER_LOW), 0)
+    # M1: loss-rate CV from Hansen annual series
+    recent = [forest.annual_loss_ha[y] for y in range(2016, 2024) if y in forest.annual_loss_ha]
+    if len(recent) >= 2:
+        mean_l = sum(recent) / len(recent)
+        std_l = (_math.fsum((x - mean_l) ** 2 for x in recent) / len(recent)) ** 0.5
+        cv_loss = std_l / mean_l if mean_l > 0 else _CV_DENSITY_IPCC_DEFAULT
+    else:
+        cv_loss = _CV_DENSITY_IPCC_DEFAULT  # too few years — conservative default
 
-    # Safety: ensure range (rounding edge-cases with tiny areas)
+    sigma = _math.sqrt(cv_density ** 2 + cv_loss ** 2)
+
+    # Central estimate
+    central = area * loss_rate * years * carbon_density
+
+    # Uncertainty band — before buffer
+    low_before_buf = central * max(0.0, 1.0 - sigma)
+    high_before_buf = central * (1.0 + sigma)
+
+    # VCS non-permanence buffer: SEPARATE, LABELLED deduction
+    net_low = round(low_before_buf * (1 - _BUFFER_HIGH), 0)
+    net_high = round(high_before_buf * (1 - _BUFFER_LOW), 0)
+
     if net_low >= net_high:
         net_high = net_low + max(1.0, round(net_low * 0.1, 0))
 
-    # Dynamic density source label (ESA CCI if available, else IPCC Tier-1)
-    _esa_src = next(
-        (s for s in forest.data_sources if "ESA CCI" in s or "GEDI" in s),
-        None,
-    )
-    if _esa_src:
-        density_label = f"ESA CCI / satellite AGB ({carbon_density:.0f} tCO2/ha)"
+    # Density source label (M2 saturation caveat for ESA CCI)
+    if has_esa_cci:
+        density_label = (
+            f"ESA CCI / satellite AGB ({carbon_density:.0f} tCO2/ha, concession mean); "
+            f"SATURATION CAVEAT: ESA CCI underestimates AGB >~150–250 Mg/ha (sensor saturation) — "
+            f"actual density may be higher in dense forest; "
+            f"relative SE: {cv_density*100:.0f}%"
+        )
     else:
-        density_label = f"IPCC 2006 Table 4.7 SE-Asia Tier-1 default ({carbon_density:.0f} tCO2/ha)"
+        density_label = (
+            f"IPCC 2006 Table 4.7 SE-Asia Tier-1 default ({carbon_density:.0f} tCO2/ha); "
+            f"DEFAULT DENSITY — HIGH UNCERTAINTY: no satellite AGB available; "
+            f"true density may differ significantly; "
+            f"relative SE: {cv_density*100:.0f}%"
+        )
 
+    n_loss_yrs = len([y for y in range(2016, 2024) if y in forest.annual_loss_ha])
     unc = (
-        f"Tier 1 indicative screening — carbon density: {density_label}; "
-        f"Hansen GFC-2022-v1.10 pixel loss {loss_rate*100:.3f}%/yr "
-        f"({len([y for y in range(2016, 2024) if y in forest.annual_loss_ha])}-yr avg 2016-2022); "
-        f"buffer {int(_BUFFER_LOW*100)}-{int(_BUFFER_HIGH*100)}%. "
+        f"Tier 1 indicative screening — ADR-0016 M1 error budget (in quadrature): "
+        f"carbon density [{density_label}]; "
+        f"baseline loss-rate CV {cv_loss*100:.0f}% "
+        f"(Hansen GFC-2022 2016–2023 {n_loss_yrs}-yr std/mean); "
+        f"combined sigma {sigma*100:.0f}%; "
+        f"central {central:,.0f} tCO2e; "
+        f"pre-buffer band [{low_before_buf:,.0f}–{high_before_buf:,.0f}] tCO2e. "
+        f"VCS non-permanence buffer deducted SEPARATELY: "
+        f"{int(_BUFFER_LOW*100)}–{int(_BUFFER_HIGH*100)}%. "
+        f"Net: [{net_low:,.0f}–{net_high:,.0f}] tCO2e. "
         f"Baseline (legally-permitted harvest rate) and carbon density are co-dominant "
         f"uncertainties — IUP extraction rate not yet verified from permit document; "
         f"satellite AGB is a concession-mean estimate, not field-measured. "
+        f"GEDI/ICESat-2 as secondary AGB source: pre-launch backlog. "
         f"Not registry-grade. Confirm with full feasibility study before any crediting claim."
     )
     return net_low, net_high, unc

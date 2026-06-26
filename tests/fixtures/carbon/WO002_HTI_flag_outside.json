@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 2279952.0,
-    "quantity_high_tco2e": 3257074.0,
+    "quantity_low_tco2e": 1992050.0,
+    "quantity_high_tco2e": 4237520.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "WO-CARBON-004 — frozen 2026-06-24. Point input; proxy 25,000 ha × loss rate from coords (40.0, 10.0)."
+    "freeze_note": "ADR-0016-M1 re-baseline 2026-06-26 — IPCC default CV=0.30 (no ESA CCI); quadrature with loss CV; VCS buffer separate. Verdict flagged (IPCC default loud flag). Was: 2279952–3257074."
   }
 }

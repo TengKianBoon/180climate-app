@@ -246,13 +246,20 @@ class GFWHTTPAdapter:
 
     # ── Density: ESA CCI -> IPCC fallback ────────────────────────────────────
 
-    def _query_density(self, boundary: Boundary) -> tuple[float, str]:
-        """Concession-mean carbon density in tCO2/ha.
+    def _query_density(self, boundary: Boundary) -> tuple[float, str, float | None]:
+        """Concession-mean carbon density in tCO2/ha, plus uncertainty pct.
+
+        Returns (biomass_tco2_per_ha, source_label, biomass_uncertainty_pct).
+        biomass_uncertainty_pct=None for IPCC Tier-1 fallback (no SE layer available).
 
         Fallback chain:
           1. DENSITY_COG_URL env var (custom ESA CCI / GEDI COG override)
           2. ESA CCI Biomass v3.0 2018 — CEDA public, no auth (auto)
           3. IPCC 2006 Table 4.7 SE-Asia Tier-1 default (657.1 tCO2/ha)
+
+        ADR-0016-M1: ESA CCI SD layer (per-pixel uncertainty) is pre-launch backlog;
+        default concession-level SE = 20% when ESA CCI read succeeds.
+        GEDI/ICESat-2 as secondary density source: pre-launch backlog.
         """
         import os
 
@@ -266,7 +273,7 @@ class GFWHTTPAdapter:
                     f"ESA CCI / GEDI AGB (DENSITY_COG_URL override; "
                     f"concession mean {agb:.0f} tDM/ha -> {biomass:.0f} tCO2/ha)"
                 )
-                return biomass, source
+                return biomass, source, 20.0  # ADR-0016: default 20% for ESA CCI
 
         # 2 — ESA CCI Biomass v3.0 2018 (auto, no auth)
         esa_url = self._esa_cci_url(boundary.centroid_lat, boundary.centroid_lon)
@@ -278,7 +285,7 @@ class GFWHTTPAdapter:
                 f"ESA CCI Biomass v3.0 2018 (CEDA public, tile {esa_tile}, "
                 f"100 m; concession mean {agb:.0f} tDM/ha -> {biomass:.0f} tCO2/ha)"
             )
-            return biomass, source
+            return biomass, source, 20.0  # ADR-0016: default 20% for ESA CCI
 
         # 3 — IPCC Tier-1 fallback
         value = biomass_tco2_per_ha("lowland_moist")
@@ -286,7 +293,7 @@ class GFWHTTPAdapter:
             f"Biomass: {biomass_citation()} "
             f"— Tier-1 fallback (ESA CCI read failed; set DENSITY_COG_URL to override)"
         )
-        return value, source
+        return value, source, None  # ADR-0016: no SE for IPCC default
 
     # ── Main query ────────────────────────────────────────────────────────────
 
@@ -300,7 +307,7 @@ class GFWHTTPAdapter:
 
         loss_after_2020 = sum(v for yr, v in annual_loss.items() if yr >= 2021)
 
-        biomass, density_source = self._query_density(boundary)
+        biomass, density_source, biomass_uncertainty_pct = self._query_density(boundary)
 
         return ForestData(
             annual_loss_ha=annual_loss,
@@ -309,4 +316,5 @@ class GFWHTTPAdapter:
             data_sources=loss_sources + [density_source],
             uncertainty_band=loss_unc,
             biomass_tco2_per_ha=biomass,
+            biomass_uncertainty_pct=biomass_uncertainty_pct,
         )

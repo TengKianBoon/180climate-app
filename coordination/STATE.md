@@ -1,7 +1,6 @@
-phase: P4 · Pre-launch — METHODOLOGY CORRECTION batch. ADR-0015 BUILT (C1 plantation gate + C2 IFM Pearson basis). STOPPED for Cowork + advisor post-build confirm.
-active_wo: WO-METHFIX-001 — COMPLETE. 270 tests green. Stopped for advisor confirm.
-status: WO-METHFIX-001 done (plantation gate + IFM Pearson basis). Before→after documented in OUTBOX. Next: advisor confirms derivation → ADR-0016 (M1 uncertainty propagation + M2 density gating) → wording WO → WO-DERIVE-001 (derivation) last.
-gate: GATE C SIGNED (ADR-0015, John 2026-06-26). WO-METHFIX-001 built. Advisor confirms post-build.
-last_commit: WO-METHFIX-001 build (270 tests)
-next_step: Cowork delivers OUTBOX to advisor → advisor confirms derivation numbers + plantation gate → ADR-0016 dispatched → wording WO → derivation last.
+phase: P4 · Pre-launch — methodology correction batch. ADR-0015 + ADR-0016 done; awaiting Cowork verify.
+active_wo: WO-METHFIX-002 — M1 uncertainty propagation + M2 density gating (ADR-0016). BUILT; STOPPED for Cowork.
+status: ADR-0016 implemented: M1 quadrature (density SE + loss CV in quadrature; buffer separate+labelled, REDD+IFM); M2 no-biomass gate (FLAG, no number) + IPCC-default loud flag + ESA CCI saturation caveat. ForestData.biomass_uncertainty_pct added (Gate C). Goldens re-baselined (REDD widens due to real loss CV≈0.877; IFM narrows slightly — honest). 281 tests green (11 new). Peat/routing unchanged. OUTBOX has before→after table.
+last_commit: (pending — about to commit)
+next_step: Cowork verifies WO-METHFIX-002 → M3 wording WO → WO-DERIVE-001 derivation LAST on corrected engine → deploy items → Gate L.
 updated: 2026-06-26

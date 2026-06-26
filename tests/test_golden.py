@@ -1048,13 +1048,14 @@ def test_ha_ifm_uncertainty_contains_pearson():
 
 
 def test_ha_ifm_formula_reconciliation():
-    """ADR-0015-C2: IFM estimate reconciles to the documented derivation.
+    """ADR-0015-C2 / ADR-0016-M1: IFM estimate reconciles to the documented derivation.
 
-    Formula: harvested_area × EF_per_ha × (1−buffer)
+    Formula (M1 quadrature + separate buffer):
       harvested_area = 73,787 ha × min(1, 15/35) = 31,623 ha
-      EF range: 26×1.4×44/12 to 40×1.5×44/12 tCO2/ha (~133–220 tCO2/ha)
-      buffer: 20–30%
-    Frozen numbers: low=2,954,441; high=5,565,666 (WO-METHFIX-001).
+      central = harvested_area × EF_central (~175.45 tCO2/ha using Pearson midpoints)
+      sigma_IFM = sqrt(CV_intensity^2 + CV_TEF^2) ≈ 0.2149
+      net_low = central × (1−sigma) × (1−buf_high); net_high = central × (1+sigma) × (1−buf_low)
+    Frozen numbers: low=3,049,142; high=5,392,503 (ADR-0016-M1 re-baseline 2026-06-26).
     DO NOT assert 'smaller' — IFM may equal or exceed old REDD estimate.
     Assert formula basis (n_entries=1, no density×loss_rate).
     """
@@ -1114,4 +1115,171 @@ def test_natural_forest_ha_proceeds_to_number():
     assert estimate.forest.forest_origin == "natural", (
         f"Expected forest_origin='natural' for WO002_HA_eligible, "
         f"got {estimate.forest.forest_origin!r}"
+    )
+
+
+# ── WO-METHFIX-002 / ADR-0016: M1 quadrature + M2 density-fallback gate ──────
+
+def test_redd_uncertainty_uses_quadrature():
+    """ADR-0016-M1: REDD uncertainty string must state 'in quadrature' (density SE + loss CV combined)."""
+    case = _load("WO002_HTI_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert "in quadrature" in estimate.uncertainty.lower(), (
+        "ADR-0016-M1: REDD uncertainty must state 'in quadrature' (density SE + loss-rate CV). "
+        f"Got: {estimate.uncertainty[:300]}"
+    )
+
+
+def test_redd_buffer_labelled_separately():
+    """ADR-0016-M1: REDD uncertainty string must label VCS buffer as applied separately."""
+    case = _load("WO002_HTI_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    unc_lower = estimate.uncertainty.lower()
+    assert "separately" in unc_lower or "separate" in unc_lower, (
+        "ADR-0016-M1: VCS buffer must be labelled as applied separately in REDD uncertainty. "
+        f"Got: {estimate.uncertainty[:300]}"
+    )
+
+
+def test_esa_cci_saturation_caveat_in_redd():
+    """ADR-0016-M2: ESA CCI density label must state saturation caveat for ESA-CCI-sourced fixtures."""
+    case = _load("WO002_HTI_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert "saturation" in estimate.uncertainty.lower(), (
+        "ADR-0016-M2: ESA CCI density label must state saturation caveat "
+        "(underestimates AGB >~150–250 Mg/ha). "
+        f"Got: {estimate.uncertainty[:300]}"
+    )
+
+
+def test_ipcc_default_loud_flag_in_uncertainty():
+    """ADR-0016-M2: IPCC default density → 'DEFAULT DENSITY' must appear in uncertainty string."""
+    case = _load("WO002_HTI_flag_outside.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert "DEFAULT DENSITY" in estimate.uncertainty, (
+        "ADR-0016-M2: IPCC fallback density must emit 'DEFAULT DENSITY — HIGH UNCERTAINTY' "
+        f"in uncertainty string. Got: {estimate.uncertainty[:300]}"
+    )
+
+
+def test_ipcc_default_verdict_flagged():
+    """ADR-0016-M2: IPCC default density → verdict must be 'flagged' (loud flag changes eligible → flagged)."""
+    case = _load("WO002_HTI_flag_outside.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.eligibility.verdict == "flagged", (
+        "ADR-0016-M2: IPCC default density must change verdict to 'flagged'. "
+        f"Got: {estimate.eligibility.verdict!r}"
+    )
+
+
+def test_no_biomass_no_number():
+    """ADR-0016-M2: no credible biomass source → REDD estimate must be null (no number emitted)."""
+    case = _load("WO010_REDD_no_biomass.json")
+    exp = case["expected_no_biomass"]
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.quantity_low_tco2e is None, (
+        f"ADR-0016-M2: no-biomass gate must produce quantity_low=None, "
+        f"got {estimate.quantity_low_tco2e}"
+    )
+    assert estimate.quantity_high_tco2e is None, (
+        f"ADR-0016-M2: no-biomass gate must produce quantity_high=None, "
+        f"got {estimate.quantity_high_tco2e}"
+    )
+
+
+def test_no_biomass_verdict_flagged():
+    """ADR-0016-M2: no credible biomass → verdict must be 'flagged'."""
+    case = _load("WO010_REDD_no_biomass.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.eligibility.verdict == "flagged", (
+        "ADR-0016-M2: no-biomass must produce verdict='flagged'. "
+        f"Got: {estimate.eligibility.verdict!r}"
+    )
+
+
+def test_no_biomass_reason_contains():
+    """ADR-0016-M2: no-biomass eligibility reasons must cite 'no credible biomass source'."""
+    case = _load("WO010_REDD_no_biomass.json")
+    exp = case["expected_no_biomass"]
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    reason_text = " ".join(estimate.eligibility.reasons).lower()
+    assert exp["reason_contains"].lower() in reason_text, (
+        f"ADR-0016-M2: expected reasons to contain {exp['reason_contains']!r}. "
+        f"Got: {estimate.eligibility.reasons}"
+    )
+
+
+def test_no_biomass_uncertainty_label():
+    """ADR-0016-M2: no-biomass uncertainty string must cite ADR-0016-M2."""
+    case = _load("WO010_REDD_no_biomass.json")
+    exp = case["expected_no_biomass"]
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert exp["uncertainty_contains"] in estimate.uncertainty, (
+        f"ADR-0016-M2: uncertainty must contain {exp['uncertainty_contains']!r}. "
+        f"Got: {estimate.uncertainty[:300]}"
+    )
+
+
+def test_ifm_uncertainty_uses_quadrature():
+    """ADR-0016-M1: IFM uncertainty string must state 'in quadrature' (intensity CV + TEF CV combined)."""
+    case = _load("WO002_HA_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert "in quadrature" in estimate.uncertainty.lower(), (
+        "ADR-0016-M1: IFM uncertainty must state 'in quadrature'. "
+        f"Got: {estimate.uncertainty[:300]}"
+    )
+
+
+def test_ifm_buffer_labelled_separately():
+    """ADR-0016-M1: IFM uncertainty string must label VCS buffer as applied separately."""
+    case = _load("WO002_HA_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    unc_lower = estimate.uncertainty.lower()
+    assert "separately" in unc_lower or "separate" in unc_lower, (
+        "ADR-0016-M1: VCS buffer must be labelled as applied separately in IFM uncertainty. "
+        f"Got: {estimate.uncertainty[:300]}"
     )

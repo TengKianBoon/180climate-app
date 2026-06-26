@@ -1,0 +1,22 @@
+{
+  "description": "HTI REDD, 20yr, 147,575 ha polygon near (-3.0, 113.0). Data cache has biomass_tco2_per_ha=null (no credible AGB source). ADR-0016-M2 gate: no-biomass → FLAG, no number.",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Barito No-Biomass",
+    "iup_address": "Kalimantan Tengah, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[112.8,-2.85],[113.2,-2.85],[113.2,-3.15],[112.8,-3.15],[112.8,-2.85]]]}"
+    }
+  },
+  "expected_no_biomass": {
+    "eligibility_verdict": "flagged",
+    "quantity_low_tco2e": null,
+    "quantity_high_tco2e": null,
+    "reason_contains": "no credible biomass source",
+    "uncertainty_contains": "ADR-0016-M2"
+  }
+}

@@ -1,43 +1,9 @@
-# GATE-AR SIGNED — ADR-0013 Auto-Routing Build
+# GATE C — ADR-0016 (uncertainty propagation + density gating) — SIGNED
 
-**Ready:** 2026-06-24 | **Signed:** 2026-06-24  
-**Signed by:** John (Gate-AR approved)  
-**Work Orders:** WO-AUTOROUTE-001 through WO-AUTOROUTE-005  
-**Builder:** Claude Sonnet 4.6 (Opus 4.8 for contract + peat/forest logic reviews)
-
-## What this gate covers
-The complete ADR-0013 auto-routing feature:
-1. **WO-001** — Contracts + KHG/PIPPIB/WorldCover/JRC-TMF overlay adapters
-2. **WO-002** — Peat = FLAG never tonnage; peat-no-tonnage Stratum validator; SMPP fixture
-3. **WO-003** — Forest-presence gate; REDD+/IFM routing; HTI-cleared golden
-4. **WO-004** — Intake classifier (Haiku, input-boundary-only); mixed-concession soil-first stratification
-5. **WO-005** — Golden suite consolidation (all peat overlay combos + forest gate variants); full invariant sweep; this gate pack
-
-## Gate pack
-→ `docs/adr-0013-build-gate-pack.md`
-
-## Evidence
-- 231 tests green (all invariants, all worked examples, no regressions)
-- See `tests/test_golden.py` and `tests/test_classifier.py` for the full invariant suite
-
-## Acceptance criteria status
-- [x] peat = FLAG — never a tonnage, by construction and by test
-- [x] Two overlays independent (A=KHG, B=PIPPIB) — never collapsed
-- [x] Forest-presence gate — cleared land blocks number; intact/light/heavy computed
-- [x] Intake classifier out of number path — structural test asserts no import
-- [x] Mixed stratification — soil-first, areas sum to boundary, peat stratum = flag
-- [x] REDD+/IFM routing correct — HTI→APD, HA→IFM, never VM0048/VM0007/VM0027
-- [x] Determinism — run twice → identical output (all fixtures tested)
-- [x] Existing non-peat numbers unchanged
-- [x] Out-of-scope: leads captured + polite apology CTA
-
-## Sign-off
-- [x] **John** — Gate-AR approved 2026-06-24
-- [ ] **Methodology advisor** — confirm peat legal overlay logic + forest gate thresholds + routing correctness (carry-forward to Gate L)
-
-## Carry-forward before Gate L (go-live)
-1. Wire REAL KHG + SK PIPPIB shapefiles (overlays are fixtures only)
-2. Set ANTHROPIC_API_KEY for classifier in production env
-3. Configure EMAIL_FROM, SMTP, GOOGLE_SHEETS creds (Gate P carry-forward)
-4. Logo + brand final polish
-5. Advisor wording check on peat narrative
+**Decision:** APPROVED by John ("proceed", 2026-06-26); advisor post-build confirm waived by John for this one.
+**Authorizes:** the `core/contracts` + number-path change in ADR-0016 — `ForestData.biomass_uncertainty_pct`, M1
+uncertainty propagation (density SE + loss CV in quadrature; buffer applied separately), M2 density-fallback gating.
+**Ranges WIDEN (intended); goldens re-baselined.**
+**Build:** WO-METHFIX-002 (INBOX) — Opus. **Post-build:** Cowork verifies (band widens, buffer separate, default-density
+loud-flag, no-biomass flag, peat unchanged, before→after documented).
+**Prior gate:** ADR-0015 (plantation + IFM) — built, Cowork-verified, advisor confirm waived by John.

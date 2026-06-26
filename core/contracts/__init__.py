@@ -38,6 +38,9 @@ class ForestData(BaseModel):
     biomass_tco2_per_ha: Optional[float] = None
     # ADR-0015-C1: forest-origin gate — natural vs established plantation (KLHK Penutupan Lahan)
     forest_origin: Literal["natural", "plantation", "mixed", "unknown"] = "unknown"
+    # ADR-0016-M1: biomass density relative SE (0–100); from ESA CCI per-pixel SD layer or field survey.
+    # None = no SE layer available; engine falls back to a source-based default CV.
+    biomass_uncertainty_pct: Optional[float] = None
 
 class Disclaimer(BaseModel):
     text: str

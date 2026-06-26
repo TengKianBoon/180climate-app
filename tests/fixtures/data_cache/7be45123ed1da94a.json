@@ -1,0 +1,39 @@
+{
+  "annual_loss_ha": {
+    "2001": 1725.82,
+    "2002": 1763.88,
+    "2003": 1803.11,
+    "2004": 1831.21,
+    "2005": 1768.48,
+    "2006": 1836.45,
+    "2007": 1715.93,
+    "2008": 1740.42,
+    "2009": 1845.09,
+    "2010": 1813.26,
+    "2011": 1788.28,
+    "2012": 1871.54,
+    "2013": 1841.41,
+    "2014": 1880.78,
+    "2015": 1807.13,
+    "2016": 1907.2,
+    "2017": 1837.89,
+    "2018": 1876.45,
+    "2019": 1801.67,
+    "2020": 1836.98,
+    "2021": 1822.61,
+    "2022": 1867.55,
+    "2023": 1828.76
+  },
+  "baseline_cover_pct": 80.7,
+  "loss_after_2020_ha": 5518.92,
+  "data_sources": [
+    "GFW/Hansen annual loss (stub — offline/CI mode)",
+    "Biomass: no satellite AGB available — no credible source for this location (ADR-0016-M2 test fixture)"
+  ],
+  "uncertainty_band": "±25 % — deterministic stub; Tier 1 indicative screening once real satellite data is wired",
+  "peat_present": null,
+  "peat_depth_proxy_m": null,
+  "biomass_tco2_per_ha": null,
+  "forest_origin": "unknown",
+  "biomass_uncertainty_pct": null
+}

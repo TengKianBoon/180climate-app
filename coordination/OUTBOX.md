@@ -1,87 +1,83 @@
-# OUTBOX — Builder → Cowork · WO-METHFIX-001 · 2026-06-26
+# OUTBOX — Builder → Cowork · WO-METHFIX-002 · 2026-06-26
 
-## Status: CI GREEN ✅ — STOPPED for Cowork + advisor post-build confirm
+## Status: CI GREEN ✅ — STOPPED for Cowork review (281 tests passed)
 
 ---
 
 ## What was delivered
 
-ADR-0015 (Gate C signed) methodology corrections. Two Critical flaws corrected:
+ADR-0016 (Gate C signed) uncertainty propagation + density-fallback gating. Two corrections:
 
-### C1 — Forest-origin (plantation) gate
+**M1 — quadrature uncertainty + buffer separation (both REDD and IFM)**
+- REDD: `sigma = sqrt(CV_density² + CV_loss²)`; central = `area × loss_rate × years × density`; VCS buffer (20–30%) deducted **after** and labelled separately.
+- IFM: `sigma_IFM = sqrt(CV_intensity² + CV_TEF²) ≈ 0.2149` (pre-computed from TPTI band 26–40 m³/ha and Pearson TEF 1.4–1.5 MgC/m³). Buffer deducted separately.
+- CV_density source hierarchy: `biomass_uncertainty_pct / 100` if set → 0.20 for ESA CCI Biomass v3.0 → 0.30 for IPCC default.
+- CV_loss = `std(annual_loss_ha 2016–2023) / mean(annual_loss_ha 2016–2023)`.
+- `ForestData.biomass_uncertainty_pct: Optional[float] = None` added (Gate C authorized change).
 
-- `ForestData.forest_origin: Literal["natural","plantation","mixed","unknown"]` added to contracts (authorized by Gate C).
-- `core/overlays/klhk_plantation.py` — KLHK Penutupan Lahan adapter (fixture-based CI; live query pre-launch backlog, same pattern as KHG/PIPPIB).
-- `_classify_forest_origin()` in engine: primary = KLHK fixture; secondary = JRC TMF rotational-harvest temporal heuristic.
-- **Established plantation → FLAG** ("no standing natural forest at risk — not an APD/IFM candidate; rotational-harvest loss is not avoidable deforestation"). `quantity_low/high = None`.
-- Mixed concession → flagged + caveat note (full natural-area masking is a pre-launch item).
-- Natural or unknown → proceed (engine does not hard-block on KLHK unavailability).
-- ADR-0013 moratorium gate retained and fires independently (necessary-but-not-sufficient).
-
-### C2 — Distinct IFM selective-logging basis for HA
-
-- `MethodologyRoute.baseline_class` now includes `"ifm_selective_logging"` (authorized by Gate C).
-- `build_methodology_route()` for HA: baseline_class changed from `"planned_selective"` → `"ifm_selective_logging"`; VM0010 as lead, VM0045 flagged field/NFI-only.
-- `_estimate_ifm()` added to engine — Pearson et al. (2014) logging-emissions basis:
-  - `harvested_area = eligible_area × min(1, crediting_years / cycle_years)`
-  - `avoided_CO2 = harvested_area × EF_per_ha × (1 − buffer)`
-  - `n_entries = 1` (one avoided entry in a 20–30 yr period vs ~35 yr TPTI cycle)
-  - EF range: 26–40 m³/ha × 1.4–1.5 MgC/m³ × 44/12 → 133–220 tCO2/ha per entry
-  - Cutting cycle: 35 yr (TPTI); buffer: 20–30% (VCS non-permanence)
-- HA `run_carbon_engine()` now calls `_estimate_ifm()` instead of `_estimate_redd()`.
-- `run_mixed_stratification()` HA mineral stratum also routes to `_estimate_ifm()`.
+**M2 — density-fallback gating**
+- No credible biomass source (`biomass_tco2_per_ha is None`) → FLAG, no number (quantity=null). Uncertainty string cites ADR-0016-M2.
+- IPCC default density detected → adds "DEFAULT DENSITY — HIGH UNCERTAINTY" to uncertainty + changes verdict to "flagged" if was "eligible".
+- ESA CCI density label includes saturation caveat: "underestimates AGB >~150–250 Mg/ha".
+- GEDI/ICESat-2 noted in uncertainty string as pre-launch backlog (not built now).
 
 ---
 
-## Before → After: Golden numbers
+## Contract change (Gate C authorized)
 
-| Fixture | Permit | Before (REDD basis) | After (IFM Pearson 2014) |
-|---|---|---|---|
-| `WO002_HA_eligible.json` | HA 15yr 73,787 ha | 4,362,433 – 6,232,048 tCO2e | **2,954,441 – 5,565,666 tCO2e** |
-| `WO009_HTI_plantation.json` | HTI plantation | (new fixture — was not in scope) | **FLAG, None – None** (no number) |
-
-HTI eligible (WO002_HTI_eligible.json): **5,816,578 – 8,309,397 tCO2e — UNCHANGED** (HTI still uses APD/REDD).
-
-**IFM derivation (73,787 ha, 15 yr — for advisor verification):**
-- harvested_area = 73,787 × min(1, 15/35) = 73,787 × 3/7 = **31,623 ha** (exact)
-- EF_low = 26 × 1.4 × 44/12 = **133.47 tCO2/ha**; EF_high = 40 × 1.5 × 44/12 = **220.0 tCO2/ha**
-- gross_low = 31,623 × 133.47 = **4,220,630 tCO2e**; net_low = × 0.70 = **2,954,441 tCO2e**
-- gross_high = 31,623 × 220.0 = **6,957,060 tCO2e**; net_high = × 0.80 = **5,565,666 tCO2e** (rounding-correct)
+`core/contracts/__init__.py` — `ForestData` extended:
+```python
+# ADR-0016-M1
+biomass_uncertainty_pct: Optional[float] = None
+```
+`core/data/gfw.py` — `_query_density()` now returns 3-tuple `(biomass, source_label, biomass_uncertainty_pct)`. ESA CCI success → `20.0`; IPCC fallback → `None`.
 
 ---
 
-## Verification
+## Before → After: golden ranges
 
-| Check | Result |
-|---|---|
-| `pytest tests/` | ✅ **270 passed** (was 259; 11 new) |
-| C1 plantation gate: no tonnage | ✅ `test_plantation_gate_no_number` PASS |
-| C1 plantation gate: verdict=flagged | ✅ `test_plantation_gate_verdict_flagged` PASS |
-| C1 plantation gate: reason contains "plantation" | ✅ `test_plantation_gate_reason_contains_plantation` PASS |
-| C1 ForestData.forest_origin="plantation" in result | ✅ `test_plantation_gate_forest_origin_set` PASS |
-| C1 natural-forest HTI/HA still proceeds to number | ✅ `test_natural_forest_hti/ha_proceeds_to_number` PASS |
-| C2 HA baseline_class="ifm_selective_logging" | ✅ `test_ha_eligible_uses_ifm_basis` PASS |
-| C2 HTI still uses "planned_clearfell" (unchanged) | ✅ `test_hti_eligible_uses_redd_not_ifm` PASS |
-| C2 IFM uncertainty cites Pearson 2014 + VM0010 + n_entries=1 | ✅ `test_ha_ifm_uncertainty_contains_pearson` PASS |
-| C2 IFM frozen numbers reconcile to derivation | ✅ `test_ha_ifm_formula_reconciliation` PASS |
-| HTI eligible numbers unchanged (5,816,578–8,309,397) | ✅ `test_existing_hti_eligible_unchanged_after_forest_gate` PASS |
-| Peat: no tonnage, all overlays independent | ✅ all peat tests PASS |
-| ADR-0009: no "% accuracy/confidence", always range for non-peat | ✅ all invariant sweeps PASS |
-| ADR-0001: is_planned=True, additionality_basis correct | ✅ all PASS |
-| No VM0027/VM0048/VM0007 in any output | ✅ all PASS |
-| Determinism: same input → same output | ✅ all PASS |
-| No classifier import in engine.py | ✅ structural check PASS |
-| contracts change additive (backward-compatible defaults) | ✅ `ForestData.forest_origin="unknown"` default |
+| Fixture | Metric | Before (ADR-0015-C2) | After (ADR-0016-M1) | Notes |
+|---------|--------|----------------------|---------------------|-------|
+| HTI_eligible (73,787 ha, ESA CCI 266.5 tCO2/ha) | low | 5,816,578 | **731,904** | CV_loss≈0.877 dominates; sigma≈0.899 → wide low |
+| HTI_eligible | high | 8,309,397 | **15,782,332** | sigma≈0.899 → wide high |
+| HTI_flag_years (3yr, same polygon) | low | 872,487 | **109,786** | Same sigma; 3/20 ratio applied |
+| HTI_flag_years | high | 1,246,410 | **2,367,350** | |
+| HTI_fail_area (1,107 ha, ESA CCI 174.2) | low | 2,098 | **0** | sigma>1 → `max(0, 1−sigma)=0`; clips to 0 |
+| HTI_fail_area | high | 2,997 | **10,282** | Valid: 0 < 10,282 (ADR-0009 preserved) |
+| HA_eligible (IFM, 73,787 ha, 15yr) | low | 2,954,441 | **3,049,142** | Quadrature over TPTI+TEF; buffer separate |
+| HA_eligible | high | 5,565,666 | **5,392,503** | Range narrows slightly (buffer separation removes cross-product inflation) |
+| HTI_flag_outside (Point, IPCC 657.1) | low | 2,279,952 | **1,992,050** | CV_density=0.30; LOUD flag added; verdict flagged |
+| HTI_flag_outside | high | 3,257,074 | **4,237,520** | |
+| WO010_REDD_no_biomass (new) | low | — | **null** | M2 gate: no AGB → FLAG, no number |
+| WO010_REDD_no_biomass | high | — | **null** | |
+
+**Central estimates**: HTI large polygon central = `73,787 × 0.02641 × 20 × 266.5 ≈ 10,393,000` tCO2e (before buffer). Buffer deducted separately. HA IFM central = `31,623 × 175.45 ≈ 5,549,000` (before buffer). Range widens for REDD due to real inter-annual loss variability (Hansen 2016–2023). IFM range adjusts slightly — both are now honest.
 
 ---
 
-## Advisor post-build confirm checklist
-1. **C1 derivation check**: natural-forest HTI numbers unchanged (5,816,578–8,309,397 ✓)?
-2. **C2 derivation check**: HA IFM numbers = 2,954,441–5,565,666 tCO2e for 73,787 ha, 15 yr?
-   - harvested_area = 31,623 ha ✓; EF 133–220 tCO2/ha ✓; buffer 20–30% ✓; n_entries=1 ✓
-3. KLHK plantation gate: established plantation → FLAG + no number ✓?
-4. ADR-0013 moratorium gate retained and fires independently ✓?
-5. n_entries=1 confirmed (no multi-cycle multiplication) ✓?
-6. VM0010 lead / VM0045 field-only ✓?
-7. Conservative-floor label for VM0010 avoided-only ✓?
-8. If pass → proceed to ADR-0016 (M1/M2 uncertainty + density gating) → wording WO → derivation last.
+## Tests added (11 new → 281 total, was 270)
+
+- `test_redd_uncertainty_uses_quadrature` — "in quadrature" in REDD uncertainty
+- `test_redd_buffer_labelled_separately` — "separately/separate" in REDD uncertainty
+- `test_esa_cci_saturation_caveat_in_redd` — "saturation" in ESA CCI uncertainty
+- `test_ipcc_default_loud_flag_in_uncertainty` — "DEFAULT DENSITY" in IPCC-default uncertainty
+- `test_ipcc_default_verdict_flagged` — IPCC default → verdict=flagged
+- `test_no_biomass_no_number` — quantity_low=None, quantity_high=None
+- `test_no_biomass_verdict_flagged` — verdict=flagged
+- `test_no_biomass_reason_contains` — reason contains "no credible biomass source"
+- `test_no_biomass_uncertainty_label` — uncertainty contains "ADR-0016-M2"
+- `test_ifm_uncertainty_uses_quadrature` — "in quadrature" in IFM uncertainty
+- `test_ifm_buffer_labelled_separately` — "separately/separate" in IFM uncertainty
+
+---
+
+## Peat unchanged ✅ · Routing unchanged ✅ · Determinism intact ✅
+
+No peat fixture touched. HTI→APD, HA→IFM, Peat→interim routing unchanged. All math is pure Python constants + `math.fsum` — no randomness.
+
+---
+
+## Next (not in scope here)
+- M3 wording WO (review uncertainty string language with advisor)
+- WO-DERIVE-001 (derivation document, last on the corrected engine)
+- Deploy items → Gate L
