@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 109786.0,
-    "quantity_high_tco2e": 2367350.0,
+    "quantity_low_tco2e": 668458.0,
+    "quantity_high_tco2e": 1728867.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "ADR-0016-M1 re-baseline 2026-06-26 — quadrature uncertainty (ESA CCI CV=0.20, loss CV≈0.877, sigma≈0.899); 3-yr crediting; VCS buffer separate. Was: 872487–1246410."
+    "freeze_note": "ADR-0016-M1 retry-1 re-baseline 2026-06-26 — quadrature uncertainty (ESA CCI CV=0.20, loss SEM≈0.331, sigma≈0.385); 3-yr crediting; VCS buffer separate. Was: 109786–2367350 (raw CV). Was (pre-ADR-0016): 872487–1246410."
   }
 }

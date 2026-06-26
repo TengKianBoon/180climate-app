@@ -1065,12 +1065,15 @@ def _estimate_redd(
     # M1: density CV
     cv_density, is_ipcc_default, has_esa_cci = _density_cv_info(forest)
 
-    # M1: loss-rate CV from Hansen annual series
+    # M1: loss-rate uncertainty = standard error of the mean (SEM) of the annual series.
+    # SEM = std / (mean × sqrt(n)) — reflects uncertainty in the estimated mean, not raw variability.
+    # Using raw CV (std/mean) would penalise a stable series just because its inter-annual spread
+    # is wide relative to a small mean; SEM shrinks with more years as expected for an estimator.
     recent = [forest.annual_loss_ha[y] for y in range(2016, 2024) if y in forest.annual_loss_ha]
     if len(recent) >= 2:
         mean_l = sum(recent) / len(recent)
         std_l = (_math.fsum((x - mean_l) ** 2 for x in recent) / len(recent)) ** 0.5
-        cv_loss = std_l / mean_l if mean_l > 0 else _CV_DENSITY_IPCC_DEFAULT
+        cv_loss = (std_l / mean_l) / (len(recent) ** 0.5) if mean_l > 0 else _CV_DENSITY_IPCC_DEFAULT
     else:
         cv_loss = _CV_DENSITY_IPCC_DEFAULT  # too few years — conservative default
 
@@ -1110,8 +1113,8 @@ def _estimate_redd(
     unc = (
         f"Tier 1 indicative screening — ADR-0016 M1 error budget (in quadrature): "
         f"carbon density [{density_label}]; "
-        f"baseline loss-rate CV {cv_loss*100:.0f}% "
-        f"(Hansen GFC-2022 2016–2023 {n_loss_yrs}-yr std/mean); "
+        f"baseline loss-rate SEM {cv_loss*100:.1f}% "
+        f"(Hansen GFC-2022 2016–2023 {n_loss_yrs}-yr std/(mean×√n)); "
         f"combined sigma {sigma*100:.0f}%; "
         f"central {central:,.0f} tCO2e; "
         f"pre-buffer band [{low_before_buf:,.0f}–{high_before_buf:,.0f}] tCO2e. "

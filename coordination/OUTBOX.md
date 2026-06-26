@@ -1,6 +1,6 @@
-# OUTBOX — Builder → Cowork · WO-METHFIX-002 · 2026-06-26
+# OUTBOX — Builder → Cowork · WO-METHFIX-002 retry 1/2 · 2026-06-26
 
-## Status: CI GREEN ✅ — STOPPED for Cowork review (281 tests passed)
+## Status: CI GREEN ✅ — STOPPED for Cowork review (281 tests passed, retry 1/2 fix applied)
 
 ---
 
@@ -9,10 +9,10 @@
 ADR-0016 (Gate C signed) uncertainty propagation + density-fallback gating. Two corrections:
 
 **M1 — quadrature uncertainty + buffer separation (both REDD and IFM)**
-- REDD: `sigma = sqrt(CV_density² + CV_loss²)`; central = `area × loss_rate × years × density`; VCS buffer (20–30%) deducted **after** and labelled separately.
-- IFM: `sigma_IFM = sqrt(CV_intensity² + CV_TEF²) ≈ 0.2149` (pre-computed from TPTI band 26–40 m³/ha and Pearson TEF 1.4–1.5 MgC/m³). Buffer deducted separately.
+- REDD: `sigma = sqrt(CV_density² + SEM_loss²)`; central = `area × loss_rate × years × density`; VCS buffer (20–30%) deducted **after** and labelled separately.
+- **Retry 1/2 fix:** loss uncertainty changed from raw CV (`std/mean`) to **standard error of the mean** (`SEM = std / (mean × sqrt(n))`). SEM reflects uncertainty in the estimated baseline mean; raw CV was inflating ranges by penalising natural inter-annual variability that does not affect the mean estimator.
+- IFM: `sigma_IFM = sqrt(CV_intensity² + CV_TEF²) ≈ 0.2149` (pre-computed from TPTI band 26–40 m³/ha and Pearson TEF 1.4–1.5 MgC/m³). Buffer deducted separately. **IFM unchanged.**
 - CV_density source hierarchy: `biomass_uncertainty_pct / 100` if set → 0.20 for ESA CCI Biomass v3.0 → 0.30 for IPCC default.
-- CV_loss = `std(annual_loss_ha 2016–2023) / mean(annual_loss_ha 2016–2023)`.
 - `ForestData.biomass_uncertainty_pct: Optional[float] = None` added (Gate C authorized change).
 
 **M2 — density-fallback gating**
@@ -36,22 +36,22 @@ biomass_uncertainty_pct: Optional[float] = None
 
 ## Before → After: golden ranges
 
-| Fixture | Metric | Before (ADR-0015-C2) | After (ADR-0016-M1) | Notes |
-|---------|--------|----------------------|---------------------|-------|
-| HTI_eligible (73,787 ha, ESA CCI 266.5 tCO2/ha) | low | 5,816,578 | **731,904** | CV_loss≈0.877 dominates; sigma≈0.899 → wide low |
-| HTI_eligible | high | 8,309,397 | **15,782,332** | sigma≈0.899 → wide high |
-| HTI_flag_years (3yr, same polygon) | low | 872,487 | **109,786** | Same sigma; 3/20 ratio applied |
-| HTI_flag_years | high | 1,246,410 | **2,367,350** | |
-| HTI_fail_area (1,107 ha, ESA CCI 174.2) | low | 2,098 | **0** | sigma>1 → `max(0, 1−sigma)=0`; clips to 0 |
-| HTI_fail_area | high | 2,997 | **10,282** | Valid: 0 < 10,282 (ADR-0009 preserved) |
-| HA_eligible (IFM, 73,787 ha, 15yr) | low | 2,954,441 | **3,049,142** | Quadrature over TPTI+TEF; buffer separate |
-| HA_eligible | high | 5,565,666 | **5,392,503** | Range narrows slightly (buffer separation removes cross-product inflation) |
-| HTI_flag_outside (Point, IPCC 657.1) | low | 2,279,952 | **1,992,050** | CV_density=0.30; LOUD flag added; verdict flagged |
-| HTI_flag_outside | high | 3,257,074 | **4,237,520** | |
-| WO010_REDD_no_biomass (new) | low | — | **null** | M2 gate: no AGB → FLAG, no number |
-| WO010_REDD_no_biomass | high | — | **null** | |
+| Fixture | Metric | Pre-ADR-0016 (ADR-0015-C2) | ADR-0016 raw-CV | **ADR-0016 SEM (final)** | Notes |
+|---------|--------|---------------------------|-----------------|--------------------------|-------|
+| HTI_eligible (73,787 ha, ESA CCI 266.5 tCO2/ha) | low | 5,816,578 | 731,904 | **4,456,388** | SEM≈33.1%, sigma≈38.5% |
+| HTI_eligible | high | 8,309,397 | 15,782,332 | **11,525,779** | |
+| HTI_flag_years (3yr) | low | 872,487 | 109,786 | **668,458** | Same sigma; 3-yr crediting |
+| HTI_flag_years | high | 1,246,410 | 2,367,350 | **1,728,867** | |
+| HTI_fail_area (1,107 ha, ESA CCI 174.2) | low | 2,098 | 0 | **165** | Raw CV: sigma>1→clip. SEM: sigma<1→positive low |
+| HTI_fail_area | high | 2,997 | 10,282 | **5,806** | |
+| HA_eligible (IFM, 73,787 ha, 15yr) | low | 2,954,441 | 3,049,142 | **3,049,142** | IFM unchanged |
+| HA_eligible | high | 5,565,666 | 5,392,503 | **5,392,503** | IFM unchanged |
+| HTI_flag_outside (Point, IPCC 657.1) | low | 2,279,952 | 1,992,050 | **1,994,594** | SEM≈0.9% (stable stub); sigma≈30% |
+| HTI_flag_outside | high | 3,257,074 | 4,237,520 | **4,234,612** | |
+| WO010_REDD_no_biomass (new) | low | — | null | **null** | M2 gate: no AGB → FLAG |
+| WO010_REDD_no_biomass | high | — | null | **null** | |
 
-**Central estimates**: HTI large polygon central = `73,787 × 0.02641 × 20 × 266.5 ≈ 10,393,000` tCO2e (before buffer). Buffer deducted separately. HA IFM central = `31,623 × 175.45 ≈ 5,549,000` (before buffer). Range widens for REDD due to real inter-annual loss variability (Hansen 2016–2023). IFM range adjusts slightly — both are now honest.
+**Key numbers**: HTI large polygon — SEM = 33.1% (7 years, std/mean = 87.7% raw); sigma = sqrt(0.20² + 0.331²) ≈ 38.5%. Central ≈ 10,393k tCO2e (pre-buffer). HA IFM central ≈ 5,549k (pre-buffer; unchanged). HTI_fail_area SEM = 91.5% for this high-variability small polygon (sigma ≈ 93.6%) — still gives a small positive low (165 tCO2e) instead of clipping to 0.
 
 ---
 
