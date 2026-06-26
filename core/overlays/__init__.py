@@ -15,6 +15,7 @@ from core.overlays.khg import query_khg
 from core.overlays.pippib import query_pippib
 from core.overlays.worldcover import query_worldcover, WorldCoverResult
 from core.overlays.jrc_tmf import query_jrc_tmf, JRCTMFResult
+from core.overlays.klhk_plantation import query_klhk_plantation, PlantationOriginResult
 
 __all__ = [
     "query_khg",
@@ -23,4 +24,6 @@ __all__ = [
     "WorldCoverResult",
     "query_jrc_tmf",
     "JRCTMFResult",
+    "query_klhk_plantation",
+    "PlantationOriginResult",
 ]

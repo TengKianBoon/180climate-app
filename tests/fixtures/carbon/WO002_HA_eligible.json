@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 4362433.0,
-    "quantity_high_tco2e": 6232048.0,
+    "quantity_low_tco2e": 2954441.0,
+    "quantity_high_tco2e": 5565666.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "WO-CARBON-001c — re-frozen 2026-06-24 with real ESA CCI Biomass v3.0 2018 density (266.5 tCO2/ha). HA 15yr; same area+density as HTI_eligible. Was: 10756304–15366148 (IPCC 657.1)."
+    "freeze_note": "WO-METHFIX-001 / ADR-0015-C2 — re-frozen 2026-06-26. IFM logging-emissions basis (Pearson 2014): harvested_area=31,623 ha (73,787 ha × 15/35); EF 133–220 tCO2/ha per entry; buffer 20–30%; n_entries=1. Was (REDD basis, WO-CARBON-001c): 4,362,433–6,232,048."
   }
 }

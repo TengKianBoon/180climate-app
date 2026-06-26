@@ -1,0 +1,23 @@
+{
+  "description": "HTI, 20yr, ~74,350 ha polygon near (0.9, 114.15) — KLHK Penutupan Lahan: hutan tanaman (established plantation). ADR-0015-C1 plantation gate fires → FLAG, no avoided-deforestation number. Retain ADR-0013 moratorium gate (necessary-but-not-sufficient). No tonnage asserted.",
+  "input": {
+    "contact": {"name": "Test User", "email": "test@example.com"},
+    "iup_name": "PT Plantation Timber Kalimantan (test)",
+    "iup_address": "Kalimantan Barat, Indonesia",
+    "permit_type": "HTI",
+    "permit_years_remaining": 20,
+    "project_type": "REDD",
+    "geo": {
+      "fmt": "geojson",
+      "payload": "{\"type\":\"Polygon\",\"coordinates\":[[[114.0,1.0],[114.3,1.0],[114.3,0.8],[114.0,0.8],[114.0,1.0]]]}"
+    }
+  },
+  "expected_plantation": {
+    "eligibility_verdict": "flagged",
+    "quantity_low_tco2e": null,
+    "quantity_high_tco2e": null,
+    "plantation_reason_contains": "plantation",
+    "forest_origin": "plantation",
+    "never_eligible": true
+  }
+}

@@ -901,3 +901,217 @@ def test_all_redd_never_vm0048_vm0007(fixture_name: str):
             assert bad not in m, (
                 f"INVARIANT VIOLATION (ADR-0001): {bad!r} in cited_methods for {fixture_name}"
             )
+
+
+# ── WO-METHFIX-001 / ADR-0015-C1: Plantation gate tests ──────────────────────
+
+PLANTATION_FIXTURES = ["WO009_HTI_plantation.json"]
+
+
+@pytest.mark.parametrize("fixture_name", PLANTATION_FIXTURES)
+def test_plantation_gate_no_number(fixture_name: str):
+    """ADR-0015-C1: established plantation must NEVER emit an avoided-deforestation number."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.quantity_low_tco2e is None, (
+        f"INVARIANT VIOLATION (ADR-0015-C1): plantation must have quantity_low_tco2e=None "
+        f"(got {estimate.quantity_low_tco2e} for {fixture_name})"
+    )
+    assert estimate.quantity_high_tco2e is None, (
+        f"INVARIANT VIOLATION (ADR-0015-C1): plantation must have quantity_high_tco2e=None "
+        f"(got {estimate.quantity_high_tco2e} for {fixture_name})"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", PLANTATION_FIXTURES)
+def test_plantation_gate_verdict_flagged(fixture_name: str):
+    """ADR-0015-C1: plantation → 'flagged', never 'eligible' and never 'hard_no'."""
+    case = _load(fixture_name)
+    exp = case["expected_plantation"]
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.eligibility.verdict == exp["eligibility_verdict"], (
+        f"{fixture_name}: expected verdict={exp['eligibility_verdict']!r}, "
+        f"got {estimate.eligibility.verdict!r}"
+    )
+    assert estimate.eligibility.verdict != "hard_no", (
+        f"INVARIANT (ADR-0015-C1): plantation must never be 'hard_no' — "
+        f"no APD number is a different outcome from a hard exclusion."
+    )
+
+
+@pytest.mark.parametrize("fixture_name", PLANTATION_FIXTURES)
+def test_plantation_gate_reason_contains_plantation(fixture_name: str):
+    """ADR-0015-C1: eligibility reasons must mention 'plantation' for the plantation gate."""
+    case = _load(fixture_name)
+    exp = case["expected_plantation"]
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    reason_text = " ".join(estimate.eligibility.reasons).lower()
+    assert exp["plantation_reason_contains"].lower() in reason_text, (
+        f"{fixture_name}: expected reasons to contain {exp['plantation_reason_contains']!r}, "
+        f"got reasons: {estimate.eligibility.reasons}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", PLANTATION_FIXTURES)
+def test_plantation_gate_forest_origin_set(fixture_name: str):
+    """ADR-0015-C1: ForestData.forest_origin must be 'plantation' after engine run."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.forest.forest_origin == "plantation", (
+        f"{fixture_name}: expected forest_origin='plantation', "
+        f"got {estimate.forest.forest_origin!r}"
+    )
+
+
+@pytest.mark.parametrize("fixture_name", PLANTATION_FIXTURES)
+def test_plantation_gate_no_forbidden_phrases(fixture_name: str):
+    """ADR-0009: no forbidden phrases in plantation flag output."""
+    case = _load(fixture_name)
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+    dump = estimate.model_dump_json()
+    for pattern in _FORBIDDEN_PHRASES:
+        assert not re.search(pattern, dump, re.IGNORECASE), (
+            f"INVARIANT VIOLATION (ADR-0009): forbidden phrase {pattern!r} "
+            f"in plantation fixture output for {fixture_name}"
+        )
+
+
+# ── WO-METHFIX-001 / ADR-0015-C2: IFM estimate formula tests ─────────────────
+
+def test_ha_eligible_uses_ifm_basis():
+    """ADR-0015-C2: HA estimate must use IFM logging basis — methodology.baseline_class='ifm_selective_logging'."""
+    case = _load("WO002_HA_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.methodology.baseline_class == "ifm_selective_logging", (
+        f"ADR-0015-C2: HA must use IFM basis (baseline_class='ifm_selective_logging'), "
+        f"got {estimate.methodology.baseline_class!r}"
+    )
+
+
+def test_hti_eligible_uses_redd_not_ifm():
+    """ADR-0015-C2: HTI must still use APD (REDD) basis — baseline_class='planned_clearfell'."""
+    case = _load("WO002_HTI_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.methodology.baseline_class == "planned_clearfell", (
+        f"HTI must use APD/REDD basis (planned_clearfell), "
+        f"got {estimate.methodology.baseline_class!r}"
+    )
+
+
+def test_ha_ifm_uncertainty_contains_pearson():
+    """ADR-0015-C2: IFM uncertainty string must cite Pearson et al. (2014) as EF source."""
+    case = _load("WO002_HA_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert "Pearson" in estimate.uncertainty, (
+        "ADR-0015-C2: IFM uncertainty must cite Pearson et al. (2014) as EF source. "
+        f"Got: {estimate.uncertainty[:200]}"
+    )
+    assert "VM0010" in estimate.uncertainty, (
+        "ADR-0015-C2: IFM uncertainty must mention VM0010 (selective-logging baseline). "
+        f"Got: {estimate.uncertainty[:200]}"
+    )
+    assert "n_entries=1" in estimate.uncertainty, (
+        "ADR-0015-C2: n_entries=1 must be stated in uncertainty (no multi-cycle multiplication). "
+        f"Got: {estimate.uncertainty[:200]}"
+    )
+
+
+def test_ha_ifm_formula_reconciliation():
+    """ADR-0015-C2: IFM estimate reconciles to the documented derivation.
+
+    Formula: harvested_area × EF_per_ha × (1−buffer)
+      harvested_area = 73,787 ha × min(1, 15/35) = 31,623 ha
+      EF range: 26×1.4×44/12 to 40×1.5×44/12 tCO2/ha (~133–220 tCO2/ha)
+      buffer: 20–30%
+    Frozen numbers: low=2,954,441; high=5,565,666 (WO-METHFIX-001).
+    DO NOT assert 'smaller' — IFM may equal or exceed old REDD estimate.
+    Assert formula basis (n_entries=1, no density×loss_rate).
+    """
+    case = _load("WO002_HA_eligible.json")
+    exp = case["expected_range"]
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.quantity_low_tco2e == exp["quantity_low_tco2e"], (
+        f"IFM low estimate mismatch: expected {exp['quantity_low_tco2e']:,.0f}, "
+        f"got {estimate.quantity_low_tco2e:,.0f}"
+    )
+    assert estimate.quantity_high_tco2e == exp["quantity_high_tco2e"], (
+        f"IFM high estimate mismatch: expected {exp['quantity_high_tco2e']:,.0f}, "
+        f"got {estimate.quantity_high_tco2e:,.0f}"
+    )
+    # Assert range (ADR-0009)
+    assert estimate.quantity_low_tco2e < estimate.quantity_high_tco2e, (
+        "INVARIANT VIOLATION (ADR-0009): IFM estimate must be a range"
+    )
+    # Assert IFM basis — uncertainty should NOT mention 'density' (REDD formula) as the primary driver
+    assert "Pearson" in estimate.uncertainty, (
+        "IFM uncertainty must cite Pearson (logging-emissions basis, not density×loss_rate)"
+    )
+
+
+def test_natural_forest_hti_proceeds_to_number():
+    """ADR-0015-C1: natural-forest HTI must NOT be blocked by plantation gate."""
+    case = _load("WO002_HTI_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.quantity_low_tco2e is not None, (
+        "ADR-0015-C1: natural-forest HTI must produce a number (plantation gate must not fire)"
+    )
+    assert estimate.forest.forest_origin == "natural", (
+        f"Expected forest_origin='natural' for WO002_HTI_eligible, "
+        f"got {estimate.forest.forest_origin!r}"
+    )
+
+
+def test_natural_forest_ha_proceeds_to_number():
+    """ADR-0015-C1: natural-forest HA must NOT be blocked by plantation gate."""
+    case = _load("WO002_HA_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.quantity_low_tco2e is not None, (
+        "ADR-0015-C1: natural-forest HA must produce a number (plantation gate must not fire)"
+    )
+    assert estimate.forest.forest_origin == "natural", (
+        f"Expected forest_origin='natural' for WO002_HA_eligible, "
+        f"got {estimate.forest.forest_origin!r}"
+    )

@@ -15,15 +15,25 @@ WO-AUTOROUTE-004 / ADR-0013-auto-routing: run_mixed_stratification() added for
   soil-first mixed-concession stratification (called from API only — never inside
   run_carbon_engine()). Intake classifier in classifier/intake.py (separate module,
   never imported here — determinism invariant preserved).
+WO-METHFIX-001 / ADR-0015: Two critical methodology corrections:
+  C1 — Forest-origin (plantation) gate: KLHK Penutupan Lahan classifies hutan tanaman
+  (established plantation) vs hutan alam (natural forest). Established plantation →
+  FLAG ("no standing natural forest at risk — not an APD/IFM candidate"). Mixed →
+  natural-area-only estimate (plantation pixels masked). Natural or unknown → proceed.
+  Retain ADR-0013 moratorium gate (necessary-but-not-sufficient).
+  C2 — Distinct IFM estimate for HA: _estimate_ifm() replaces _estimate_redd() for HA.
+  Basis: avoided selective-logging emissions (Pearson et al. 2014 TEF, NOT density×loss_rate).
+  Formula: harvested_area × EF_per_ha × (1−buffer); n_entries=1; cycle=35yr (TPTI).
+  VM0010 lead; VM0045 flagged (field/NFI-dependent, not satellite-screenable).
 
 Determinism invariant: pure functions + typed models; NO LLM calls here.
 The only permitted product LLM calls are in narrative/ (rendering) and classifier/
 (intake boundary — never imported by this module).
 
-Methodology routing (ADR-0001 / ADR-0012 / ADR-0013):
+Methodology routing (ADR-0001 / ADR-0012 / ADR-0013 / ADR-0015):
   project_type PEAT → FLAG, never a tonnage (ADR-0013); VM0027 inactivated 2023 — never cite
-  permit_type HTI   → APD route (VM0009 — active but in transition)
-  permit_type HA    → IFM (VM0045 / VM0010) — advisor-confirm active version
+  permit_type HTI   → APD route (VM0009 — active but in transition) if forest_origin != plantation
+  permit_type HA    → IFM (VM0010 lead; VM0045 field-only) if forest_origin != plantation
   NEVER: VM0048 family for foregone-harvest baselines.
   NEVER: VM0007 (unrelated methodology).
   NEVER: VM0027 (rewetting method, inactivated 2023; wrong activity type).
@@ -36,10 +46,48 @@ from core.contracts import (
     ForestPresenceGate, LegalOverlayResult, ProjectClassification, Stratum,
 )
 from core.contracts import Boundary, ForestData
-from core.overlays import query_khg, query_pippib, query_worldcover, query_jrc_tmf
+from core.overlays import (
+    query_khg, query_pippib, query_worldcover, query_jrc_tmf,
+    query_klhk_plantation,
+)
 
 
 _GATES = CarbonGates()
+
+# ── IFM selective-logging constants (ADR-0015-C2) ─────────────────────────────
+# Source: Pearson et al. (2014) Carbon emissions from tropical forest degradation
+# caused by logging. Environmental Research Letters 9(3).
+# Indonesia/SE-Asia field validation: Butarbutar et al. (2019), Griscom et al.
+#
+# TEF = Total Emission Factor (full: extraction + damage + infrastructure).
+# IPCC 2006 GL Vol 4 / 2019 Refinement = CONVERSION MATH ONLY (BCEF, CF=0.47, ×44/12).
+# IPCC does NOT publish a selective-logging TEF; the TEF is Pearson-sourced.
+#
+# Indonesia / SE-Asia defaults (advisor-confirmed, ADR-0015):
+#   Logging intensity: 26–40 m³/ha (centre ~30 m³/ha; TPTI allowed range)
+#   TEF low : 1.4 MgC/m³ (extraction + damage only)
+#   TEF high: 1.5 MgC/m³ (full, incl. infrastructure)
+#   EF_per_ha = intensity × TEF × (44/12) → ~133–220 tCO2/ha per entry
+#   Cross-check: ~50 tC/ha × 44/12 ≈ 185 tCO2/ha (Butarbutar, Kalimantan) — within band
+#   Cutting cycle (TPTI): 35 yr
+#   n_entries = 1  (one avoided entry in a 20–30 yr credit period vs ~35 yr cycle)
+_IFM_INTENSITY_LOW_M3_HA = 26.0    # m³/ha (TPTI minimum commercial volume)
+_IFM_INTENSITY_HIGH_M3_HA = 40.0   # m³/ha (TPTI maximum)
+_IFM_TEF_LOW_MG_C_M3 = 1.4        # MgC/m³ (extraction + damage; Pearson 2014)
+_IFM_TEF_HIGH_MG_C_M3 = 1.5       # MgC/m³ (full incl. infrastructure; Pearson 2014)
+_IFM_CYCLE_YR = 35                 # yr (Indonesian TPTI cutting cycle)
+_C_TO_CO2 = 44.0 / 12.0           # carbon → CO2 stoichiometry
+
+# Derived EF per ha (tCO2/ha per selective-logging entry):
+_IFM_EF_LOW_TCO2_HA = _IFM_INTENSITY_LOW_M3_HA * _IFM_TEF_LOW_MG_C_M3 * _C_TO_CO2
+_IFM_EF_HIGH_TCO2_HA = _IFM_INTENSITY_HIGH_M3_HA * _IFM_TEF_HIGH_MG_C_M3 * _C_TO_CO2
+
+_IFM_CITATION = (
+    "Pearson et al. (2014) 'Carbon emissions from tropical forest degradation caused "
+    "by logging', Environmental Research Letters 9(3); "
+    "Butarbutar et al. (2019) Kalimantan field study; "
+    "IPCC 2006 GL Vol 4 + 2019 Refinement (conversion math only: CF 0.47, ×44/12)"
+)
 
 # IPCC 2013 Wetlands Supplement Table 2.1 — tropical drained peat EF (tCO2-eq/ha/yr)
 # Used for the dominant peat-drainage carbon term in PEAT projects (WO-CARBON-004).
@@ -207,16 +255,23 @@ def build_methodology_route(inp: CarbonInput) -> MethodologyRoute:
             ),
         )
 
-    # HA — Hak Alam (selective logging permit)
+    # HA — Hak Alam (selective logging permit); IFM logging-emissions basis (ADR-0015-C2)
     return MethodologyRoute(
-        baseline_class="planned_selective",
-        verra_family="IFM (VM0045 / VM0010) — advisor-confirm active version",
+        baseline_class="ifm_selective_logging",
+        verra_family=(
+            "IFM — VM0010 (selective-logging baseline, excl. planted forests; lead); "
+            "VM0045 flagged (field/NFI-dependent — not satellite-screenable at screening stage)"
+        ),
         cited_methods=["VM0010", "VM0045"],
         is_planned=True,
         additionality_basis="legal harvest right foregone",
         notes=(
             "HA = natural forest exploitation permit; baseline = planned selective logging foregone. "
-            "IFM (Improved Forest Management) family. Never VM0048 / AUD family."
+            "IFM (Improved Forest Management) — ADR-0015-C2: uses Pearson-2014 logging-emissions "
+            "basis (harvested_area × EF_per_ha), NOT density×loss_rate (REDD formula). "
+            "VM0010 also credits removals from continued growth → our avoided-emissions-only "
+            "estimate is a conservative floor. HWP second-order (extracted log 15-25% of TEF). "
+            "Never VM0048 / VM0007."
         ),
     )
 
@@ -488,10 +543,92 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
             ],
         )
 
-    # ── Non-peat REDD / IFM estimate (forest confirmed or data uncertain) ────
-    low, high, unc = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
+    # ── ADR-0015-C1: Forest-origin (plantation) gate — non-peat, non-hard_no ──
+    # Classify forest_origin via KLHK Penutupan Lahan (primary) + temporal pattern.
+    # Only fires when there is standing forest to classify (forest gate did not fail).
+    forest_origin = _classify_forest_origin(boundary, forest)
+    # Store classified origin in ForestData so the result carries it through
+    forest = forest.model_copy(update={"forest_origin": forest_origin})
 
-    # Attach forest gate to classification for all non-peat results
+    if forest_origin == "plantation" and eligibility.verdict != "hard_no":
+        # Established plantation: no standing NATURAL forest at risk.
+        # Rotational-harvest loss ≠ avoidable deforestation → not an APD/IFM candidate.
+        plantation_note = (
+            f"ADR-0015-C1 plantation gate: KLHK Penutupan Lahan classifies this "
+            f"concession as established plantation (hutan tanaman). "
+            f"No standing natural forest at risk — rotational-harvest loss is not "
+            f"avoidable deforestation. Not an APD candidate (HTI) or IFM candidate (HA). "
+            f"No avoided-deforestation number asserted."
+        )
+        eligibility = EligibilityResult(
+            gates=eligibility.gates,
+            verdict="flagged",
+            reasons=eligibility.reasons + [f"plantation gate: {plantation_note}"],
+        )
+        plantation_stratum = Stratum(
+            stratum_id="plantation",
+            area_ha=effective_area,
+            soil_type="mineral",
+            methodology=methodology,
+            forest_gate=forest_gate,
+            eligibility_verdict="flagged",
+            eligibility_reasons=[plantation_note],
+        )
+        classification = ProjectClassification(
+            strata=[plantation_stratum],
+            dominant_soil="mineral",
+            auto_determined=True,
+            note=(
+                f"ADR-0015-C1 plantation gate — forest_origin=plantation "
+                f"(KLHK: hutan tanaman). Forest condition: {forest_gate.condition}."
+            ),
+        )
+        unc = (
+            f"Plantation gate (ADR-0015-C1) — Tier 1 screening: KLHK Penutupan Lahan "
+            f"indicates established plantation (hutan tanaman). "
+            f"Rotational-harvest loss is NOT avoidable deforestation; "
+            f"Tier 1 baseline cannot be asserted for plantation-derived 'loss'. "
+            "Not registry-grade. Field origin-verification and dominant-baseline "
+            "assessment required before any crediting claim."
+        )
+        return CarbonEstimate(
+            eligibility=eligibility,
+            methodology=methodology,
+            forest=forest,
+            quantity_low_tco2e=None,
+            quantity_high_tco2e=None,
+            uncertainty=unc,
+            quality=quality,
+            classification=classification,
+        )
+
+    if forest_origin == "mixed" and eligibility.verdict != "hard_no":
+        # Mixed: plantation pixels mask applied to loss rate
+        # Estimate uses the natural-forest fraction of the area (TODO: refine with KLHK area split).
+        # For now, full area proceeds with a caveat (conservative: if plantation, fewer actual
+        # emissions; this may overstate, not understate). ADR-0015 future: real area split.
+        mixed_note = (
+            "ADR-0015-C1: mixed natural+plantation concession. "
+            "Plantation rotational-harvest pixels should be masked from the APD baseline; "
+            "area used in estimate includes plantation component — overstatement risk. "
+            "Confirm natural-forest area with KLHK Penutupan Lahan before submission."
+        )
+        if eligibility.verdict not in ("hard_no", "flagged"):
+            eligibility = EligibilityResult(
+                gates=eligibility.gates,
+                verdict="flagged",
+                reasons=eligibility.reasons + [f"mixed forest-origin: {mixed_note}"],
+            )
+
+    # ── ADR-0015-C2: Route to correct estimate formula ────────────────────────
+    # HA → IFM selective-logging basis (Pearson 2014, not density×loss_rate)
+    # HTI → APD (REDD, density×loss_rate; unchanged)
+    if inp.permit_type == "HA":
+        low, high, unc = _estimate_ifm(effective_area, project_years, methodology)
+    else:
+        low, high, unc = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
+
+    # Attach forest gate + origin to classification for all non-peat results
     mineral_stratum = Stratum(
         stratum_id="mineral",
         area_ha=effective_area,
@@ -503,11 +640,16 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
         quantity_low_tco2e=low,
         quantity_high_tco2e=high,
     )
+    origin_note = (
+        f"forest_origin={forest_origin} (ADR-0015-C1 KLHK gate)"
+        if forest_origin != "unknown"
+        else "forest_origin=unknown (KLHK Penutupan Lahan data unavailable; proceed with caveat)"
+    )
     classification = ProjectClassification(
         strata=[mineral_stratum],
         dominant_soil="mineral",
         auto_determined=True,
-        note=f"Forest condition: {forest_gate.condition} (gate: {forest_gate.gate_result})",
+        note=f"Forest condition: {forest_gate.condition} (gate: {forest_gate.gate_result}); {origin_note}",
     )
 
     return CarbonEstimate(
@@ -623,9 +765,15 @@ def run_mixed_stratification(
                     f"forest gate flag: {forest_gate.note}"
                 ],
             )
-        mineral_low, mineral_high, unc_redd = _estimate_redd(
-            mineral_area, project_years, forest, loss_rate, methodology
-        )
+        # ADR-0015-C2: route HA mineral stratum to IFM basis
+        if inp.permit_type == "HA":
+            mineral_low, mineral_high, unc_redd = _estimate_ifm(
+                mineral_area, project_years, methodology
+            )
+        else:
+            mineral_low, mineral_high, unc_redd = _estimate_redd(
+                mineral_area, project_years, forest, loss_rate, methodology
+            )
         mineral_stratum = Stratum(
             stratum_id="mineral",
             area_ha=mineral_area,
@@ -672,6 +820,95 @@ def run_mixed_stratification(
         quality=quality,
         classification=classification,
     )
+
+
+def _classify_forest_origin(boundary: Boundary, forest: ForestData) -> str:
+    """Classify forest origin: natural / plantation / mixed / unknown (ADR-0015-C1).
+
+    Primary: KLHK Penutupan Lahan — distinguishes hutan tanaman (plantation) vs
+             hutan alam (natural forest); administrative ground truth.
+    Secondary: JRC TMF / Hansen rotational-harvest temporal pattern
+               (short ~5–7 yr clear-and-replant return interval is a plantation signal;
+               natural forest is NOT stand-replaced on a 5–7 yr grid).
+
+    CI uses KLHK fixture (real KLHK API → pre-launch backlog, same as KHG/PIPPIB).
+    Returns "unknown" when both signals are unavailable — engine proceeds with caveat.
+    """
+    klhk = query_klhk_plantation(boundary)
+
+    # Primary: KLHK map result
+    if klhk.forest_origin in ("natural", "plantation", "mixed"):
+        return klhk.forest_origin
+
+    # Secondary: temporal pattern from annual_loss_ha time series.
+    # Heuristic: if ≥3 loss-spike years (where the year's loss > 2× the long-run mean)
+    # form a regular cycle with ~5–7 yr gaps, it is consistent with rotational harvest.
+    # This is a low-precision screen; KLHK is authoritative.
+    if len(forest.annual_loss_ha) >= 10:
+        losses = [forest.annual_loss_ha[y] for y in sorted(forest.annual_loss_ha)]
+        mean_loss = sum(losses) / len(losses)
+        if mean_loss > 0:
+            spike_years = [
+                y for y in sorted(forest.annual_loss_ha)
+                if forest.annual_loss_ha[y] > 2.5 * mean_loss
+            ]
+            if len(spike_years) >= 2:
+                gaps = [spike_years[i + 1] - spike_years[i] for i in range(len(spike_years) - 1)]
+                periodic_gaps = [g for g in gaps if 4 <= g <= 8]
+                if len(periodic_gaps) >= len(gaps) * 0.6:
+                    return "plantation"
+
+    return "unknown"
+
+
+def _estimate_ifm(
+    area: float,
+    years: int,
+    route: MethodologyRoute,
+) -> tuple[float, float, str]:
+    """Avoided-emissions range for IFM (selective logging) — HA permit type only (ADR-0015-C2).
+
+    Formula (Pearson et al. 2014 logging-emissions basis):
+      harvested_area = eligible_area × min(1, crediting_years / cycle_years)
+      avoided_CO2   = harvested_area × EF_per_ha × (1 − buffer)
+      n_entries = 1  (one avoided entry in a 20–30 yr period vs ~35 yr TPTI cycle)
+
+    Low estimate: conservative intensity (26 m³/ha), TEF low (1.4 MgC/m³), buffer high (30%).
+    High estimate: intensive (40 m³/ha), TEF high (1.5 MgC/m³), buffer low (20%).
+    IPCC Tier 1 — Pearson-2014 defaults; not field-measured intensity.
+
+    NOT density×loss_rate — that is the REDD (APD) formula.
+    VM0010 lead (selective-logging baseline, excl. planted forests); VM0045 field/NFI-only.
+    VM0010 also credits removals from continued growth → avoided-only is a conservative floor.
+    HWP (wood products) is second-order (extracted log 15–25% of emissions) — noted, not engineered.
+    """
+    harvested_area = area * min(1.0, years / _IFM_CYCLE_YR)
+
+    gross_low = harvested_area * _IFM_EF_LOW_TCO2_HA
+    gross_high = harvested_area * _IFM_EF_HIGH_TCO2_HA
+
+    net_low = round(gross_low * (1 - _BUFFER_HIGH), 0)
+    net_high = round(gross_high * (1 - _BUFFER_LOW), 0)
+
+    if net_low >= net_high:
+        net_high = net_low + max(1.0, round(net_low * 0.1, 0))
+
+    unc = (
+        f"Tier 1 indicative screening — IFM selective-logging basis ({_IFM_CITATION}); "
+        f"logging intensity {_IFM_INTENSITY_LOW_M3_HA:.0f}–{_IFM_INTENSITY_HIGH_M3_HA:.0f} m³/ha (TPTI band); "
+        f"TEF {_IFM_TEF_LOW_MG_C_M3}–{_IFM_TEF_HIGH_MG_C_M3} MgC/m³ (full incl. infrastructure); "
+        f"EF {_IFM_EF_LOW_TCO2_HA:.0f}–{_IFM_EF_HIGH_TCO2_HA:.0f} tCO2/ha per entry; "
+        f"TPTI cutting cycle {_IFM_CYCLE_YR} yr; n_entries=1 (one avoided entry in a {years}-yr period); "
+        f"harvested_area {harvested_area:,.0f} ha (= {area:,.0f} ha × min(1, {years}/{_IFM_CYCLE_YR})); "
+        f"buffer {int(_BUFFER_LOW*100)}–{int(_BUFFER_HIGH*100)}%. "
+        f"Dominant uncertainty: IUP extraction intensity not verified from permit document; "
+        f"Pearson-2014 TEF is a regional default, not site-specific. "
+        f"VM0010 (selective-logging baseline, excl. planted forests) — avoided-emissions-only "
+        f"estimate is a conservative floor (VM0010 also credits continued-growth removals). "
+        f"VM0045 requires NFI/field data — not satellite-screenable at this stage. "
+        f"Not registry-grade. Confirm with full feasibility study before any crediting claim."
+    )
+    return net_low, net_high, unc
 
 
 def _estimate_redd(

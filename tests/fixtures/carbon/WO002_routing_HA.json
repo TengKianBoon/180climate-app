@@ -13,10 +13,10 @@
     }
   },
   "expected_methodology": {
-    "baseline_class": "planned_selective",
+    "baseline_class": "ifm_selective_logging",
     "is_planned": true,
     "additionality_basis": "legal harvest right foregone",
-    "verra_family_contains": ["IFM"],
+    "verra_family_contains": ["IFM", "VM0010"],
     "cited_methods_must_not_contain": ["VM0048", "VM0007"]
   }
 }

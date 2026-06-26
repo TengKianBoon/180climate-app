@@ -36,6 +36,8 @@ class ForestData(BaseModel):
     peat_present: Optional[bool] = None
     peat_depth_proxy_m: Optional[float] = None
     biomass_tco2_per_ha: Optional[float] = None
+    # ADR-0015-C1: forest-origin gate — natural vs established plantation (KLHK Penutupan Lahan)
+    forest_origin: Literal["natural", "plantation", "mixed", "unknown"] = "unknown"
 
 class Disclaimer(BaseModel):
     text: str
@@ -79,7 +81,7 @@ class EligibilityResult(BaseModel):
     reasons: list[str]
 
 class MethodologyRoute(BaseModel):
-    baseline_class: Literal["planned_clearfell", "planned_selective", "peat"]
+    baseline_class: Literal["planned_clearfell", "planned_selective", "ifm_selective_logging", "peat"]
     verra_family: str                         # e.g. "APD (VM0009/legacy — advisor-confirm)"
     cited_methods: list[str]
     additionality_basis: str = "legal harvest right foregone"
