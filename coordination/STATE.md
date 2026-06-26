@@ -1,5 +1,6 @@
-phase: P4 · Pre-launch — methodology correction batch. ADR-0015 + ADR-0016 done; awaiting Cowork verify.
-active_wo: WO-METHFIX-002 retry 1/2 — fix REDD loss uncertainty (raw CV -> standard error of the mean, /sqrt(n)). Rest of ADR-0016 kept.
-status: ADR-0016 implemented: M1 quadrature (density SE + loss CV in quadrature; buffer separate+labelled, REDD+IFM); M2 no-biomass gate (FLAG, no number) + IPCC-default loud flag + ESA CCI saturation caveat. ForestData.biomass_uncertainty_pct added (Gate C). Goldens re-baselined (REDD widens due to real loss CV≈0.877; IFM narrows slightly — honest). 281 tests green (11 new). Peat/routing unchanged. OUTBOX has before→after table.
-last_commit: 538df83 feat(uncertainty): ADR-0016-M1+M2 quadrature uncertainty + density gating (WO-METHFIX-002)
-next_step: Cowork verifies WO-METHFIX-002 → M3 wording WO → WO-DERIVE-001 derivation LAST on corre
+phase: P4 · Pre-launch — carbon engine COMPLETE. WO-DERIVE-001 DONE (CI green, 287 tests).
+active_wo: none · STOPPED for Cowork review of WO-DERIVE-001
+status: ADR-0014 derivation trace built (CalculationTrace in contracts, engine returns 4-tuple, 6 new golden tests — ADR-0014 invariant tested). Report restructured: "How derived" is now main body, narrative+uncertainty+disclaimer+data sources demoted to fine print. M3 wording applied: "accredited Verra methodology" → "applicable Verra methodology family (subject to advisor confirmation and Verra's evolving rules)"; SGD-12K separated from credit value; additionality caveat (genuine-harvest-intent + PIPPIB) added; VM0010 lead / VM0045 field-only labels confirmed. 287 tests green.
+last_commit: (pending this commit)
+next_step: Cowork reviews (derivation reproduces range, fine print last, M3 wording, no overclaims) -> CARBON DONE -> deploy items (PIPPIB snapshot, creds, Render, DNS) -> Gate L. EUDR = post-carbon (Gate E).
+updated: 2026-06-26

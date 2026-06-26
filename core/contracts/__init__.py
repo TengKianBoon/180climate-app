@@ -154,6 +154,38 @@ class ProjectClassification(BaseModel):
     user_project_type_override: Optional[str] = None   # for project_type="other" free-text
     note: str = ""
 
+class CalculationTrace(BaseModel):
+    """ADR-0014: derivation trace — engine populates with the actual values it used.
+
+    Invariant (tested): net_low_tco2e == CarbonEstimate.quantity_low_tco2e.
+    derivation=None for peat / flagged-no-number (ADR-0013; no tonnage).
+    Changes no figure — surfaces what is already computed inside the engine.
+    """
+    formula: str
+    basis: Literal["redd", "ifm"]
+    eligible_area_ha: float
+    project_years: int
+    buffer_low: float = 0.20
+    buffer_high: float = 0.30
+    central_tco2e: Optional[float] = None
+    gross_low_tco2e: float                    # before buffer deduction
+    gross_high_tco2e: float                   # before buffer deduction
+    net_low_tco2e: float                      # == CarbonEstimate.quantity_low_tco2e
+    net_high_tco2e: float                     # == CarbonEstimate.quantity_high_tco2e
+    notes: str = ""
+    # REDD-specific (ADR-0016-M1: SEM-based quadrature)
+    baseline_loss_rate_yr: Optional[float] = None
+    loss_rate_sem_pct: Optional[float] = None
+    carbon_density_tco2_ha: Optional[float] = None
+    carbon_density_source: Optional[str] = None
+    carbon_density_cv_pct: Optional[float] = None
+    sigma_combined_pct: Optional[float] = None
+    # IFM-specific (ADR-0015-C2 + ADR-0016-M1)
+    harvested_area_ha: Optional[float] = None
+    ef_central_tco2_ha: Optional[float] = None
+    sigma_ifm_pct: Optional[float] = None
+
+
 class CarbonEstimate(BaseModel):
     eligibility: EligibilityResult
     methodology: MethodologyRoute
@@ -163,6 +195,7 @@ class CarbonEstimate(BaseModel):
     uncertainty: str
     quality: QualityFactors
     classification: Optional[ProjectClassification] = None  # ADR-0013; None = not yet classified
+    derivation: Optional[CalculationTrace] = None  # ADR-0014; None for peat/flagged-no-number
 
 # ---------- EUDR ----------
 class Plot(BaseModel):

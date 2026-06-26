@@ -45,6 +45,7 @@ from core.contracts import (
     CarbonInput, CarbonEstimate, EligibilityResult, GateResult,
     MethodologyRoute, QualityFactors, CarbonGates,
     ForestPresenceGate, LegalOverlayResult, ProjectClassification, Stratum,
+    CalculationTrace,
 )
 from core.contracts import Boundary, ForestData
 from core.overlays import (
@@ -701,9 +702,9 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
     # HA → IFM selective-logging basis (Pearson 2014, not density×loss_rate)
     # HTI → APD (REDD, density×loss_rate; unchanged)
     if inp.permit_type == "HA":
-        low, high, unc = _estimate_ifm(effective_area, project_years, methodology)
+        low, high, unc, trace = _estimate_ifm(effective_area, project_years, methodology)
     else:
-        low, high, unc = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
+        low, high, unc, trace = _estimate_redd(effective_area, project_years, forest, loss_rate, methodology)
 
     # Attach forest gate + origin to classification for all non-peat results
     mineral_stratum = Stratum(
@@ -738,6 +739,7 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
         uncertainty=unc,
         quality=quality,
         classification=classification,
+        derivation=trace,  # ADR-0014
     )
 
 
@@ -826,6 +828,7 @@ def run_mixed_stratification(
         )
         mineral_low: float | None = None
         mineral_high: float | None = None
+        mineral_trace = None
         unc = (
             f"Mixed-concession — mineral stratum ({mineral_area:,.0f} ha): "
             f"forest gate fail — no at-risk forest confirmed. "
@@ -844,19 +847,20 @@ def run_mixed_stratification(
             )
         # ADR-0015-C2 / ADR-0016-M2: route HA mineral stratum to IFM; HTI to REDD
         if inp.permit_type == "HA":
-            mineral_low, mineral_high, unc_redd = _estimate_ifm(
+            mineral_low, mineral_high, unc_redd, mineral_trace = _estimate_ifm(
                 mineral_area, project_years, methodology
             )
         elif forest.biomass_tco2_per_ha is None:
             # ADR-0016-M2: no-biomass gate in mixed mineral stratum
             mineral_low = None
             mineral_high = None
+            mineral_trace = None
             unc_redd = (
                 "ADR-0016-M2: mineral stratum — no credible biomass source; "
                 "no avoided-deforestation number asserted."
             )
         else:
-            mineral_low, mineral_high, unc_redd = _estimate_redd(
+            mineral_low, mineral_high, unc_redd, mineral_trace = _estimate_redd(
                 mineral_area, project_years, forest, loss_rate, methodology
             )
         mineral_stratum = Stratum(
@@ -904,6 +908,7 @@ def run_mixed_stratification(
         uncertainty=unc,
         quality=quality,
         classification=classification,
+        derivation=mineral_trace if mineral_low is not None else None,  # ADR-0014
     )
 
 
@@ -971,7 +976,7 @@ def _estimate_ifm(
     area: float,
     years: int,
     route: MethodologyRoute,
-) -> tuple[float, float, str]:
+) -> tuple[float, float, str, CalculationTrace]:
     """Avoided-emissions range for IFM (selective logging) — HA permit type only (ADR-0015-C2).
 
     Formula (Pearson et al. 2014 logging-emissions basis):
@@ -1033,7 +1038,34 @@ def _estimate_ifm(
         f"VM0045 requires NFI/field data — not satellite-screenable at this stage. "
         f"Not registry-grade. Confirm with full feasibility study before any crediting claim."
     )
-    return net_low, net_high, unc
+    trace = CalculationTrace(
+        formula=(
+            "harvested_area = eligible_area x min(1, years / cycle); "
+            "central = harvested_area x EF_central; "
+            "sigma_IFM = sqrt(CV_intensity^2 + CV_TEF^2) [pre-computed constant]; "
+            "gross_low = central x max(0, 1-sigma); gross_high = central x (1+sigma); "
+            "net_low = gross_low x (1-buffer_high); net_high = gross_high x (1-buffer_low)"
+        ),
+        basis="ifm",
+        eligible_area_ha=round(area, 1),
+        project_years=years,
+        buffer_low=_BUFFER_LOW,
+        buffer_high=_BUFFER_HIGH,
+        harvested_area_ha=round(harvested_area, 1),
+        ef_central_tco2_ha=round(_IFM_EF_CENTRAL_TCO2_HA, 2),
+        sigma_ifm_pct=round(sigma * 100, 2),
+        central_tco2e=round(central, 0),
+        gross_low_tco2e=round(low_before_buf, 0),
+        gross_high_tco2e=round(high_before_buf, 0),
+        net_low_tco2e=net_low,
+        net_high_tco2e=net_high,
+        notes=(
+            "ADR-0015-C2 + ADR-0016-M1: Pearson-2014 TEF basis; "
+            "sigma pre-computed from TPTI intensity + TEF ranges; "
+            "VCS buffer deducted separately and labelled."
+        ),
+    )
+    return net_low, net_high, unc, trace
 
 
 def _estimate_redd(
@@ -1042,7 +1074,7 @@ def _estimate_redd(
     forest: ForestData,
     loss_rate: float,
     route: MethodologyRoute,
-) -> tuple[float, float, str]:
+) -> tuple[float, float, str, CalculationTrace]:
     """Avoided-emissions range for REDD (APD).
 
     ADR-0016 M1: uncertainty propagated in quadrature; buffer applied SEPARATELY.
@@ -1127,7 +1159,40 @@ def _estimate_redd(
         f"GEDI/ICESat-2 as secondary AGB source: pre-launch backlog. "
         f"Not registry-grade. Confirm with full feasibility study before any crediting claim."
     )
-    return net_low, net_high, unc
+    density_source_str = (
+        f"ESA CCI Biomass v3.0 ({carbon_density:.0f} tCO2/ha concession mean)"
+        if has_esa_cci
+        else f"IPCC 2006 Table 4.7 SE-Asia Tier-1 default ({carbon_density:.0f} tCO2/ha)"
+    )
+    trace = CalculationTrace(
+        formula=(
+            "central = eligible_area x baseline_loss_rate x years x carbon_density; "
+            "sigma = sqrt(CV_density^2 + SEM_loss^2) [quadrature; ADR-0016-M1]; "
+            "gross_low = central x max(0, 1-sigma); gross_high = central x (1+sigma); "
+            "net_low = gross_low x (1-buffer_high); net_high = gross_high x (1-buffer_low)"
+        ),
+        basis="redd",
+        eligible_area_ha=round(area, 1),
+        project_years=years,
+        buffer_low=_BUFFER_LOW,
+        buffer_high=_BUFFER_HIGH,
+        baseline_loss_rate_yr=round(loss_rate, 6),
+        loss_rate_sem_pct=round(cv_loss * 100, 2),
+        carbon_density_tco2_ha=round(carbon_density, 1),
+        carbon_density_source=density_source_str,
+        carbon_density_cv_pct=round(cv_density * 100, 1),
+        sigma_combined_pct=round(sigma * 100, 2),
+        central_tco2e=round(central, 0),
+        gross_low_tco2e=round(low_before_buf, 0),
+        gross_high_tco2e=round(high_before_buf, 0),
+        net_low_tco2e=net_low,
+        net_high_tco2e=net_high,
+        notes=(
+            "ADR-0016-M1: SEM-based loss uncertainty (not raw CV); "
+            "VCS buffer deducted separately and labelled."
+        ),
+    )
+    return net_low, net_high, unc, trace
 
 
 def _peat_flag_uncertainty(legal_overlay: LegalOverlayResult) -> str:

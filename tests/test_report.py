@@ -184,7 +184,10 @@ class TestPdf:
     def test_new_cta_wording(self, hti_eligible_data):
         text = _pdf_text(generate_pdf(hti_eligible_data))
         assert "registry-grade" in text
-        assert "accredited Verra methodology" in text or "accredited" in text
+        # M3 wording: "accredited" replaced with "applicable Verra methodology family"
+        assert "applicable Verra methodology" in text
+        assert "subject to advisor confirmation" in text
+        assert "service fee" in text
 
     def test_no_accredited_methodology_trust_risk(self, hti_eligible_data):
         text = _pdf_text(generate_pdf(hti_eligible_data))

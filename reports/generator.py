@@ -58,6 +58,7 @@ class ReportData:
     forest_peat_present: Optional[bool] = field(default=None)
     forest_biomass_tco2_per_ha: Optional[float] = field(default=None)
     data_sources: list = field(default_factory=list)
+    derivation: Optional[Any] = field(default=None)   # ADR-0014 CalculationTrace; None for peat
 
     # --- derived helpers ---
 
@@ -88,14 +89,25 @@ _DISCLAIMER = (
 )
 
 _ENGAGE_CTA = (
-    "This free screening already routes your concession to the appropriate accredited "
-    "Verra methodology, at an indicative IPCC Tier 1 level — a first read that a paid "
-    "pre-feasibility study (~SGD 12K) would otherwise begin.\n\n"
+    "This free screening already identifies the applicable Verra methodology family "
+    "(subject to advisor confirmation and Verra's evolving rules), at an indicative "
+    "IPCC Tier 1 level — a first read that a paid pre-feasibility study (service fee "
+    "~SGD 12K; separate from any carbon credit value) would otherwise begin.\n\n"
     "To take it to a bankable, registry-grade carbon project — field validation, full "
     "methodology application, a financial model, independent third-party verification, "
     "Verra registration, and market access — talk to 180Climate.\n\n"
     "Contact: info@180climate.net\n"
     "Website: www.180climate.net"
+)
+
+_ADDITIONALITY_CAVEAT = (
+    "Note: 'legal harvest right foregone' is necessary but not sufficient for "
+    "additionality. It must also be accompanied by demonstrated genuine harvest intent — "
+    "an approved management plan with confirmed financing and operational viability "
+    "(not satellite-derivable at screening stage). Additionally, the PIPPIB moratorium "
+    "(Inpres 5/2019), if applicable, can negate the legal right and make "
+    "avoided-conversion non-additional (regulatory surplus fails); the KHG overlay "
+    "screens for this."
 )
 
 _DOMINANT_UNC = (
@@ -128,6 +140,44 @@ _PEAT_FLAG_PATHWAY = (
     "hydrology survey, and qualified methodology advisor. "
     "Contact 180Climate to explore the restoration pathway."
 )
+
+
+def _derivation_rows(d: Any) -> list[tuple[str, str]]:
+    """Convert a CalculationTrace into an ordered list of label/value pairs for the report."""
+    if d is None:
+        return []
+    rows: list[tuple[str, str]] = []
+    rows.append(("Eligible area", f"{d.eligible_area_ha:,.0f} ha"))
+    rows.append(("Project crediting period", f"{d.project_years} yr"))
+    if d.basis == "redd":
+        if d.baseline_loss_rate_yr is not None:
+            rows.append(("Baseline loss rate (mean)", f"{d.baseline_loss_rate_yr*100:.4f}%/yr"))
+        if d.loss_rate_sem_pct is not None:
+            rows.append(("Loss-rate uncertainty (SEM)", f"{d.loss_rate_sem_pct:.1f}% (ADR-0016-M1)"))
+        if d.carbon_density_tco2_ha is not None:
+            src = f" [{d.carbon_density_source}]" if d.carbon_density_source else ""
+            rows.append(("Carbon density", f"{d.carbon_density_tco2_ha:,.1f} tCO2/ha{src}"))
+        if d.carbon_density_cv_pct is not None:
+            rows.append(("Density CV (relative SE)", f"{d.carbon_density_cv_pct:.0f}%"))
+        if d.sigma_combined_pct is not None:
+            rows.append(("Combined sigma (quadrature)", f"{d.sigma_combined_pct:.1f}%"))
+    elif d.basis == "ifm":
+        if d.harvested_area_ha is not None:
+            rows.append(("Harvested area (one entry)", f"{d.harvested_area_ha:,.0f} ha"))
+        if d.ef_central_tco2_ha is not None:
+            rows.append(("EF_central (Pearson-2014)", f"{d.ef_central_tco2_ha:.2f} tCO2/ha"))
+        if d.sigma_ifm_pct is not None:
+            rows.append(("Combined sigma (quadrature)", f"{d.sigma_ifm_pct:.1f}% (TPTI intensity + TEF)"))
+    if d.central_tco2e is not None:
+        rows.append(("Central estimate", f"{d.central_tco2e:,.0f} tCO2e"))
+    if d.gross_low_tco2e is not None and d.gross_high_tco2e is not None:
+        rows.append(("Pre-buffer band",
+                     f"[{d.gross_low_tco2e:,.0f} – {d.gross_high_tco2e:,.0f}] tCO2e"))
+    rows.append(("VCS buffer deducted",
+                 f"{int(d.buffer_low*100)}–{int(d.buffer_high*100)}% (separately labelled)"))
+    rows.append(("Net range (reproduced)",
+                 f"{d.net_low_tco2e:,.0f} – {d.net_high_tco2e:,.0f} tCO2e"))
+    return rows
 
 
 # ── PDF ───────────────────────────────────────────────────────────────────────
@@ -248,17 +298,34 @@ def generate_pdf(data: ReportData) -> bytes:
             BODY))
     story.append(hr())
 
-    # ── Peat additionality flag (shown only for peat concessions) ─────────────
+    # ── How this estimate is derived (ADR-0014) ───────────────────────────────
     if data.baseline_class == "peat":
-        story.append(Paragraph(_PEAT_FLAG_HEADING, H2))
+        story.append(Paragraph("How This Estimate Is Derived", H2))
+        story.append(Paragraph(_PEAT_FLAG_HEADING, ParagraphStyle(
+            "PeatSubH", parent=BODY, fontName="Helvetica-Bold")))
         story.append(Paragraph(_PEAT_FLAG_LEGAL, BODY))
         story.append(Spacer(1, 4))
         story.append(Paragraph("<b>Overlay screening result:</b>", BODY))
-        unc_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
-        story.append(Paragraph(unc_clean, SMALL))
+        unc_clean_peat = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
+        story.append(Paragraph(unc_clean_peat, SMALL))
         story.append(Spacer(1, 4))
         story.append(Paragraph(_PEAT_FLAG_PATHWAY, BODY))
-        story.append(hr())
+    elif data.derivation is not None:
+        story.append(Paragraph("How This Estimate Is Derived", H2))
+        d = data.derivation
+        story.append(Paragraph(
+            f"<i>Formula ({d.basis.upper()}): {d.formula}</i>", SMALL))
+        story.append(Spacer(1, 4))
+        for _k, _v in _derivation_rows(d):
+            story.append(Paragraph(f"<b>{_k}:</b> {_v}", BODY))
+        if d.notes:
+            story.append(Spacer(1, 4))
+            story.append(Paragraph(f"<i>{d.notes}</i>", SMALL))
+    elif data.quantity_low_tco2e is not None:
+        story.append(Paragraph("How This Estimate Is Derived", H2))
+        story.append(Paragraph(
+            "Derivation detail not available for this estimate variant.", SMALL))
+    story.append(hr())
 
     # ── Methodology ───────────────────────────────────────────────────────────
     story.append(Paragraph("Methodology (Indicative)", H2))
@@ -269,6 +336,8 @@ def generate_pdf(data: ReportData) -> bytes:
     ]
     for k, v in meth_rows:
         story.append(Paragraph(f"<b>{k}:</b> {v}", BODY))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(_ADDITIONALITY_CAVEAT, SMALL))
     story.append(Spacer(1, 4))
     story.append(Paragraph(
         "<i>Methodology confirmation requires a qualified methodology advisor. "
@@ -287,6 +356,18 @@ def generate_pdf(data: ReportData) -> bytes:
         ]:
             story.append(Paragraph(f"<b>{label}:</b> {value}", BODY))
         story.append(hr())
+
+    # ── Engage 180Climate CTA ────────────────────────────────────────────────
+    story.append(Paragraph("Engage 180Climate", H2))
+    for line in _ENGAGE_CTA.split("\n"):
+        story.append(Paragraph(line or "&nbsp;", BODY))
+    story.append(hr())
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # FINE PRINT — supporting detail; narrative, uncertainty, data, disclaimer
+    # ════════════════════════════════════════════════════════════════════════════
+    story.append(Paragraph("Notes &amp; Supporting Detail", ParagraphStyle(
+        "FPHead", parent=H2, textColor=colors.HexColor("#888888"), fontSize=9)))
 
     # ── Forest data summary ───────────────────────────────────────────────────
     story.append(Paragraph("Forest Data Summary", H2))
@@ -317,7 +398,7 @@ def generate_pdf(data: ReportData) -> bytes:
     if not _forest_rows:
         story.append(Paragraph("Not available at screening stage.", SMALL))
     for _k, _v in _forest_rows:
-        story.append(Paragraph(f"<b>{_k}:</b> {_v}", BODY))
+        story.append(Paragraph(f"<b>{_k}:</b> {_v}", SMALL))
     story.append(hr())
 
     # ── Assessment narrative ──────────────────────────────────────────────────
@@ -328,34 +409,27 @@ def generate_pdf(data: ReportData) -> bytes:
         for _line in _narr_clean.split("\n"):
             _line = _line.strip()
             if _line:
-                story.append(Paragraph(_line, BODY))
+                story.append(Paragraph(_line, SMALL))
             else:
                 story.append(Spacer(1, 4))
         story.append(hr())
 
     # ── Uncertainty ───────────────────────────────────────────────────────────
     story.append(Paragraph("Uncertainty Band", H2))
-    # Strip any markdown artifacts before rendering in PDF
     unc_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
-    story.append(Paragraph(unc_clean, BODY))
-    story.append(hr())
-
-    # ── Disclaimer ────────────────────────────────────────────────────────────
-    story.append(Paragraph("Disclaimer", H2))
-    story.append(Paragraph(_DISCLAIMER, SMALL))
+    story.append(Paragraph(unc_clean, SMALL))
     story.append(hr())
 
     # ── Data sources ──────────────────────────────────────────────────────────
     if data.data_sources:
         story.append(Paragraph("Data Sources", H2))
         for _src in data.data_sources:
-            story.append(Paragraph(f"• {_src}", BODY))
+            story.append(Paragraph(f"• {_src}", SMALL))
         story.append(hr())
 
-    # ── Engage 180Climate CTA ────────────────────────────────────────────────
-    story.append(Paragraph("Engage 180Climate", H2))
-    for line in _ENGAGE_CTA.split("\n"):
-        story.append(Paragraph(line or "&nbsp;", BODY))
+    # ── Disclaimer ────────────────────────────────────────────────────────────
+    story.append(Paragraph("Disclaimer", H2))
+    story.append(Paragraph(_DISCLAIMER, SMALL))
 
     doc.build(story)
     return buf.getvalue()
@@ -486,15 +560,28 @@ def generate_docx(data: ReportData) -> bytes:
               italic=True)
     _hr()
 
-    # ── Peat additionality flag (shown only for peat concessions) ─────────────
+    # ── How this estimate is derived (ADR-0014) ───────────────────────────────
+    _h2("How This Estimate Is Derived")
     if data.baseline_class == "peat":
-        _h2(_PEAT_FLAG_HEADING)
+        _body(_PEAT_FLAG_HEADING, bold=True)
         _body(_PEAT_FLAG_LEGAL)
         _body("Overlay screening result:", bold=True)
-        unc_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
-        _body(unc_clean, italic=True, colour=(136, 136, 136), size=9)
+        unc_clean_peat = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
+        _body(unc_clean_peat, italic=True, colour=(136, 136, 136), size=9)
         _body(_PEAT_FLAG_PATHWAY)
-        _hr()
+    elif data.derivation is not None:
+        d = data.derivation
+        _body(f"Formula ({d.basis.upper()}): {d.formula}",
+              italic=True, colour=(136, 136, 136), size=9)
+        doc.add_paragraph()
+        for _k, _v in _derivation_rows(d):
+            _kv(_k, _v)
+        if d.notes:
+            _body(d.notes, italic=True, colour=(136, 136, 136), size=9)
+    elif data.quantity_low_tco2e is not None:
+        _body("Derivation detail not available for this estimate variant.",
+              italic=True, colour=(136, 136, 136), size=9)
+    _hr()
 
     # ── Methodology ───────────────────────────────────────────────────────────
     _h2("Methodology (Indicative)")
@@ -504,6 +591,7 @@ def generate_docx(data: ReportData) -> bytes:
         ("Baseline class", data.baseline_class.replace("_", " ").title()),
     ]:
         _kv(k, v)
+    _body(_ADDITIONALITY_CAVEAT, italic=True, colour=(136, 136, 136), size=9)
     _body(
         "Methodology confirmation requires a qualified methodology advisor. "
         "All cited methods must be verified as active at the time of registration.",
@@ -522,6 +610,17 @@ def generate_docx(data: ReportData) -> bytes:
         ]:
             _kv(_label, _value)
         _hr()
+
+    # ── Engage 180Climate CTA ────────────────────────────────────────────────
+    _h2("Engage 180Climate")
+    for line in _ENGAGE_CTA.split("\n"):
+        _body(line) if line else doc.add_paragraph()
+    _hr()
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # FINE PRINT — supporting detail; narrative, uncertainty, data, disclaimer
+    # ════════════════════════════════════════════════════════════════════════════
+    _body("Notes & Supporting Detail", bold=True, colour=(136, 136, 136), size=9)
 
     # ── Forest data summary ───────────────────────────────────────────────────
     _h2("Forest Data Summary")
@@ -560,7 +659,7 @@ def generate_docx(data: ReportData) -> bytes:
         for _line in _narr_clean.split("\n"):
             _line = _line.strip()
             if _line:
-                _body(_line)
+                _body(_line, size=9)
             else:
                 doc.add_paragraph()
         _hr()
@@ -568,25 +667,19 @@ def generate_docx(data: ReportData) -> bytes:
     # ── Uncertainty ───────────────────────────────────────────────────────────
     _h2("Uncertainty Band")
     unc_clean = re.sub(r"\*\*(.*?)\*\*", r"\1", data.uncertainty)
-    _body(unc_clean)
-    _hr()
-
-    # ── Disclaimer ────────────────────────────────────────────────────────────
-    _h2("Disclaimer")
-    _body(_DISCLAIMER, italic=True, colour=(136, 136, 136), size=9)
+    _body(unc_clean, size=9)
     _hr()
 
     # ── Data sources ──────────────────────────────────────────────────────────
     if data.data_sources:
         _h2("Data Sources")
         for _src in data.data_sources:
-            _body(f"• {_src}")
+            _body(f"• {_src}", size=9)
         _hr()
 
-    # ── Engage 180Climate CTA ────────────────────────────────────────────────
-    _h2("Engage 180Climate")
-    for line in _ENGAGE_CTA.split("\n"):
-        _body(line) if line else doc.add_paragraph()
+    # ── Disclaimer ────────────────────────────────────────────────────────────
+    _h2("Disclaimer")
+    _body(_DISCLAIMER, italic=True, colour=(136, 136, 136), size=9)
 
     buf = io.BytesIO()
     doc.save(buf)

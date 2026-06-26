@@ -1,83 +1,93 @@
-# OUTBOX — Builder → Cowork · WO-METHFIX-002 retry 1/2 · 2026-06-26
+# OUTBOX — Builder → Cowork · WO-DERIVE-001 · 2026-06-26
 
-## Status: CI GREEN ✅ — STOPPED for Cowork review (281 tests passed, retry 1/2 fix applied)
+## Status: CI GREEN ✅ — STOPPED for Cowork review (287 tests passed, 6 new ADR-0014 tests)
 
 ---
 
 ## What was delivered
 
-ADR-0016 (Gate C signed) uncertainty propagation + density-fallback gating. Two corrections:
+### Part 1 — ADR-0014 CalculationTrace (Gate C signed, contracts + engine)
 
-**M1 — quadrature uncertainty + buffer separation (both REDD and IFM)**
-- REDD: `sigma = sqrt(CV_density² + SEM_loss²)`; central = `area × loss_rate × years × density`; VCS buffer (20–30%) deducted **after** and labelled separately.
-- **Retry 1/2 fix:** loss uncertainty changed from raw CV (`std/mean`) to **standard error of the mean** (`SEM = std / (mean × sqrt(n))`). SEM reflects uncertainty in the estimated baseline mean; raw CV was inflating ranges by penalising natural inter-annual variability that does not affect the mean estimator.
-- IFM: `sigma_IFM = sqrt(CV_intensity² + CV_TEF²) ≈ 0.2149` (pre-computed from TPTI band 26–40 m³/ha and Pearson TEF 1.4–1.5 MgC/m³). Buffer deducted separately. **IFM unchanged.**
-- CV_density source hierarchy: `biomass_uncertainty_pct / 100` if set → 0.20 for ESA CCI Biomass v3.0 → 0.30 for IPCC default.
-- `ForestData.biomass_uncertainty_pct: Optional[float] = None` added (Gate C authorized change).
+`core/contracts/__init__.py`: new `CalculationTrace(BaseModel)` + `CarbonEstimate.derivation: Optional[CalculationTrace] = None`.
 
-**M2 — density-fallback gating**
-- No credible biomass source (`biomass_tco2_per_ha is None`) → FLAG, no number (quantity=null). Uncertainty string cites ADR-0016-M2.
-- IPCC default density detected → adds "DEFAULT DENSITY — HIGH UNCERTAINTY" to uncertainty + changes verdict to "flagged" if was "eligible".
-- ESA CCI density label includes saturation caveat: "underestimates AGB >~150–250 Mg/ha".
-- GEDI/ICESat-2 noted in uncertainty string as pre-launch backlog (not built now).
+Fields:
+- **Common**: `formula`, `basis` ("redd"|"ifm"), `eligible_area_ha`, `project_years`, `buffer_low`, `buffer_high`, `central_tco2e`, `gross_low_tco2e`, `gross_high_tco2e`, `net_low_tco2e`, `net_high_tco2e`, `notes`
+- **REDD-specific**: `baseline_loss_rate_yr`, `loss_rate_sem_pct`, `carbon_density_tco2_ha`, `carbon_density_source`, `carbon_density_cv_pct`, `sigma_combined_pct`
+- **IFM-specific**: `harvested_area_ha`, `ef_central_tco2_ha`, `sigma_ifm_pct`
 
----
+`engines/carbon/engine.py`:
+- `_estimate_redd()` and `_estimate_ifm()` now return 4-tuple `(net_low, net_high, unc, CalculationTrace)`
+- `run_carbon_engine()` and `run_mixed_stratification()` unpack 4-tuples; attach `derivation=trace` to `CarbonEstimate`
+- Plantation / peat / forest-fail / no-biomass early returns: `derivation=None` (ADR-0013 compliant)
 
-## Contract change (Gate C authorized)
-
-`core/contracts/__init__.py` — `ForestData` extended:
-```python
-# ADR-0016-M1
-biomass_uncertainty_pct: Optional[float] = None
-```
-`core/data/gfw.py` — `_query_density()` now returns 3-tuple `(biomass, source_label, biomass_uncertainty_pct)`. ESA CCI success → `20.0`; IPCC fallback → `None`.
+**ADR-0014 invariant confirmed by test**: `trace.net_low_tco2e == estimate.quantity_low_tco2e` — the trace reproduces the headline range exactly (no re-computation, same `round()` call).
 
 ---
 
-## Before → After: golden ranges
+### Part 2 — Report restructure (docs/report-derivation-spec.md)
 
-| Fixture | Metric | Pre-ADR-0016 (ADR-0015-C2) | ADR-0016 raw-CV | **ADR-0016 SEM (final)** | Notes |
-|---------|--------|---------------------------|-----------------|--------------------------|-------|
-| HTI_eligible (73,787 ha, ESA CCI 266.5 tCO2/ha) | low | 5,816,578 | 731,904 | **4,456,388** | SEM≈33.1%, sigma≈38.5% |
-| HTI_eligible | high | 8,309,397 | 15,782,332 | **11,525,779** | |
-| HTI_flag_years (3yr) | low | 872,487 | 109,786 | **668,458** | Same sigma; 3-yr crediting |
-| HTI_flag_years | high | 1,246,410 | 2,367,350 | **1,728,867** | |
-| HTI_fail_area (1,107 ha, ESA CCI 174.2) | low | 2,098 | 0 | **165** | Raw CV: sigma>1→clip. SEM: sigma<1→positive low |
-| HTI_fail_area | high | 2,997 | 10,282 | **5,806** | |
-| HA_eligible (IFM, 73,787 ha, 15yr) | low | 2,954,441 | 3,049,142 | **3,049,142** | IFM unchanged |
-| HA_eligible | high | 5,565,666 | 5,392,503 | **5,392,503** | IFM unchanged |
-| HTI_flag_outside (Point, IPCC 657.1) | low | 2,279,952 | 1,992,050 | **1,994,594** | SEM≈0.9% (stable stub); sigma≈30% |
-| HTI_flag_outside | high | 3,257,074 | 4,237,520 | **4,234,612** | |
-| WO010_REDD_no_biomass (new) | low | — | null | **null** | M2 gate: no AGB → FLAG |
-| WO010_REDD_no_biomass | high | — | null | **null** | |
+New section order (PDF + DOCX):
+1. Header
+2. Eligibility Verdict
+3. Indicative Carbon Estimate (range + dominant uncertainty)
+4. **How This Estimate Is Derived** ← NEW main body
+   - REDD: formula + area / loss_rate / SEM / density / CV / sigma / central / pre-buffer / buffer / net rows
+   - IFM: formula + area / harvested_area / EF_central / sigma / central / pre-buffer / buffer / net rows
+   - Peat: flag rationale (no formula, no tonnage)
+5. Methodology (Indicative) + **additionality caveat** ← new
+6. Quality Factors
+7. Engage 180Climate CTA ← moved BEFORE fine print
+8. ── Notes & Supporting Detail (fine print) ──
+9. Forest Data Summary
+10. Assessment Narrative
+11. Uncertainty Band
+12. Data Sources
+13. Disclaimer
 
-**Key numbers**: HTI large polygon — SEM = 33.1% (7 years, std/mean = 87.7% raw); sigma = sqrt(0.20² + 0.331²) ≈ 38.5%. Central ≈ 10,393k tCO2e (pre-buffer). HA IFM central ≈ 5,549k (pre-buffer; unchanged). HTI_fail_area SEM = 91.5% for this high-variability small polygon (sigma ≈ 93.6%) — still gives a small positive low (165 tCO2e) instead of clipping to 0.
-
----
-
-## Tests added (11 new → 281 total, was 270)
-
-- `test_redd_uncertainty_uses_quadrature` — "in quadrature" in REDD uncertainty
-- `test_redd_buffer_labelled_separately` — "separately/separate" in REDD uncertainty
-- `test_esa_cci_saturation_caveat_in_redd` — "saturation" in ESA CCI uncertainty
-- `test_ipcc_default_loud_flag_in_uncertainty` — "DEFAULT DENSITY" in IPCC-default uncertainty
-- `test_ipcc_default_verdict_flagged` — IPCC default → verdict=flagged
-- `test_no_biomass_no_number` — quantity_low=None, quantity_high=None
-- `test_no_biomass_verdict_flagged` — verdict=flagged
-- `test_no_biomass_reason_contains` — reason contains "no credible biomass source"
-- `test_no_biomass_uncertainty_label` — uncertainty contains "ADR-0016-M2"
-- `test_ifm_uncertainty_uses_quadrature` — "in quadrature" in IFM uncertainty
-- `test_ifm_buffer_labelled_separately` — "separately/separate" in IFM uncertainty
+`reports/generator.py`:
+- `ReportData.derivation: Optional[Any] = field(default=None)` added
+- `_derivation_rows(d)` helper converts CalculationTrace to label/value list
+- `_ENGAGE_CTA` M3 wording applied (see Part 3)
+- `_ADDITIONALITY_CAVEAT` constant added; rendered in Methodology section
 
 ---
 
-## Peat unchanged ✅ · Routing unchanged ✅ · Determinism intact ✅
+### Part 3 — M3 wording (drop the overclaims)
 
-No peat fixture touched. HTI→APD, HA→IFM, Peat→interim routing unchanged. All math is pure Python constants + `math.fsum` — no randomness.
+| Location | Before | After |
+|---|---|---|
+| `api/main.py` `_CARROT` | "appropriate accredited Verra methodology" | "the applicable Verra methodology family (subject to advisor confirmation and Verra's evolving rules)" |
+| `api/main.py` `_CARROT` | "~SGD 12K" (ambiguous) | "service fee ~SGD 12K; separate from any carbon credit value" |
+| `reports/generator.py` `_ENGAGE_CTA` | same old wording | same M3 fix |
+| `narrative/narrator.py` `_ENGAGE_CTA` | same old wording | same M3 fix |
+| `narrator.py` `_METHODOLOGY_NOTE["planned_clearfell"]` | no additionality caveat | genuine-harvest-intent + PIPPIB caveat appended |
+| `narrator.py` `_METHODOLOGY_NOTE["planned_selective"]` | "IFM (VM0045 / VM0010) — advisor-confirm" | VM0010 lead / VM0045 field-only labels; conservative-floor qualification; additionality caveat |
+
+---
+
+## Tests updated / added
+
+| Test | Change |
+|---|---|
+| `test_new_cta_wording` (test_report.py:184) | Updated: now asserts "applicable Verra methodology" + "subject to advisor confirmation" + "service fee" |
+| `test_redd_derivation_reproduces_range` | NEW — ADR-0014 invariant: REDD trace reproduces exact range |
+| `test_ifm_derivation_reproduces_range` | NEW — ADR-0014 invariant: IFM trace reproduces exact range |
+| `test_peat_derivation_is_none` | NEW — ADR-0013+0014: peat has derivation=None |
+| `test_plantation_derivation_is_none` | NEW — plantation flag has derivation=None |
+| `test_derivation_basis_matches_permit_type` | NEW — basis='redd' for HTI, 'ifm' for HA |
+| `test_derivation_no_single_number_invariant` | NEW — trace always carries a range |
+
+**Total: 287 tests passed (was 281). 6 new ADR-0014 tests added.**
+
+---
+
+## Peat unchanged ✅ · Numbers unchanged ✅ · Determinism intact ✅ · No confidence % ✅
+
+The derivation trace stores the actual values already computed inside the engine — no re-computation, no new logic. The headline range numbers are identical to the post-ADR-0016 SEM baselines (HTI ~4.46M–11.53M, HA/IFM ~3.05M–5.39M).
 
 ---
 
 ## Next (not in scope here)
-- M3 wording WO (review uncertainty string language with advisor)
-- WO-DERIVE-001 (derivation document, last on the corrected engine)
-- Deploy items → Gate L
+- Cowork verifies: derivation reproduces range, fine print last, M3 wording applied, no overclaims
+- Deploy-time items → Gate L (PIPPIB snapshot, credentials, Render, DNS, CI secrets)
+- EUDR build = post-carbon (Gate E) per docs/eudr-design-v2.md

@@ -43,9 +43,10 @@ _DISCLAIMER_TEXT = (
     "site visit and full methodology application."
 )
 _CARROT = (
-    "This free screening already routes your concession to the appropriate "
-    "accredited Verra methodology, at an indicative IPCC Tier 1 level — "
-    "a first read that a paid pre-feasibility study (~SGD 12K) would otherwise begin. "
+    "This free screening already identifies the applicable Verra methodology family "
+    "(subject to advisor confirmation and Verra's evolving rules), at an indicative "
+    "IPCC Tier 1 level — a first read that a paid pre-feasibility study (service fee "
+    "~SGD 12K; separate from any carbon credit value) would otherwise begin. "
     "To take it to a bankable, registry-grade carbon project — field validation, "
     "full methodology application, a financial model, independent third-party "
     "verification, Verra registration, and market access — talk to 180Climate "

@@ -1283,3 +1283,127 @@ def test_ifm_buffer_labelled_separately():
         "ADR-0016-M1: VCS buffer must be labelled as applied separately in IFM uncertainty. "
         f"Got: {estimate.uncertainty[:300]}"
     )
+
+
+# ── WO-DERIVE-001 / ADR-0014: derivation trace tests ─────────────────────────
+
+def test_redd_derivation_reproduces_range():
+    """ADR-0014 invariant: trace.net_low_tco2e == estimate.quantity_low_tco2e for REDD."""
+    case = _load("WO002_HTI_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.derivation is not None, (
+        "ADR-0014: REDD estimate must have derivation trace (not None)"
+    )
+    d = estimate.derivation
+    assert d.basis == "redd", f"Expected basis='redd', got {d.basis!r}"
+    assert d.net_low_tco2e == estimate.quantity_low_tco2e, (
+        f"ADR-0014 INVARIANT: trace.net_low_tco2e ({d.net_low_tco2e:,.0f}) must equal "
+        f"estimate.quantity_low_tco2e ({estimate.quantity_low_tco2e:,.0f})"
+    )
+    assert d.net_high_tco2e == estimate.quantity_high_tco2e, (
+        f"ADR-0014 INVARIANT: trace.net_high_tco2e ({d.net_high_tco2e:,.0f}) must equal "
+        f"estimate.quantity_high_tco2e ({estimate.quantity_high_tco2e:,.0f})"
+    )
+    # REDD-specific fields must be populated
+    assert d.baseline_loss_rate_yr is not None, "REDD trace must have baseline_loss_rate_yr"
+    assert d.carbon_density_tco2_ha is not None, "REDD trace must have carbon_density_tco2_ha"
+    assert d.sigma_combined_pct is not None, "REDD trace must have sigma_combined_pct"
+    assert d.central_tco2e is not None, "REDD trace must have central_tco2e"
+    assert d.gross_low_tco2e <= d.gross_high_tco2e, "gross_low must <= gross_high (pre-buffer)"
+    assert d.net_low_tco2e <= d.net_high_tco2e, "net_low must <= net_high"
+
+
+def test_ifm_derivation_reproduces_range():
+    """ADR-0014 invariant: trace.net_low_tco2e == estimate.quantity_low_tco2e for IFM."""
+    case = _load("WO002_HA_eligible.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.derivation is not None, (
+        "ADR-0014: IFM estimate must have derivation trace (not None)"
+    )
+    d = estimate.derivation
+    assert d.basis == "ifm", f"Expected basis='ifm', got {d.basis!r}"
+    assert d.net_low_tco2e == estimate.quantity_low_tco2e, (
+        f"ADR-0014 INVARIANT: trace.net_low_tco2e ({d.net_low_tco2e:,.0f}) must equal "
+        f"estimate.quantity_low_tco2e ({estimate.quantity_low_tco2e:,.0f})"
+    )
+    assert d.net_high_tco2e == estimate.quantity_high_tco2e, (
+        f"ADR-0014 INVARIANT: trace.net_high_tco2e ({d.net_high_tco2e:,.0f}) must equal "
+        f"estimate.quantity_high_tco2e ({estimate.quantity_high_tco2e:,.0f})"
+    )
+    # IFM-specific fields must be populated
+    assert d.harvested_area_ha is not None, "IFM trace must have harvested_area_ha"
+    assert d.ef_central_tco2_ha is not None, "IFM trace must have ef_central_tco2_ha"
+    assert d.sigma_ifm_pct is not None, "IFM trace must have sigma_ifm_pct"
+    assert d.central_tco2e is not None, "IFM trace must have central_tco2e"
+    assert d.harvested_area_ha <= d.eligible_area_ha, (
+        "harvested_area_ha must be <= eligible_area_ha (fraction of one TPTI cycle)"
+    )
+
+
+def test_peat_derivation_is_none():
+    """ADR-0014 + ADR-0013: peat estimate must have derivation=None (no formula, no tonnage)."""
+    case = _load("WO003_routing_PEAT.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.derivation is None, (
+        f"ADR-0014 + ADR-0013: peat must have derivation=None (no formula, no tonnage). "
+        f"Got derivation={estimate.derivation!r}"
+    )
+
+
+def test_plantation_derivation_is_none():
+    """ADR-0014: plantation-flagged estimate must have derivation=None (no number asserted)."""
+    case = _load("WO009_HTI_plantation.json")
+    inp = _make_input(case["input"])
+    boundary = parse_geo(inp.geo)
+    forest = query_forest_data(boundary)
+    estimate = run_carbon_engine(inp, boundary, forest)
+
+    assert estimate.derivation is None, (
+        f"ADR-0014: plantation flag must have derivation=None. Got {estimate.derivation!r}"
+    )
+
+
+def test_derivation_basis_matches_permit_type():
+    """ADR-0014 consistency: basis='redd' for HTI, basis='ifm' for HA."""
+    for fixture, expected_basis, permit in [
+        ("WO002_HTI_eligible.json", "redd", "HTI"),
+        ("WO002_HA_eligible.json", "ifm", "HA"),
+    ]:
+        case = _load(fixture)
+        inp = _make_input(case["input"])
+        boundary = parse_geo(inp.geo)
+        forest = query_forest_data(boundary)
+        estimate = run_carbon_engine(inp, boundary, forest)
+        assert estimate.derivation is not None, f"{fixture}: derivation must not be None"
+        assert estimate.derivation.basis == expected_basis, (
+            f"{fixture}: expected basis={expected_basis!r} for {permit}, "
+            f"got {estimate.derivation.basis!r}"
+        )
+
+
+def test_derivation_no_single_number_invariant():
+    """ADR-0014 + ADR-0009: trace must always carry a range (net_low != net_high)."""
+    for fixture in ["WO002_HTI_eligible.json", "WO002_HA_eligible.json"]:
+        case = _load(fixture)
+        inp = _make_input(case["input"])
+        boundary = parse_geo(inp.geo)
+        forest = query_forest_data(boundary)
+        estimate = run_carbon_engine(inp, boundary, forest)
+        d = estimate.derivation
+        assert d is not None
+        assert d.net_low_tco2e < d.net_high_tco2e, (
+            f"ADR-0009/0014: derivation trace must carry a range "
+            f"(net_low={d.net_low_tco2e:,.0f}, net_high={d.net_high_tco2e:,.0f}) for {fixture}"
+        )

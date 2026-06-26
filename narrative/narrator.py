@@ -28,13 +28,23 @@ _DISCLAIMER = (
 )
 
 _ENGAGE_CTA = (
-    "**Engage 180Climate** — This free screening already routes your concession to the "
-    "appropriate accredited Verra methodology, at an indicative IPCC Tier 1 level — "
-    "a first read that a paid pre-feasibility study (~SGD 12K) would otherwise begin. "
+    "**Engage 180Climate** — This free screening already identifies the applicable "
+    "Verra methodology family (subject to advisor confirmation and Verra's evolving rules), "
+    "at an indicative IPCC Tier 1 level — a first read that a paid pre-feasibility study "
+    "(service fee ~SGD 12K; separate from any carbon credit value) would otherwise begin. "
     "To take it to a bankable, registry-grade carbon project — field validation, "
     "full methodology application, a financial model, independent third-party "
     "verification, Verra registration, and market access — talk to 180Climate "
     "at info@180climate.net."
+)
+
+_ADDITIONALITY_CAVEAT = (
+    "Note: 'legal harvest right foregone' is necessary but not sufficient for additionality. "
+    "It must also be accompanied by demonstrated genuine harvest intent — an approved management "
+    "plan with confirmed financing and operational viability (not satellite-derivable at screening "
+    "stage). Additionally, the PIPPIB moratorium (Inpres 5/2019), if applicable, can negate the "
+    "legal right and make avoided-conversion non-additional (regulatory surplus fails); the KHG "
+    "overlay screens for this."
 )
 
 _METHODOLOGY_NOTE = {
@@ -44,15 +54,19 @@ _METHODOLOGY_NOTE = {
         "route is VM0009 — active but in transition; confirm with your methodology advisor at deal time. "
         "The additionality basis is the legal harvest right foregone: the concession holder has a legal "
         "right to clear-fell but is choosing to forego it. This is a planned-deforestation baseline — "
-        "not the unplanned-deforestation (AUD / VM0048) family."
+        "not the unplanned-deforestation (AUD / VM0048) family. " + _ADDITIONALITY_CAVEAT
     ),
     "planned_selective": (
         "**Methodology basis (indicative):** Based on the HA permit, the applicable methodology "
-        "family is IFM (Improved Forest Management). Applicable Verra methodologies: "
-        "IFM (VM0045 / VM0010) — advisor-confirm active version at deal time. "
+        "family is IFM (Improved Forest Management). VM0010 lead (selective-logging baseline, "
+        "excl. planted forests); VM0045 requires field NFI data (not satellite-screenable at this "
+        "stage) — advisor-confirm active version at deal time. "
         "The additionality basis is the legal harvest right foregone: the concession holder has a legal "
         "right to selectively log but is choosing to forego it. This is a planned selective-logging "
-        "baseline — not the unplanned-deforestation (AUD / VM0048) family."
+        "baseline — not the unplanned-deforestation (AUD / VM0048) family. "
+        "The avoided-emissions-only estimate is a conservative floor — VM0010 also credits "
+        "continued-growth removals (ongoing forest increment), which would increase the credited "
+        "total at registry grade. " + _ADDITIONALITY_CAVEAT
     ),
     "peat": (
         "**Methodology basis (indicative):** Peat avoided-conversion projects sit in an unsettled "
