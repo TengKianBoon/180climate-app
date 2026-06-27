@@ -328,21 +328,10 @@ def generate_pdf(data: ReportData) -> bytes:
 
     story = []
 
-    # ── 1. Header ─────────────────────────────────────────────────────────────
-    if _LOGO_PATH.exists():
-        from reportlab.platypus import Image as RLImage
-        logo_h = 1.6 * cm
-        logo_w = logo_h * _LOGO_ASPECT
-        story.append(RLImage(str(_LOGO_PATH), width=logo_w, height=logo_h))
-        story.append(Spacer(1, 4))
-    else:
-        story.append(Paragraph("180Climate", ParagraphStyle(
-            "Brand", parent=styles["Normal"], fontSize=22, textColor=green,
-            fontName="Helvetica-Bold")))
-    story.append(Paragraph("Carbon Pre-Feasibility Report", ParagraphStyle(
-        "Sub", parent=styles["Normal"], fontSize=13, textColor=navy,
-        fontName="Helvetica-Bold", spaceBefore=2, spaceAfter=2)))
-    story.append(Spacer(1, 4))
+    # ── 1. Header (2-col: left = title+meta, right = logo top-right) ────────
+    from reportlab.platypus import Image as RLImage, Table as RLTable, TableStyle as RLTS
+    SUB = ParagraphStyle("Sub", parent=styles["Normal"], fontSize=13, textColor=navy,
+                         fontName="Helvetica-Bold", spaceBefore=0, spaceAfter=4)
     meta_rows = [
         ("Concession", data.iup_name),
         ("Region", data.iup_address or "—"),
@@ -351,8 +340,29 @@ def generate_pdf(data: ReportData) -> bytes:
         ("Reference", data.filename_base),
         ("Date (UTC)", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
     ]
-    for k, v in meta_rows:
-        story.append(Paragraph(f"<b>{k}:</b> {v}", META))
+    left_col = [Paragraph("Carbon Pre-Feasibility Report", SUB)]
+    left_col += [Paragraph(f"<b>{k}:</b> {v}", META) for k, v in meta_rows]
+
+    logo_h = 1.6 * cm
+    logo_w = logo_h * _LOGO_ASPECT
+    if _LOGO_PATH.exists():
+        right_col = [RLImage(str(_LOGO_PATH), width=logo_w, height=logo_h)]
+    else:
+        right_col = [Paragraph("180Climate", ParagraphStyle(
+            "Brand", parent=styles["Normal"], fontSize=16, textColor=green,
+            fontName="Helvetica-Bold"))]
+
+    hdr_tbl = RLTable([[left_col, right_col]],
+                      colWidths=[doc.width - logo_w - 0.4 * cm, logo_w + 0.4 * cm])
+    hdr_tbl.setStyle(RLTS([
+        ("VALIGN",      (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",       (1, 0), (1, 0),   "RIGHT"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
+    ]))
+    story.append(hdr_tbl)
     story.append(hr())
 
     # ── 2. Hero — range + per-year + worth ───────────────────────────────────
@@ -624,9 +634,9 @@ def generate_docx(data: ReportData) -> bytes:
     if _LOGO_PATH.exists():
         from docx.shared import Inches as _Inches
         p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         run = p.add_run()
         run.add_picture(str(_LOGO_PATH), height=_Inches(0.55))
-        doc.add_paragraph()
     else:
         _h1("180Climate", colour=_GREEN)
     _h1("Carbon Pre-Feasibility Report", colour=_NAVY)
