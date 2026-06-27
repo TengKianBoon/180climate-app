@@ -1,93 +1,105 @@
-# OUTBOX — Builder → Cowork · WO-DERIVE-001 · 2026-06-26
+# OUTBOX — Builder → Cowork · WO-VALUEFIRST-001 · 2026-06-27
 
-## Status: CI GREEN ✅ — STOPPED for Cowork review (287 tests passed, 6 new ADR-0014 tests)
+## Status: CI GREEN ✅ — STOPPED for Cowork review (285 tests passed)
 
 ---
 
 ## What was delivered
 
-### Part 1 — ADR-0014 CalculationTrace (Gate C signed, contracts + engine)
+### Part 1 — Engine: ADR-0017 (project_years = 30 fixed; per-year fields)
 
-`core/contracts/__init__.py`: new `CalculationTrace(BaseModel)` + `CarbonEstimate.derivation: Optional[CalculationTrace] = None`.
+**`core/contracts/__init__.py`** (Gate C signed):
+- Added `quantity_low_per_yr_tco2e: Optional[float] = None`
+- Added `quantity_high_per_yr_tco2e: Optional[float] = None`
 
-Fields:
-- **Common**: `formula`, `basis` ("redd"|"ifm"), `eligible_area_ha`, `project_years`, `buffer_low`, `buffer_high`, `central_tco2e`, `gross_low_tco2e`, `gross_high_tco2e`, `net_low_tco2e`, `net_high_tco2e`, `notes`
-- **REDD-specific**: `baseline_loss_rate_yr`, `loss_rate_sem_pct`, `carbon_density_tco2_ha`, `carbon_density_source`, `carbon_density_cv_pct`, `sigma_combined_pct`
-- **IFM-specific**: `harvested_area_ha`, `ef_central_tco2_ha`, `sigma_ifm_pct`
+**`engines/carbon/engine.py`**:
+- `project_years = min(inp.permit_years_remaining, _MAX_CREDITING_YR)` → `project_years = _MAX_CREDITING_YR` (both `_estimate_redd` and `run_mixed_stratification`)
+- Per-year fields populated: `round(low / _MAX_CREDITING_YR, 0)` and `round(high / _MAX_CREDITING_YR, 0)` in non-peat returns
+- Peat `quantity_low_per_yr_tco2e = None`, `quantity_high_per_yr_tco2e = None` (no tonnage for peat)
 
-`engines/carbon/engine.py`:
-- `_estimate_redd()` and `_estimate_ifm()` now return 4-tuple `(net_low, net_high, unc, CalculationTrace)`
-- `run_carbon_engine()` and `run_mixed_stratification()` unpack 4-tuples; attach `derivation=trace` to `CarbonEstimate`
-- Plantation / peat / forest-fail / no-biomass early returns: `derivation=None` (ADR-0013 compliant)
+**Golden re-baselines** (before → after, all 30-yr fixed):
 
-**ADR-0014 invariant confirmed by test**: `trace.net_low_tco2e == estimate.quantity_low_tco2e` — the trace reproduces the headline range exactly (no re-computation, same `round()` call).
-
----
-
-### Part 2 — Report restructure (docs/report-derivation-spec.md)
-
-New section order (PDF + DOCX):
-1. Header
-2. Eligibility Verdict
-3. Indicative Carbon Estimate (range + dominant uncertainty)
-4. **How This Estimate Is Derived** ← NEW main body
-   - REDD: formula + area / loss_rate / SEM / density / CV / sigma / central / pre-buffer / buffer / net rows
-   - IFM: formula + area / harvested_area / EF_central / sigma / central / pre-buffer / buffer / net rows
-   - Peat: flag rationale (no formula, no tonnage)
-5. Methodology (Indicative) + **additionality caveat** ← new
-6. Quality Factors
-7. Engage 180Climate CTA ← moved BEFORE fine print
-8. ── Notes & Supporting Detail (fine print) ──
-9. Forest Data Summary
-10. Assessment Narrative
-11. Uncertainty Band
-12. Data Sources
-13. Disclaimer
-
-`reports/generator.py`:
-- `ReportData.derivation: Optional[Any] = field(default=None)` added
-- `_derivation_rows(d)` helper converts CalculationTrace to label/value list
-- `_ENGAGE_CTA` M3 wording applied (see Part 3)
-- `_ADDITIONALITY_CAVEAT` constant added; rendered in Methodology section
-
----
-
-### Part 3 — M3 wording (drop the overclaims)
-
-| Location | Before | After |
+| Fixture | Was | Now |
 |---|---|---|
-| `api/main.py` `_CARROT` | "appropriate accredited Verra methodology" | "the applicable Verra methodology family (subject to advisor confirmation and Verra's evolving rules)" |
-| `api/main.py` `_CARROT` | "~SGD 12K" (ambiguous) | "service fee ~SGD 12K; separate from any carbon credit value" |
-| `reports/generator.py` `_ENGAGE_CTA` | same old wording | same M3 fix |
-| `narrative/narrator.py` `_ENGAGE_CTA` | same old wording | same M3 fix |
-| `narrator.py` `_METHODOLOGY_NOTE["planned_clearfell"]` | no additionality caveat | genuine-harvest-intent + PIPPIB caveat appended |
-| `narrator.py` `_METHODOLOGY_NOTE["planned_selective"]` | "IFM (VM0045 / VM0010) — advisor-confirm" | VM0010 lead / VM0045 field-only labels; conservative-floor qualification; additionality caveat |
+| HTI_eligible (20yr→30yr) | 4,456,388 – 11,525,779 | 6,684,581 – 17,288,669 |
+| HTI_flag_years (3yr→30yr) | 668,458 – 1,728,867 | 6,684,581 – 17,288,669 |
+| HTI_fail_area (20yr→30yr) | 165 – 5,806 | 248 – 8,709 |
+| HA_eligible IFM (15yr→30yr) | 3,049,142 – 5,392,503 | 6,098,285 – 10,785,006 |
+| HTI_flag_outside (20yr→30yr) | 1,994,594 – 4,234,612 | 2,991,891 – 6,351,918 |
+
+IFM 30yr math: harvested_area = area × min(1, 30/35) = area × 6/7 (≈2× the 15yr figure). REDD: linear ×30/20 = 1.5×.
+
+**`api/main.py`**: `_build_report_data()` + `loss_overlay` dict now include per-year fields and `derivation`.
 
 ---
 
-## Tests updated / added
+### Part 2 — Value-first report (PDF + DOCX)
 
-| Test | Change |
-|---|---|
-| `test_new_cta_wording` (test_report.py:184) | Updated: now asserts "applicable Verra methodology" + "subject to advisor confirmation" + "service fee" |
-| `test_redd_derivation_reproduces_range` | NEW — ADR-0014 invariant: REDD trace reproduces exact range |
-| `test_ifm_derivation_reproduces_range` | NEW — ADR-0014 invariant: IFM trace reproduces exact range |
-| `test_peat_derivation_is_none` | NEW — ADR-0013+0014: peat has derivation=None |
-| `test_plantation_derivation_is_none` | NEW — plantation flag has derivation=None |
-| `test_derivation_basis_matches_permit_type` | NEW — basis='redd' for HTI, 'ifm' for HA |
-| `test_derivation_no_single_number_invariant` | NEW — trace always carries a range |
+**`reports/generator.py`** — complete rewrite to value-first design:
 
-**Total: 287 tests passed (was 281). 6 new ADR-0014 tests added.**
+Section order (ADR-0009 invariants preserved):
+1. **Header** — logo + concession meta
+2. **Hero** — green table cell: range + per-year + worth box (US$8/tonne indicative)
+3. **Why Your Forest Qualifies** — substantive APD/IFM/peat pathway copy
+4. **How Strong Is Your Project** — quality cards as strengths (2-column, no caveat language)
+5. **How Your Number Is Built** — derivation table (if derivation present); peat: qualitative flag explanation
+6. **What We Found on Your Land** — forest data bullets + flags reframed as opportunities + data sources credit
+7. **How to Grow This Number** — RKU/RKT upload prompt
+8. **Engage 180Climate** — dark green CTA box
+9. **Footer (ONE line)** — "Indicative satellite screening — not a verified credit issuance or legal advice. IPCC Tier 1 approach. How this is calculated & legal notes: 180climate.net/methodology."
+
+Removed from report body: `_DISCLAIMER`, `_ADDITIONALITY_CAVEAT`, `_DOMINANT_UNC` — all caveats remain in engine logic + docs/methodology.md only.
+
+**`INDICATIVE_PRICE_USD_PER_TCO2E = 8`** — presentation-layer config only; no contracts change.
 
 ---
 
-## Peat unchanged ✅ · Numbers unchanged ✅ · Determinism intact ✅ · No confidence % ✅
+### Part 3 — Value-first result page (frontend)
 
-The derivation trace stores the actual values already computed inside the engine — no re-computation, no new logic. The headline range numbers are identical to the post-ADR-0016 SEM baselines (HTI ~4.46M–11.53M, HA/IFM ~3.05M–5.39M).
+**`frontend/index.html`**:
+
+CSS additions: `.result-hero`, `.worth-box`, `.moves-h`, `.move`, `.cta-move`, `.result-foot`
+
+New HTML structure (step-result):
+- `#result-hero` card → `#result-lbl`, `#result-num`, `#result-sub`, `#result-chip`
+- `#worth-box` → `#worth-text`
+- `#map` (unchanged)
+- `#oos-card` (out-of-scope fallback)
+- `#moves-heading` + 3 move cards: `#move-plan`, `#move-land` (with `#move-land-detail`), `#move-cta`
+- `#report-dl-card`, `#lead-gate-card`
+- `#result-footer` (ONE line)
+
+`renderResult()` rewritten:
+- Populates all new element IDs
+- `#result-hero` green gradient for eligible; amber for OOS
+- `#worth-box` shows indicative $ computed client-side from `ov.quantity_{low,high}_per_yr_tco2e × 8`
+- `#move-land-detail` surfaces peat/forest-condition flags as opportunities
+- Out-of-scope: shows `#oos-card`, hides moves/worth/hero-range
+- Footer always shown for non-OOS; `#report-dl-card` shown only for `hasRange`
 
 ---
 
-## Next (not in scope here)
-- Cowork verifies: derivation reproduces range, fine print last, M3 wording applied, no overclaims
-- Deploy-time items → Gate L (PIPPIB snapshot, credentials, Render, DNS, CI secrets)
-- EUDR build = post-carbon (Gate E) per docs/eudr-design-v2.md
+## ADR-0009 invariants confirmed ✅
+
+- Always a range; never a single bare tCO2e number ✅
+- No "% accuracy" or "% confidence" strings ✅
+- "IPCC Tier 1" present (in footer line for all reports) ✅
+- Methodology label present (APD in why_qualifies / derivation table) ✅
+- CTA with 180Climate + info@180climate.net present ✅
+- Peat: no tonnage in report body ✅
+- Zero body disclaimers ✅ · One footer line only ✅
+
+---
+
+## Test changes
+
+- `tests/test_report.py`: removed 4 stale assertions (old section headers: "Quality Factors", "Forest Data Summary", "Assessment Narrative", "Data Sources"); removed 2 "dominant uncertainty" checks; updated CTA wording assertions; added new value-first structure checks.
+- **285 tests passed** (was 287 — 2 tests removed as their sections no longer exist in value-first design; net: 0 failures)
+
+---
+
+## Numbers unchanged ✅ (beyond ADR-0017 30-yr re-baseline)
+- No methodology routing change
+- No peat number
+- No confidence %
+- Determinism intact

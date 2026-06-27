@@ -130,45 +130,41 @@
       border: 1px solid #CDEBD5; padding: .25rem .7rem; border-radius: 999px;
     }
 
-    /* ── Verdict card ─────────────────────────────────────────────────────── */
-    .verdict-card {
-      border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.25rem;
-      box-shadow: var(--shadow);
+    /* ── Value-first result hero card ────────────────────────────────────── */
+    .result-hero {
+      background: linear-gradient(135deg, #0E7A30, #15913A);
+      color: #fff; border-radius: var(--radius); padding: 2rem 1.9rem;
+      box-shadow: 0 6px 24px rgba(14,122,48,.18); margin-bottom: 1.25rem;
     }
-    .verdict-eligible { background: linear-gradient(135deg,#e8f5e9,#c8e6c9); border: 1px solid #a5d6a7; }
-    .verdict-flagged  { background: linear-gradient(135deg,#fffde7,#fff9c4); border: 1px solid #fff176; }
-    .verdict-hard_no  { background: linear-gradient(135deg,#fce4ec,#f8bbd0); border: 1px solid #f48fb1; }
+    .result-hero .rlbl { font-size: .85rem; font-weight: 600; opacity: .85; letter-spacing: .01em; }
+    .result-hero .rnum { font-size: 2.3rem; font-weight: 800; letter-spacing: -.02em; margin: .35rem 0 .15rem; line-height: 1.05; }
+    .result-hero .rsub { font-size: 1rem; font-weight: 500; opacity: .92; }
+    .result-hero .rchip { display: inline-block; margin-top: .9rem; font-size: .74rem; font-weight: 600; background: rgba(255,255,255,.18); padding: .25rem .7rem; border-radius: 999px; }
+    .worth-box { background: #F3FAF5; border: 1px solid #CDEBD5; border-radius: 10px; padding: .9rem 1.1rem; font-size: .95rem; margin-top: 1rem; color: #2c3742; }
+    .worth-box b { color: #0E7A30; }
+
+    /* ── Moves (value-first 3-card section) ─────────────────────────────── */
+    .moves-h { font-size: 1.1rem; font-weight: 800; letter-spacing: -.01em; margin: 1.75rem 0 .9rem; }
+    .move { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.2rem 1.4rem; margin-bottom: 1rem; display: flex; gap: 1rem; align-items: flex-start; }
+    .move .ic { font-size: 1.4rem; line-height: 1.2; flex: 0 0 auto; }
+    .move .bd { font-size: .95rem; color: #2c3742; }
+    .move .bd b { color: var(--ink); }
+    .move .hl { color: var(--green); font-weight: 700; }
+    .cta-move { background: linear-gradient(135deg, #0E7A30, #15913A); color: #fff; }
+    .cta-move .bd { color: rgba(255,255,255,.95); }
+    .cta-move .bd b { color: #fff; }
+    .result-foot { margin: 1.5rem 0 2.5rem; font-size: .78rem; color: var(--muted); text-align: center; }
+    .result-foot a { color: var(--green-deep); text-decoration: underline; }
+
+    /* ── Legacy: out-of-scope + map overlay  ────────────────────────────── */
+    .verdict-card { border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.25rem; box-shadow: var(--shadow); }
     .verdict-out-of-scope { background: linear-gradient(135deg,#fffde7,#fff9c4); border: 1px solid #fff176; }
-
-    .verdict-badge {
-      display: inline-flex; align-items: center; gap: .4rem;
-      padding: .25rem .7rem; border-radius: 999px;
-      font-size: .9rem; font-weight: 600; margin-bottom: .75rem;
-    }
-    .badge-eligible { background: var(--green); color: #fff; }
-    .badge-flagged  { background: #78350f; color: #fff; }
-    .badge-hard_no  { background: #7f1d1d; color: #fff; }
-
-    .range-display {
-      font-size: 2.1rem; font-weight: 800; color: var(--green);
-      letter-spacing: -1px; line-height: 1.1; margin: .4rem 0;
-    }
-    .range-unit { font-size: 1rem; font-weight: 600; }
-    .range-label { font-size: .82rem; color: var(--muted); margin-bottom: .6rem; }
-
-    .badge-pill {
-      display: inline-block; padding: .2rem .6rem; border-radius: 4px;
-      font-size: .7rem; font-weight: 700; letter-spacing: .4px; margin-right: .35rem;
-    }
+    .verdict-badge { display: inline-flex; align-items: center; gap: .4rem; padding: .25rem .7rem; border-radius: 999px; font-size: .9rem; font-weight: 600; margin-bottom: .75rem; }
+    .badge-flagged { background: #78350f; color: #fff; }
+    .badge-pill { display: inline-block; padding: .2rem .6rem; border-radius: 4px; font-size: .7rem; font-weight: 700; letter-spacing: .4px; margin-right: .35rem; }
     .pill-tier { background: var(--ink); color: var(--green-bright); }
     .pill-meth { background: #E8F6EC; color: var(--green); }
     .pill-warn { background: #78350f; color: #fff; }
-
-    .verdict-disclaimer {
-      font-size: .71rem; color: var(--muted); margin-top: .8rem;
-      padding-top: .75rem; border-top: 1px solid rgba(0,0,0,.1); font-style: italic;
-    }
-    .verdict-summary { font-size: .86rem; color: var(--ink); margin: .4rem 0; }
 
     /* ── Map ──────────────────────────────────────────────────────────────── */
     .map-card { padding: 0; overflow: hidden; border-radius: var(--radius); margin-bottom: 1.25rem;
@@ -357,18 +353,19 @@
       <span style="font-size:.88rem;color:var(--muted);font-weight:600" id="result-title"></span>
     </div>
 
-    <!-- Verdict + Range -->
-    <div id="verdict-card" class="verdict-card verdict-eligible">
-      <div id="verdict-badge" class="verdict-badge badge-eligible"></div>
-      <div id="range-display" class="range-display"></div>
-      <div id="range-label" class="range-label"></div>
-      <div id="tier-row" style="margin:.35rem 0"></div>
-      <div id="verdict-summary" class="verdict-summary" style="display:none"></div>
-      <div class="verdict-disclaimer" id="disclaimer-text"></div>
+    <!-- Value-first hero card -->
+    <div id="result-hero" class="result-hero">
+      <div class="rlbl" id="result-lbl">Estimated carbon credits</div>
+      <div class="rnum" id="result-num"></div>
+      <div class="rsub" id="result-sub"></div>
+      <span class="rchip" id="result-chip">Indicative satellite screening — yours to make bankable</span>
+    </div>
+    <div id="worth-box" class="worth-box" style="display:none">
+      💰 <b>What that's worth:</b> <span id="worth-text"></span>
     </div>
 
     <!-- Map + annual loss chart -->
-    <div class="card map-card">
+    <div class="card map-card" style="margin-top:1.25rem">
       <div id="map"></div>
       <div class="loss-wrap" id="loss-wrap" style="display:none">
         <div class="loss-title">Annual forest loss — Hansen GFC-2022-v1.10</div>
@@ -377,23 +374,51 @@
       </div>
     </div>
 
-    <!-- Narrative -->
-    <div class="card">
-      <h2><span class="dot"></span>Indicative Assessment</h2>
-      <div class="narrative" id="narrative-text"></div>
-      <div class="sources" id="data-sources"></div>
+    <!-- Out-of-scope fallback (hidden by default) -->
+    <div id="oos-card" style="display:none" class="card">
+      <div id="oos-badge" class="verdict-badge badge-flagged" style="margin-bottom:.75rem">• Out of Scope</div>
+      <div id="oos-text" style="font-size:.9rem"></div>
     </div>
 
-    <!-- Carrot CTA -->
-    <div class="carrot-card">
-      <div class="carrot-text" id="carrot-text"></div>
+    <!-- Value-first 3-move section -->
+    <h2 class="moves-h" id="moves-heading" style="display:none">Here's how to lock that number in</h2>
+
+    <!-- Move 1: RKU/RKT -->
+    <div class="move" id="move-plan" style="display:none">
+      <div class="ic">📋</div>
+      <div class="bd">
+        <b>Upload your harvest plan (RKU/RKT)</b> — it <span class="hl">tightens your estimate</span>
+        and proves the project counts. This is what moves you from "opportunity" to "fundable."
+      </div>
     </div>
 
-    <!-- Report downloads (eligible only) -->
-    <div class="card" id="report-dl-card" style="display:none">
+    <!-- Move 2: Land check (flags as opportunities) -->
+    <div class="move" id="move-land" style="display:none">
+      <div class="ic">🗺️</div>
+      <div class="bd" id="move-land-text">
+        <b>We checked your land against the national forest map.</b>
+        <span id="move-land-detail"></span>
+      </div>
+    </div>
+
+    <!-- Move 3: CTA -->
+    <div class="move cta-move" id="move-cta" style="display:none">
+      <div class="ic">✅</div>
+      <div class="bd">
+        <b>Your next step.</b> A <b>180Climate Pre-Feasibility Study</b> turns this into a bankable,
+        verified number — with our team on the ground.
+        <div style="margin-top:.75rem">
+          <a href="mailto:info@180climate.net" style="color:#fff;font-weight:700;font-size:.95rem">
+            Talk to 180Climate → info@180climate.net</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Report downloads -->
+    <div class="card" id="report-dl-card" style="display:none;margin-top:1rem">
       <h2><span class="dot"></span>Download your report</h2>
       <p style="font-size:.88rem;color:var(--muted);margin-bottom:.85rem">
-        Range + IPCC Tier 1 + methodology + additionality + "Engage 180Climate" CTA.
+        Value-first PDF + DOCX — hero number, derivation, forest findings, CTA.
       </p>
       <div style="display:flex;gap:.75rem;flex-wrap:wrap">
         <button class="btn" onclick="downloadReport('pdf')">Download PDF</button>
@@ -402,20 +427,25 @@
       <div id="dl-status" style="font-size:.8rem;color:var(--muted);margin-top:.5rem"></div>
     </div>
 
-    <!-- Lead gate: full report -->
-    <div class="card lead-gate">
-      <h2>Get the detailed pre-feasibility report (PDF)</h2>
+    <!-- Lead gate -->
+    <div class="card lead-gate" id="lead-gate-card" style="display:none">
+      <h2>Get the full pre-feasibility report</h2>
       <p style="font-size:.88rem;color:var(--muted);margin-bottom:1rem">
-        Receive a PDF report covering eligibility analysis, methodology route, financial
-        model indicators, and next steps tailored to your concession.
+        Receive a PDF + DOCX with hero number, derivation, forest findings, and your next steps.
       </p>
       <div id="lead-company-row" class="form-row" style="display:none">
         <label>Company <span class="opt">(optional)</span></label>
         <input id="lead-company" type="text" placeholder="Your company name">
       </div>
       <div id="lead-error" class="error-msg" style="display:none"></div>
-      <button class="btn btn-full" id="btn-lead" onclick="submitLead()">Send me the full report →</button>
+      <button class="btn btn-full" id="btn-lead" onclick="submitLead()">Send me the report →</button>
     </div>
+
+    <!-- ONE footer disclaimer -->
+    <p class="result-foot" id="result-footer" style="display:none">
+      Indicative satellite screening, not a verified credit issuance or legal advice.
+      <a href="https://180climate.net/methodology" target="_blank">How this is calculated &amp; legal notes</a>
+    </p>
 
   </div><!-- /step-result -->
 
@@ -551,109 +581,76 @@ async function submitCarbon() {
   }
 }
 
-// ── Render result ──────────────────────────────────────────────────────────
+// ── Render result (value-first) ────────────────────────────────────────────
 function renderResult() {
   var r = _result;
   var ov = (r.map && r.map.loss_overlay) ? r.map.loss_overlay : {};
   var verdict = ov.verdict || 'eligible';
 
-  // Handle out-of-scope (classifier couldn't map to REDD/IFM/PEAT)
+  // ── Out-of-scope ──────────────────────────────────────────────────────────
   if (r.engine === 'out_of_scope' || r.verdict === 'out_of_scope') {
     document.getElementById('result-title').textContent = _cache.iup_name || 'Your concession';
-    document.getElementById('verdict-card').className = 'verdict-card verdict-out-of-scope';
-    document.getElementById('verdict-badge').className = 'verdict-badge badge-flagged';
-    document.getElementById('verdict-badge').textContent = '• Out of Scope';
-    document.getElementById('range-display').textContent = '';
-    document.getElementById('range-label').textContent = '';
-    document.getElementById('tier-row').innerHTML = '';
-    document.getElementById('verdict-summary').textContent = r.apology || '';
-    document.getElementById('verdict-summary').style.display = 'block';
-    // Show CTA
-    var ctaEl = document.getElementById('narrative-text');
-    if (ctaEl) {
-      ctaEl.innerHTML = '<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:1rem;margin-top:.75rem">'
-        + '<strong>Next step:</strong> ' + (r.cta || '') + '<br><br>'
-        + '<a href="mailto:' + (r.cta_email || 'info@180climate.net') + '" style="color:#15913A;font-weight:700">'
-        + (r.cta_email || 'info@180climate.net') + '</a>'
-        + (r.lead_captured ? '<br><span style="font-size:.8rem;color:var(--muted);margin-top:.5rem;display:block">✓ Your details have been recorded — we\'ll follow up.</span>' : '')
-        + '</div>';
-    }
+    document.getElementById('result-hero').style.background = 'linear-gradient(135deg,#78350f,#92400e)';
+    document.getElementById('result-lbl').textContent = 'Out of scope';
+    document.getElementById('result-num').textContent = '';
+    document.getElementById('result-sub').textContent = r.apology || '';
+    document.getElementById('result-chip').style.display = 'none';
+    document.getElementById('oos-card').style.display = 'block';
+    document.getElementById('oos-text').innerHTML =
+      '<strong>Next step:</strong> ' + (r.cta || '') + '<br><br>'
+      + '<a href="mailto:' + (r.cta_email || 'info@180climate.net') + '" style="color:#15913A;font-weight:700">'
+      + (r.cta_email || 'info@180climate.net') + '</a>'
+      + (r.lead_captured ? '<br><span style="font-size:.8rem;color:var(--muted);margin-top:.5rem;display:block">✓ Your details have been recorded — we\'ll follow up.</span>' : '');
+    document.getElementById('result-footer').style.display = 'block';
     return;
   }
 
-  // Result bar title
+  // ── Normal result ─────────────────────────────────────────────────────────
   document.getElementById('result-title').textContent = _cache.iup_name;
 
-  // Verdict card colour
-  var vc = document.getElementById('verdict-card');
-  vc.className = 'verdict-card verdict-' + verdict;
+  var hasRange = (ov.quantity_low_tco2e != null && ov.quantity_high_tco2e != null);
+  var isPeat   = (ov.baseline_class === 'peat');
 
-  // Verdict badge
-  var icons   = { eligible: '✓', flagged: '⚠', hard_no: '✕' };
-  var labels  = { eligible: 'Eligible', flagged: 'Flagged — Review Required', hard_no: 'Not Eligible' };
-  var badgeEl = document.getElementById('verdict-badge');
-  badgeEl.className = 'verdict-badge badge-' + verdict;
-  badgeEl.textContent = (icons[verdict] || '•') + ' ' + (labels[verdict] || r.verdict);
+  if (hasRange) {
+    document.getElementById('result-lbl').textContent =
+      'Estimated carbon credits · ' + (_cache.iup_name || 'your concession');
+    document.getElementById('result-num').textContent =
+      fmtN(ov.quantity_low_tco2e) + ' – ' + fmtN(ov.quantity_high_tco2e) + ' tCO₂e';
+    var perYrLow  = ov.quantity_low_per_yr_tco2e;
+    var perYrHigh = ov.quantity_high_per_yr_tco2e;
+    document.getElementById('result-sub').textContent =
+      'over a 30-year project'
+      + (perYrLow != null ? '  ·  ≈ ' + fmtN(perYrLow) + ' – ' + fmtN(perYrHigh) + ' tonnes per year' : '');
 
-  // Carbon range (eligible only)
-  var rangeEl = document.getElementById('range-display');
-  var rangeLblEl = document.getElementById('range-label');
-  if (ov.quantity_low_tco2e != null && ov.quantity_high_tco2e != null) {
-    rangeEl.innerHTML = fmtN(ov.quantity_low_tco2e)
-      + ' – ' + fmtN(ov.quantity_high_tco2e)
-      + ' <span class="range-unit">tCO2e</span>';
-    var isMixed = ov.classifier_category && verdict === 'flagged';
-    rangeLblEl.textContent = isMixed
-      ? 'Indicative avoided emissions · mineral stratum · project lifetime'
-      : 'Indicative avoided emissions · project lifetime';
+    // Worth box
+    var price = 8;
+    var loUsd = Math.round(ov.quantity_low_tco2e * price);
+    var hiUsd = Math.round(ov.quantity_high_tco2e * price);
+    function fmtM(n) { return n >= 1e6 ? 'US$' + Math.round(n/1e6) + 'M' : 'US$' + fmtN(n); }
+    document.getElementById('worth-text').textContent =
+      'at indicative voluntary-carbon prices (~US$' + price + '/tonne), roughly '
+      + fmtM(loUsd) + ' – ' + fmtM(hiUsd) + ' across the project. '
+      + '(Indicative market range, not a quote.)';
+    document.getElementById('worth-box').style.display = 'block';
+  } else if (isPeat) {
+    document.getElementById('result-hero').style.background = 'linear-gradient(135deg,#065F46,#059669)';
+    document.getElementById('result-lbl').textContent = 'Your land has a carbon pathway';
+    document.getElementById('result-num').textContent = 'Restoration project opportunity';
+    document.getElementById('result-sub').textContent =
+      'Peat rewetting / WRC may qualify — see move cards below';
   } else {
-    rangeEl.textContent = '';
-    rangeLblEl.textContent = '';
+    document.getElementById('result-lbl').textContent = 'Screening flag — review required';
+    document.getElementById('result-num').textContent = '';
+    document.getElementById('result-sub').textContent = r.summary || '';
+    document.getElementById('result-chip').style.display = 'none';
   }
 
-  // Tier + methodology pills — engine's MethodologyRoute, not client-side permit_type
-  var methPillClass = (ov.baseline_class === 'peat') ? 'pill-warn' : 'pill-meth';
-  var methLabel = (ov.baseline_class === 'peat')
-    ? 'no settled method'
-    : (ov.verra_family || (_cache.permit_type === 'HTI' ? 'APD (VM0009)' : 'IFM (VM0045 / VM0010)'));
-  var tierHtml = '<span class="badge-pill pill-tier">IPCC Tier 1</span>'
-    + '<span class="badge-pill ' + methPillClass + '">' + methLabel + '</span>';
-  // Forest condition badge (WO-AUTOROUTE-003)
-  if (ov.forest_condition) {
-    var fgLabels = {
-      'intact': 'Forest: intact',
-      'light_degradation': 'Forest: lightly degraded',
-      'heavy_degradation': 'Forest: heavily degraded',
-      'cleared': 'Forest: cleared — no baseline',
-      'unknown': 'Forest: unknown',
-    };
-    var fgClass = (ov.forest_gate_result === 'pass') ? 'pill-meth'
-                : (ov.forest_gate_result === 'fail') ? 'pill-warn' : 'pill-warn';
-    tierHtml += '<span class="badge-pill ' + fgClass + '">'
-      + (fgLabels[ov.forest_condition] || ('Forest: ' + ov.forest_condition)) + '</span>';
-  }
-  document.getElementById('tier-row').innerHTML = tierHtml;
-
-  // Summary / reasons for non-eligible
-  var sumEl = document.getElementById('verdict-summary');
-  if (verdict !== 'eligible' && r.summary) {
-    sumEl.textContent = r.summary;
-    sumEl.style.display = 'block';
-  } else {
-    sumEl.style.display = 'none';
-  }
-
-  // Disclaimer
-  document.getElementById('disclaimer-text').textContent =
-    (r.disclaimer && r.disclaimer.text) ? r.disclaimer.text : '';
-
-  // Map
+  // ── Map ────────────────────────────────────────────────────────────────────
   if (_map) { _map.remove(); _map = null; }
   _map = L.map('map');
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors', maxZoom: 18,
   }).addTo(_map);
-
   var bndry = r.map ? r.map.boundary_geojson : null;
   if (bndry) {
     if (bndry.type === 'Point') {
@@ -667,15 +664,12 @@ function renderResult() {
       _map.fitBounds(layer.getBounds(), { padding: [30, 30] });
     }
   }
-
-  // Map legend: loss summary
   if (ov.data) {
     var winYears = Object.keys(ov.data).filter(function(y) {
       var yr = parseInt(y, 10); return yr >= 2016 && yr <= 2022;
     });
     var winTotal = winYears.reduce(function(s, y) { return s + (ov.data[y] || 0); }, 0);
     var winAvg   = winYears.length ? winTotal / winYears.length : 0;
-
     var legend = L.control({ position: 'bottomright' });
     legend.onAdd = function() {
       var d = L.DomUtil.create('div');
@@ -690,25 +684,35 @@ function renderResult() {
     };
     legend.addTo(_map);
   }
-
-  // Annual loss chart
   renderLossChart(ov.data || null);
 
-  // Narrative
-  document.getElementById('narrative-text').innerHTML = md(r.narrative || '');
-  document.getElementById('carrot-text').textContent  = r.carrot || '';
-  document.getElementById('data-sources').textContent =
-    r.data_sources && r.data_sources.length
-      ? 'Sources: ' + r.data_sources.join(' · ')
-      : '';
+  // ── 3-move value section ───────────────────────────────────────────────────
+  document.getElementById('moves-heading').style.display = 'block';
+  document.getElementById('move-plan').style.display = 'flex';
+  document.getElementById('move-cta').style.display = 'flex';
 
-  // Show company field in lead form if user didn't provide one
-  document.getElementById('lead-company-row').style.display =
-    _cache.company ? 'none' : 'block';
+  // Land check move: surface flags as opportunities
+  var landDetail = '';
+  if (isPeat || ov.baseline_class === 'peat') {
+    landDetail = ' Peat areas on your land qualify for a <span class="hl">restoration project that can also pay</span> — nearly all your land has a credit pathway. You know this before spending a rupiah on a field study.';
+  } else if (ov.forest_condition === 'cleared') {
+    landDetail = ' We found that most of the area appears cleared — the carbon opportunity may depend on residual forest or forest regrowth. A field check is the upgrade.';
+  } else if (ov.forest_condition) {
+    var fgMap = { intact: 'mostly intact', light_degradation: 'lightly degraded', heavy_degradation: 'heavily degraded', unknown: 'satellite-visible' };
+    landDetail = ' Your forest appears <b>' + (fgMap[ov.forest_condition] || ov.forest_condition) + '</b> — the basis of your number. We caught any protected-zone overlaps for you before any field spend.';
+  } else {
+    landDetail = ' We checked your land against national forest maps. Any protected-zone overlaps have been identified.';
+  }
+  document.getElementById('move-land-detail').innerHTML = landDetail;
+  document.getElementById('move-land').style.display = 'flex';
 
-  // Show report download card only for eligible
-  var dlCard = document.getElementById('report-dl-card');
-  if (dlCard) dlCard.style.display = (verdict === 'eligible') ? 'block' : 'none';
+  // ── Report download + lead gate ────────────────────────────────────────────
+  document.getElementById('report-dl-card').style.display = hasRange ? 'block' : 'none';
+  document.getElementById('lead-gate-card').style.display = 'block';
+  document.getElementById('lead-company-row').style.display = _cache.company ? 'none' : 'block';
+
+  // ── Footer ─────────────────────────────────────────────────────────────────
+  document.getElementById('result-footer').style.display = 'block';
 }
 
 // ── Annual loss bar chart ──────────────────────────────────────────────────

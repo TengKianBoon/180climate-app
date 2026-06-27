@@ -128,10 +128,6 @@ class TestPdf:
         text = _pdf_text(generate_pdf(hti_eligible_data))
         assert "IPCC Tier 1" in text
 
-    def test_dominant_uncertainty_present(self, hti_eligible_data):
-        text = _pdf_text(generate_pdf(hti_eligible_data))
-        assert "dominant uncertainty" in text
-
     def test_engage_cta_present(self, hti_eligible_data):
         text = _pdf_text(generate_pdf(hti_eligible_data))
         assert "180Climate" in text
@@ -152,42 +148,47 @@ class TestPdf:
 
     def test_peat_flag_section_present(self, peat_data):
         text = _pdf_text(generate_pdf(peat_data))
-        assert "Peat Additionality Flag" in text
-        assert "regulatory" in text.lower() or "legal" in text.lower()
+        # Value-first: peat routes to "Peat Restoration Pathway" in why_qualifies
+        assert "Peat Restoration Pathway" in text
+        assert "legal" in text.lower() or "restoration" in text.lower()
 
     def test_peat_no_tonnage_in_report(self, peat_data):
         text = _pdf_text(generate_pdf(peat_data))
         assert "18,230,495" not in text
         assert "28,109,607" not in text
 
-    def test_quality_factors_present(self, hti_eligible_data):
+    def test_quality_cards_present(self, hti_eligible_data):
+        # Value-first: section is "How Strong Is Your Project"; labels are UPPERCASE
         text = _pdf_text(generate_pdf(hti_eligible_data))
-        assert "Quality Factors" in text
-        assert "Additionality" in text
-        assert "Permanence" in text
-        assert "Leakage" in text
+        assert "How Strong Is Your Project" in text
+        assert "additionality" in text.lower()
+        assert "permanence" in text.lower()
+        assert "leakage" in text.lower()
 
-    def test_forest_summary_present(self, hti_eligible_data):
+    def test_what_we_found_present(self, hti_eligible_data):
+        # Value-first: section is "What We Found on Your Land" (replaces Forest Data Summary)
         text = _pdf_text(generate_pdf(hti_eligible_data))
-        assert "Forest Data Summary" in text
-        assert "82.5" in text or "Baseline" in text
-
-    def test_narrative_present(self, hti_eligible_data):
-        text = _pdf_text(generate_pdf(hti_eligible_data))
-        assert "Assessment Narrative" in text
+        assert "What We Found" in text
+        assert "73,787" in text  # area_ha appears in the "What we found" bullet
 
     def test_data_sources_present(self, hti_eligible_data):
+        # Data sources rendered as a line (no longer a section header)
         text = _pdf_text(generate_pdf(hti_eligible_data))
-        assert "Data Sources" in text
-        assert "Hansen" in text
+        assert "Hansen" in text  # "GFW/Hansen GFC-2022-v1.10" is in data_sources
 
-    def test_new_cta_wording(self, hti_eligible_data):
+    def test_value_first_cta_present(self, hti_eligible_data):
+        # Value-first CTA: "bankable" + CTA contact
         text = _pdf_text(generate_pdf(hti_eligible_data))
-        assert "registry-grade" in text
-        # M3 wording: "accredited" replaced with "applicable Verra methodology family"
-        assert "applicable Verra methodology" in text
-        assert "subject to advisor confirmation" in text
-        assert "service fee" in text
+        assert "bankable" in text
+        assert "site visit" in text
+        assert "180climate.net" in text
+
+    def test_why_qualifies_adr_0009(self, hti_eligible_data):
+        # APD path should appear in "Why Your Forest Qualifies" section
+        text = _pdf_text(generate_pdf(hti_eligible_data))
+        assert "Why Your Forest Qualifies" in text
+        assert "APD" in text
+        assert "applicable Verra methodology" in text or "APD" in text
 
     def test_no_accredited_methodology_trust_risk(self, hti_eligible_data):
         text = _pdf_text(generate_pdf(hti_eligible_data))
@@ -234,11 +235,6 @@ class TestDocx:
         text = self._extract_text(result)
         assert "IPCC Tier 1" in text
 
-    def test_dominant_uncertainty_present(self, hti_eligible_data):
-        result = generate_docx(hti_eligible_data)
-        text = self._extract_text(result)
-        assert "dominant uncertainty" in text
-
     def test_engage_cta_present(self, hti_eligible_data):
         result = generate_docx(hti_eligible_data)
         text = self._extract_text(result)
@@ -257,8 +253,9 @@ class TestDocx:
     def test_peat_flag_section_present(self, peat_data):
         result = generate_docx(peat_data)
         text = self._extract_text(result)
-        assert "Peat Additionality Flag" in text
-        assert "regulatory" in text.lower() or "legal" in text.lower()
+        # Value-first: peat routes to "Peat Restoration Pathway" in why_qualifies
+        assert "Peat Restoration Pathway" in text
+        assert "legal" in text.lower() or "restoration" in text.lower()
 
     def test_peat_no_tonnage_in_report(self, peat_data):
         result = generate_docx(peat_data)
@@ -267,34 +264,36 @@ class TestDocx:
         assert "18,230,495" not in text
         assert "28,109,607" not in text
 
-    def test_quality_factors_present(self, hti_eligible_data):
+    def test_quality_cards_present(self, hti_eligible_data):
+        # Value-first: section "How Strong Is Your Project"; kv labels are title case
         result = generate_docx(hti_eligible_data)
         text = self._extract_text(result)
-        assert "Quality Factors" in text
+        assert "How Strong Is Your Project" in text
         assert "Additionality" in text
         assert "Permanence" in text
 
-    def test_forest_summary_present(self, hti_eligible_data):
+    def test_what_we_found_present(self, hti_eligible_data):
         result = generate_docx(hti_eligible_data)
         text = self._extract_text(result)
-        assert "Forest Data Summary" in text
-        assert "82.5" in text or "Baseline" in text
-
-    def test_narrative_present(self, hti_eligible_data):
-        result = generate_docx(hti_eligible_data)
-        text = self._extract_text(result)
-        assert "Assessment Narrative" in text
+        assert "What We Found" in text
+        assert "73,787" in text  # area_ha appears in "What we found" bullet
 
     def test_data_sources_present(self, hti_eligible_data):
         result = generate_docx(hti_eligible_data)
         text = self._extract_text(result)
-        assert "Data Sources" in text
         assert "Hansen" in text
 
-    def test_new_cta_wording(self, hti_eligible_data):
+    def test_value_first_cta_present(self, hti_eligible_data):
         result = generate_docx(hti_eligible_data)
         text = self._extract_text(result)
-        assert "registry-grade" in text
+        assert "bankable" in text
+        assert "180climate.net" in text
+
+    def test_why_qualifies_adr_0009(self, hti_eligible_data):
+        result = generate_docx(hti_eligible_data)
+        text = self._extract_text(result)
+        assert "Why Your Forest Qualifies" in text
+        assert "APD" in text
 
     def test_no_accredited_methodology_trust_risk(self, hti_eligible_data):
         result = generate_docx(hti_eligible_data)

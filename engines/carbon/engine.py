@@ -458,7 +458,7 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
 
     # ── Estimate ──────────────────────────────────────────────────────────────
     effective_area = boundary.area_ha if boundary.area_ha > 0 else 25_000.0
-    project_years = min(inp.permit_years_remaining, _MAX_CREDITING_YR)
+    project_years = _MAX_CREDITING_YR  # ADR-0017: fixed 30 yr for all methodologies
 
     # Baseline annual loss rate: 8-year recent average (2016–2023) as proxy.
     recent_years = [y for y in range(2016, 2024) if y in forest.annual_loss_ha]
@@ -730,12 +730,16 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
         note=f"Forest condition: {forest_gate.condition} (gate: {forest_gate.gate_result}); {origin_note}",
     )
 
+    low_per_yr = round(low / _MAX_CREDITING_YR, 0) if low is not None else None
+    high_per_yr = round(high / _MAX_CREDITING_YR, 0) if high is not None else None
     return CarbonEstimate(
         eligibility=eligibility,
         methodology=methodology,
         forest=forest,
         quantity_low_tco2e=low,
         quantity_high_tco2e=high,
+        quantity_low_per_yr_tco2e=low_per_yr,   # ADR-0017
+        quantity_high_per_yr_tco2e=high_per_yr,  # ADR-0017
         uncertainty=unc,
         quality=quality,
         classification=classification,
@@ -804,7 +808,7 @@ def run_mixed_stratification(
     forest_gate = _evaluate_forest_gate(boundary, forest)
     quality = _quality_factors(inp, methodology)
 
-    project_years = min(inp.permit_years_remaining, _MAX_CREDITING_YR)
+    project_years = _MAX_CREDITING_YR  # ADR-0017: fixed 30 yr for all methodologies
     recent_years = [y for y in range(2016, 2024) if y in forest.annual_loss_ha]
     if recent_years:
         avg_annual_loss_ha = (
@@ -899,12 +903,16 @@ def run_mixed_stratification(
         ),
     )
 
+    ml_per_yr = round(mineral_low / _MAX_CREDITING_YR, 0) if mineral_low is not None else None
+    mh_per_yr = round(mineral_high / _MAX_CREDITING_YR, 0) if mineral_high is not None else None
     return CarbonEstimate(
         eligibility=combined_eligibility,
         methodology=methodology,
         forest=forest,
         quantity_low_tco2e=mineral_low,
         quantity_high_tco2e=mineral_high,
+        quantity_low_per_yr_tco2e=ml_per_yr,   # ADR-0017
+        quantity_high_per_yr_tco2e=mh_per_yr,  # ADR-0017
         uncertainty=unc,
         quality=quality,
         classification=classification,

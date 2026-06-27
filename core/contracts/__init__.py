@@ -192,6 +192,8 @@ class CarbonEstimate(BaseModel):
     forest: ForestData
     quantity_low_tco2e: Optional[float]       # None for peat (ADR-0013: peat=flag, never a tonnage)
     quantity_high_tco2e: Optional[float]      # a RANGE for non-peat; None for peat
+    quantity_low_per_yr_tco2e: Optional[float] = None  # ADR-0017: quantity_low ÷ 30; None for peat
+    quantity_high_per_yr_tco2e: Optional[float] = None  # ADR-0017: quantity_high ÷ 30; None for peat
     uncertainty: str
     quality: QualityFactors
     classification: Optional[ProjectClassification] = None  # ADR-0013; None = not yet classified

@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 1994594.0,
-    "quantity_high_tco2e": 4234612.0,
+    "quantity_low_tco2e": 2991891.0,
+    "quantity_high_tco2e": 6351918.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "ADR-0016-M1 retry-1 re-baseline 2026-06-26 — IPCC default CV=0.30 (no ESA CCI); loss SEM≈0.009 (stub data, stable); sigma≈0.300; VCS buffer separate. Verdict flagged (IPCC default loud flag). Was: 1992050–4237520 (raw CV). Was (pre-ADR-0016): 2279952–3257074."
+    "freeze_note": "ADR-0017 re-baseline 2026-06-27 — project_years=30 fixed (was min(20,30)=20). IPCC default CV=0.30 (no ESA CCI). Was: 1994594–4234612 (20yr). Was (ADR-0016-M1 retry-1): IPCC default CV=0.30, loss SEM≈0.009."
   }
 }

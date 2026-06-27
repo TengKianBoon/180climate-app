@@ -1,6 +1,8 @@
-phase: P4 · Pre-launch — carbon engine COMPLETE. WO-DERIVE-001 DONE (CI green, 287 tests).
-active_wo: none · STOPPED for Cowork review of WO-DERIVE-001
-status: ADR-0014 derivation trace built (CalculationTrace in contracts, engine returns 4-tuple, 6 new golden tests — ADR-0014 invariant tested). Report restructured: "How derived" is now main body, narrative+uncertainty+disclaimer+data sources demoted to fine print. M3 wording applied: "accredited Verra methodology" → "applicable Verra methodology family (subject to advisor confirmation and Verra's evolving rules)"; SGD-12K separated from credit value; additionality caveat (genuine-harvest-intent + PIPPIB) added; VM0010 lead / VM0045 field-only labels confirmed. 287 tests green.
-last_commit: (pending this commit)
-next_step: Cowork reviews (derivation reproduces range, fine print last, M3 wording, no overclaims) -> CARBON DONE -> deploy items (PIPPIB snapshot, creds, Render, DNS) -> Gate L. EUDR = post-carbon (Gate E).
+phase: P4 · Pre-launch — CARBON ENGINE COMPLETE & DEFENSIBLE. Remaining = deploy-time (Gate L) + EUDR (post-carbon, Gate E).
+active_wo: WO-VALUEFIRST-001 COMPLETE — value-first report/UI overhaul + ADR-0017 (30yr fixed + per-year + indicative $). STOPPED for Cowork review.
+status: WO-VALUEFIRST-001 DONE. ADR-0017 (30yr fixed, per-year fields), golden re-baseline (HTI 20yr→30yr ~1.5×, HA/IFM 15yr→30yr ~2×), PDF+DOCX value-first rewrite (hero + why-qualifies + strengths + derivation + what-we-found + CTA, ZERO body disclaimers, ONE footer line), frontend result page rewritten (hero card + worth box + 3 move cards + flags-as-opportunities). 285 tests green.
+last_commit: (pending — see next commit)
+remaining_to_gate_L: deploy-time (John) per docs/deploy-runbook.md + docs/pre-launch-backlog.md — REAL maps (KHG + PIPPIB overlays + the NEW KLHK Penutupan Lahan plantation map + PIPPIB snapshot), SMTP/Sheets/ANTHROPIC creds, Render deploy, app.180climate.net DNS, Gate-P end-to-end test -> sign Gate L.
+eudr: DEFERRED to post-carbon (Gate E); corrected design locked in docs/eudr-design-v2.md.
+next_step: John drives the deploy-time list; Cowork supports + routes Gate-L/Gate-E evidence. Advisor does a final EUDR field-name/wording divergence check at Gate E.
 updated: 2026-06-26

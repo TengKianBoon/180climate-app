@@ -25,9 +25,9 @@
     "additionality_basis": "legal harvest right foregone"
   },
   "expected_range": {
-    "quantity_low_tco2e": 3049142.0,
-    "quantity_high_tco2e": 5392503.0,
+    "quantity_low_tco2e": 6098285.0,
+    "quantity_high_tco2e": 10785006.0,
     "ipcc_tier": "Tier 1",
-    "freeze_note": "ADR-0016-M1 re-baseline 2026-06-26 — IFM quadrature (CV_intensity≈0.2121, CV_TEF≈0.0345, sigma_IFM≈0.2149); VCS buffer separate. Range narrows slightly vs ADR-0015-C2 (buffer separation eliminates asymmetric cross-product inflation). Was: 2954441–5565666."
+    "freeze_note": "ADR-0017 re-baseline 2026-06-27 — project_years=30 fixed (was min(15,30)=15). IFM harvested_area=73787×(30/35)=63246ha (was 73787×(15/35)=31623ha → 2×). Was: 3049142–5392503 (15yr). Was (ADR-0016-M1): narrower range vs ADR-0015-C2."
   }
 }

@@ -1051,11 +1051,12 @@ def test_ha_ifm_formula_reconciliation():
     """ADR-0015-C2 / ADR-0016-M1: IFM estimate reconciles to the documented derivation.
 
     Formula (M1 quadrature + separate buffer):
-      harvested_area = 73,787 ha × min(1, 15/35) = 31,623 ha
+      harvested_area = 73,787 ha × min(1, 30/35) = 63,246 ha  [ADR-0017: 30yr fixed]
       central = harvested_area × EF_central (~175.45 tCO2/ha using Pearson midpoints)
       sigma_IFM = sqrt(CV_intensity^2 + CV_TEF^2) ≈ 0.2149
       net_low = central × (1−sigma) × (1−buf_high); net_high = central × (1+sigma) × (1−buf_low)
-    Frozen numbers: low=3,049,142; high=5,392,503 (ADR-0016-M1 re-baseline 2026-06-26).
+    Frozen numbers: low=6,098,285; high=10,785,006 (ADR-0017 re-baseline 2026-06-27, 30yr fixed).
+    Was: 3,049,142–5,392,503 (15yr, ADR-0016-M1 re-baseline 2026-06-26).
     DO NOT assert 'smaller' — IFM may equal or exceed old REDD estimate.
     Assert formula basis (n_entries=1, no density×loss_rate).
     """
