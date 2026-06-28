@@ -6,7 +6,7 @@ Reads SMTP credentials from environment variables:
   EMAIL_USE_SSL  (set to "true" for port-465 SMTP_SSL; default auto-detect by port)
   EMAIL_USER     (optional)
   EMAIL_PASSWORD (optional)
-  EMAIL_FROM     (default: noreply@180climate.net)
+  EMAIL_FROM     (default: john@180climate.net)
   OUTBOX_DIR     (optional — CI test hook; overrides the outbox write path)
 
 SSL mode selection (Hostinger):
@@ -102,7 +102,7 @@ def send_lead_email(
     use_ssl   = os.environ.get("EMAIL_USE_SSL", "").lower() == "true" or port == 465
     user      = os.environ.get("EMAIL_USER", "")
     password  = os.environ.get("EMAIL_PASSWORD", "")
-    from_addr = os.environ.get("EMAIL_FROM", "noreply@180climate.net")
+    from_addr = os.environ.get("EMAIL_FROM", "john@180climate.net")
 
     try:
         msg = MIMEMultipart()
