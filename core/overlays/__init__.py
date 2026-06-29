@@ -16,6 +16,10 @@ from core.overlays.pippib import query_pippib
 from core.overlays.worldcover import query_worldcover, WorldCoverResult
 from core.overlays.jrc_tmf import query_jrc_tmf, JRCTMFResult
 from core.overlays.klhk_plantation import query_klhk_plantation, PlantationOriginResult
+# EUDR triage adapters (ADR-0018, E3)
+from core.overlays.jrc_gfc2020 import query_jrc_gfc2020, JRCGFC2020Result
+from core.overlays.hansen_loss import query_hansen_loss, HansenLossResult
+from core.overlays.radd import query_radd, RADDResult
 
 __all__ = [
     "query_khg",
@@ -26,4 +30,11 @@ __all__ = [
     "JRCTMFResult",
     "query_klhk_plantation",
     "PlantationOriginResult",
+    # EUDR triage adapters (ADR-0018, E3)
+    "query_jrc_gfc2020",
+    "JRCGFC2020Result",
+    "query_hansen_loss",
+    "HansenLossResult",
+    "query_radd",
+    "RADDResult",
 ]

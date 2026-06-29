@@ -1,0 +1,5 @@
+{
+  "alert_after_cutoff": true,
+  "latest_alert_date": "2023-08-14",
+  "note": "CI fixture (loss_detected scenario): radar alerts post-cutoff"
+}

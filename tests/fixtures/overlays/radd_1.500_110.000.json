@@ -1,0 +1,5 @@
+{
+  "alert_after_cutoff": false,
+  "latest_alert_date": null,
+  "note": "CI fixture (inconclusive — no 2020 baseline): no radar alerts"
+}

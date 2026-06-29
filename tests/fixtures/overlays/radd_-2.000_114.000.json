@@ -1,0 +1,5 @@
+{
+  "alert_after_cutoff": false,
+  "latest_alert_date": null,
+  "note": "CI fixture (clear_in_screen scenario): no radar alerts post-cutoff"
+}
