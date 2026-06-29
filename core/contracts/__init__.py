@@ -1,5 +1,6 @@
 # core/contracts/__init__.py — the shared constitution. Change ONLY via ADR + Gate C.
 from __future__ import annotations
+from datetime import date
 from typing import Literal, Optional
 from pydantic import BaseModel, model_validator
 
@@ -199,16 +200,36 @@ class CarbonEstimate(BaseModel):
     classification: Optional[ProjectClassification] = None  # ADR-0013; None = not yet classified
     derivation: Optional[CalculationTrace] = None  # ADR-0014; None for peat/flagged-no-number
 
-# ---------- EUDR ----------
+# ---------- EUDR (ADR-0018: a triage & DDS-prep screen, NEVER a compliance verdict) ----------
+# Banned substrings — these legal-clearance phrases must NEVER appear in any EUDR model's
+# serialized output, enum value, field name, field default, label, or template. Enforced by
+# the contract-guard test (mirrors the carbon contract-guard hook). Free satellite detects
+# "no loss in screening", which is NOT a legal "compliant"/"deforestation-free" clearance;
+# the screen prepares a geolocation pack, it does not declare a DDS ready.
+EUDR_BANNED_SUBSTRINGS: tuple[str, ...] = (
+    "compliant",                       # also catches "non_compliant"
+    "deforestation-free",
+    "dds-ready",
+    "due diligence statement ready",
+)
+
 class Plot(BaseModel):
     plot_id: str
     geo: GeoInput
-    commodity: Literal["palm", "rubber", "timber", "cocoa", "coffee"]
+    # ADR-0018: the 5 Indonesia-relevant commodities; anything outside → "manual_review".
+    commodity: Literal["palm", "rubber", "timber", "cocoa", "coffee", "manual_review"]
     geometry_type: Literal["polygon", "point"]   # polygon required >4 ha; point allowed <=4 ha
 
 class EUDRInput(BaseModel):
     contact: ContactInfo
-    role: Literal["operator", "trader"]
+    # ADR-0018: only the first EU-market placer files the DDS (often the exporter's EU buyer);
+    # drives the "who files" explainer.
+    role: Literal["eu_first_placer", "downstream_operator", "non_eu_supplier"]
+    # ADR-0018: primary commodity; anything outside the 5 Indonesia-relevant → "manual_review".
+    commodity: Literal["palm", "rubber", "timber", "cocoa", "coffee", "manual_review"]
+    # ADR-0018: EU country-benchmark risk lookup — Indonesia = "standard". NEVER conflated
+    # with the per-plot satellite-triage risk (PlotVerdict.plot_satellite_risk).
+    country_benchmark_risk: Literal["low", "standard", "high"] = "standard"
     plots: list[Plot]
 
 class ChecklistItem(BaseModel):
@@ -216,21 +237,45 @@ class ChecklistItem(BaseModel):
     status: Literal["present", "missing", "attest"]
     note: str = ""
 
+class ReadinessItem(BaseModel):
+    """ADR-0018: readiness is CATEGORICAL per component — never a 0–100 score (false
+    precision + a litigation handle). One ✓/✗ item per get-ready component."""
+    component: str
+    status: Literal["complete", "incomplete"]
+    note: str = ""
+
 class PlotVerdict(BaseModel):
     plot_id: str
-    deforestation_free: bool                  # vs 31 Dec 2020
-    loss_after_2020_ha: float
+    # ADR-0018: free satellite detects *no loss in screening*, not legal "deforestation-free".
+    # `inconclusive` is first-class (cloud / <4 ha / agroforestry / radar noise / degradation
+    # invisible to free data); `geometry_invalid` when the plot geometry can't be assessed.
+    detection: Literal["clear_in_screen", "loss_detected", "inconclusive", "geometry_invalid"]
+    loss_after_2020_ha: float                 # vs 31 Dec 2020 cutoff
     commodity: str
     geometry_ok: bool
+    # ADR-0018: per-plot satellite-triage risk — a SEPARATE axis from country_benchmark_risk.
+    plot_satellite_risk: Literal["low", "high", "inconclusive"]
+    # ADR-0018: provenance stamp on every verdict (dataset versions + screening date).
+    datasets_version: str                     # e.g. "Hansen v1.11; JRC GFC2020; RADD 2026-06"
+    run_date: date
 
 class EUDRVerdict(BaseModel):
-    overall: Literal["compliant", "non_compliant", "needs_review"]
+    # ADR-0018: aggregate TRIAGE state — NOT a compliance verdict (no "compliant" string).
+    overall: Literal["clear_in_screen", "loss_detected", "review_needed"]
     plots: list[PlotVerdict]
-    indonesia_risk_tier: Literal["low", "standard", "high"]
+    # ADR-0018: EU country-benchmark risk (Indonesia → "standard"); a SEPARATE axis from the
+    # per-plot satellite risk carried on each PlotVerdict.
+    country_benchmark_risk: Literal["low", "standard", "high"] = "standard"
     legality_checklist: list[ChecklistItem]
-    dds_pack: dict                            # GeoJSON FeatureCollection, TRACES-aligned schema
-    readiness_score: int                      # 0-100
+    # ADR-0018 export naming: "geolocation pack for DDS preparation"
+    # (GeoJSON FeatureCollection, TRACES-aligned schema). NOT a finished DDS.
+    geolocation_pack: dict
+    # ADR-0018: categorical readiness — a list of ✓/✗ components, NO numeric score.
+    readiness: list[ReadinessItem]
     applicable_deadline: str                  # from config
+    # ADR-0018: provenance stamp.
+    datasets_version: str
+    run_date: date
 
 # ---------- Narrative ----------
 class NarrativeRequest(BaseModel):
