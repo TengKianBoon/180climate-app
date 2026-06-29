@@ -12,3 +12,4 @@ pypdf>=3.0
 gspread>=6.0
 google-auth>=2.0
 anthropic>=0.30
+pyshp>=2.3
