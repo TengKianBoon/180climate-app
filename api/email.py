@@ -1,29 +1,31 @@
 """api/email.py — Lead email delivery with DOCX attachment.
 
-Reads SMTP credentials from environment variables:
-  EMAIL_HOST     (default: unset → CI/dev fallback)
+Sends via (in priority order):
+  1. Brevo HTTPS API (port 443) when BREVO_API_KEY is set — works on Render free tier
+  2. smtplib SMTP when EMAIL_HOST is set — for non-Render envs
+  3. JSONL outbox (CI / dev mode) when neither is set
+
+Env vars:
+  BREVO_API_KEY  — Brevo transactional API key (preferred; port 443, Render-safe)
+  EMAIL_HOST     — SMTP host (fallback; blocked on Render free tier)
   EMAIL_PORT     (default: 587)
   EMAIL_USE_SSL  (set to "true" for port-465 SMTP_SSL; default auto-detect by port)
   EMAIL_USER     (optional)
   EMAIL_PASSWORD (optional)
-  EMAIL_FROM     (default: john@180climate.net)
+  EMAIL_FROM     (default: john@180climate.net — used by smtplib path only)
   OUTBOX_DIR     (optional — CI test hook; overrides the outbox write path)
-
-SSL mode selection (Hostinger):
-  port 465 → smtplib.SMTP_SSL  (implicit TLS at connect — set EMAIL_USE_SSL=true or port=465)
-  port 587 → smtplib.SMTP + starttls()  (STARTTLS — default)
-
-If EMAIL_HOST is not set, falls back to writing the email to
-  {OUTBOX_DIR}/outbox_emails.jsonl  (JSONL, one record per email)
-  coordination/evidence/outbox_emails.jsonl  (default when OUTBOX_DIR unset)
 
 Secrets MUST NOT appear in the repo (ADR-0004).
 """
 from __future__ import annotations
+import base64
+import html
 import json
 import logging
 import os
 import smtplib
+
+import httpx
 
 log = logging.getLogger(__name__)
 from datetime import datetime, timezone
@@ -35,6 +37,9 @@ from pathlib import Path
 from typing import Optional
 
 _TO = "info@180climate.net"
+_FROM_EMAIL = "john@180climate.net"
+_FROM_NAME = "180Climate"
+_BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 _COORD_EVIDENCE = Path(__file__).parent.parent / "coordination" / "evidence"
 
 
@@ -43,6 +48,29 @@ def _outbox_path() -> Path:
     base = Path(d) if d else _COORD_EVIDENCE
     base.mkdir(parents=True, exist_ok=True)
     return base / "outbox_emails.jsonl"
+
+
+def _write_outbox(
+    ts: str,
+    subject: str,
+    form_data: dict,
+    filename_base: str,
+    docx_bytes: Optional[bytes],
+    extra: Optional[dict] = None,
+) -> None:
+    record: dict = {
+        "ts": ts,
+        "subject": subject,
+        "to": _TO,
+        "form_data": form_data,
+        "attachment_filename": f"{filename_base}.docx" if docx_bytes else None,
+        "attachment_size": len(docx_bytes) if docx_bytes else 0,
+    }
+    if extra:
+        record.update(extra)
+    path = _outbox_path()
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def _build_body(form_data: dict) -> str:
@@ -71,6 +99,11 @@ def _build_body(form_data: dict) -> str:
     return "\n".join(lines)
 
 
+def _build_html_body(form_data: dict) -> str:
+    escaped = html.escape(_build_body(form_data))
+    return f'<pre style="font-family:monospace;font-size:13px">{escaped}</pre>'
+
+
 def send_lead_email(
     iup_name: str,
     filename_base: str,
@@ -79,29 +112,71 @@ def send_lead_email(
 ) -> bool:
     """Send lead notification to info@180climate.net with DOCX attached.
 
-    Returns True on success (SMTP) or logging (CI/dev fallback).
+    Returns True on success (Brevo / SMTP) or outbox-write (CI/dev fallback).
     """
     subject = f"{iup_name} — {filename_base}"
-    body = _build_body(form_data)
     ts = datetime.now(timezone.utc).isoformat()
+
+    brevo_key = os.environ.get("BREVO_API_KEY", "")
+    if brevo_key:
+        return _send_via_brevo(brevo_key, subject, form_data, filename_base, docx_bytes, ts)
 
     host = os.environ.get("EMAIL_HOST", "")
     if not host:
         log.info("EMAIL: EMAIL_HOST NOT SET -> outbox, NO email sent")
-        # CI / dev mode: write structured record to JSONL outbox
-        record = {
-            "ts": ts,
-            "subject": subject,
-            "to": _TO,
-            "form_data": form_data,
-            "attachment_filename": f"{filename_base}.docx" if docx_bytes else None,
-            "attachment_size": len(docx_bytes) if docx_bytes else 0,
-        }
-        path = _outbox_path()
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        _write_outbox(ts, subject, form_data, filename_base, docx_bytes)
         return True
 
+    return _send_via_smtp(host, subject, form_data, filename_base, docx_bytes, ts)
+
+
+def _send_via_brevo(
+    api_key: str,
+    subject: str,
+    form_data: dict,
+    filename_base: str,
+    docx_bytes: Optional[bytes],
+    ts: str,
+) -> bool:
+    payload: dict = {
+        "sender": {"name": _FROM_NAME, "email": _FROM_EMAIL},
+        "to": [{"email": _TO}],
+        "subject": subject,
+        "htmlContent": _build_html_body(form_data),
+    }
+    if docx_bytes:
+        payload["attachment"] = [
+            {
+                "name": f"{filename_base}.docx",
+                "content": base64.b64encode(docx_bytes).decode(),
+            }
+        ]
+    headers = {
+        "api-key": api_key,
+        "content-type": "application/json",
+        "accept": "application/json",
+    }
+    try:
+        resp = httpx.post(_BREVO_URL, json=payload, headers=headers, timeout=15.0)
+        if resp.status_code == 201:
+            log.info('EMAIL: SENT OK (Brevo) -> %s (subject="%s")', _TO, subject)
+            return True
+        log.error("EMAIL: BREVO ERROR: %s %s", resp.status_code, resp.text[:500])
+    except Exception as exc:
+        log.error("EMAIL: BREVO ERROR: %s", exc)
+    _write_outbox(ts, subject, form_data, filename_base, docx_bytes, {"_brevo_error": True})
+    return False
+
+
+def _send_via_smtp(
+    host: str,
+    subject: str,
+    form_data: dict,
+    filename_base: str,
+    docx_bytes: Optional[bytes],
+    ts: str,
+) -> bool:
+    body = _build_body(form_data)
     port      = int(os.environ.get("EMAIL_PORT", "587"))
     use_ssl   = os.environ.get("EMAIL_USE_SSL", "").lower() == "true" or port == 465
     user      = os.environ.get("EMAIL_USER", "")
@@ -130,13 +205,11 @@ def send_lead_email(
             msg.attach(part)
 
         if use_ssl:
-            # Port 465 — implicit TLS at connect (Hostinger SMTP_SSL)
             with smtplib.SMTP_SSL(host, port) as server:
                 if user and password:
                     server.login(user, password)
                 server.sendmail(from_addr, [_TO], msg.as_string())
         else:
-            # Port 587 — STARTTLS
             with smtplib.SMTP(host, port) as server:
                 server.ehlo()
                 server.starttls()
@@ -147,17 +220,5 @@ def send_lead_email(
         return True
     except Exception as exc:
         log.error("EMAIL: SMTP ERROR: %s", exc)
-        # Fallback: write failure record to outbox so no lead is silently lost
-        record = {
-            "ts": ts,
-            "subject": subject,
-            "to": _TO,
-            "form_data": form_data,
-            "attachment_filename": f"{filename_base}.docx" if docx_bytes else None,
-            "attachment_size": len(docx_bytes) if docx_bytes else 0,
-            "_smtp_error": str(exc),
-        }
-        path = _outbox_path()
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        _write_outbox(ts, subject, form_data, filename_base, docx_bytes, {"_smtp_error": str(exc)})
         return False

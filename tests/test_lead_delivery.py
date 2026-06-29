@@ -14,10 +14,13 @@ import json
 import os
 import shutil
 import tempfile
+from unittest.mock import MagicMock, patch
+import httpx
 import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
 
+from api.email import send_lead_email
 from api.main import app
 
 client = TestClient(app)
@@ -66,8 +69,9 @@ def ci_outbox(monkeypatch):
     """Redirect all outbox writes to a temp dir so tests are isolated."""
     d = tempfile.mkdtemp(prefix="180c_test_")
     monkeypatch.setenv("OUTBOX_DIR", d)
-    # Ensure SMTP / Sheets are off (CI mode)
+    # Ensure SMTP / Brevo / Sheets are off (CI mode)
     monkeypatch.delenv("EMAIL_HOST", raising=False)
+    monkeypatch.delenv("BREVO_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_SHEETS_ID", raising=False)
     yield Path(d)
     shutil.rmtree(d, ignore_errors=True)
@@ -160,10 +164,11 @@ class TestLeadEndpoint:
         assert r["attachment_size"] == 0
 
     def test_no_secrets_in_payload(self, ci_outbox):
-        """Outbox must not contain SMTP password or credential keys."""
+        """Outbox must not contain SMTP password, Brevo key, or credential keys."""
         client.post("/api/lead", json=_GOLDEN_LEAD)
         content = (ci_outbox / "outbox_emails.jsonl").read_text(encoding="utf-8")
         assert "EMAIL_PASSWORD" not in content
+        assert "BREVO_API_KEY" not in content
         assert "GOOGLE_CREDENTIALS_JSON" not in content
         assert "AKIA" not in content  # AWS key pattern
 
@@ -221,3 +226,88 @@ class TestReportEndpoint:
         cd = res.headers.get("content-disposition", "")
         assert "attachment" in cd
         assert ".pdf" in cd
+
+
+# ── Brevo HTTP API unit tests ──────────────────────────────────────────────────
+
+class TestBrevoEmail:
+    """Unit tests for the Brevo HTTPS API send path in send_lead_email.
+
+    Mocks httpx.post so no network calls are made. ci_outbox fixture (autouse)
+    sets OUTBOX_DIR and removes EMAIL_HOST / BREVO_API_KEY / GOOGLE_SHEETS_ID.
+    """
+
+    def test_brevo_201_sent_ok(self, ci_outbox, monkeypatch):
+        """HTTP 201 from Brevo → returns True, no outbox record written."""
+        monkeypatch.setenv("BREVO_API_KEY", "test-key-brevo-abc")
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 201
+        mock_resp.text = '{"messageId":"<abc@smtp-relay.mailin.fr>"}'
+
+        with patch("api.email.httpx.post", return_value=mock_resp) as mock_post:
+            result = send_lead_email("PT Brevo Test", "2606291200", {"name": "Alice"}, b"docxdata")
+
+        assert result is True
+        mock_post.assert_called_once()
+        # Key must be in headers, never in the JSON payload body
+        call_headers = mock_post.call_args.kwargs.get("headers", {})
+        assert call_headers.get("api-key") == "test-key-brevo-abc"
+        # No outbox record on success
+        outbox = ci_outbox / "outbox_emails.jsonl"
+        assert not outbox.exists() or _read_jsonl(outbox) == []
+
+    def test_brevo_4xx_writes_outbox(self, ci_outbox, monkeypatch):
+        """Non-201 from Brevo → returns False, outbox record written (lead not lost)."""
+        monkeypatch.setenv("BREVO_API_KEY", "test-key-brevo-abc")
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 401
+        mock_resp.text = '{"code":"unauthorized","message":"Key not found"}'
+
+        with patch("api.email.httpx.post", return_value=mock_resp):
+            result = send_lead_email("PT Brevo Test", "2606291200", {"name": "Alice"}, b"docxdata")
+
+        assert result is False
+        records = _read_jsonl(ci_outbox / "outbox_emails.jsonl")
+        assert len(records) == 1
+        r = records[0]
+        assert r["_brevo_error"] is True
+        assert "PT Brevo Test" in r["subject"]
+
+    def test_brevo_network_exception_writes_outbox(self, ci_outbox, monkeypatch):
+        """httpx exception (network down) → returns False, outbox record written."""
+        monkeypatch.setenv("BREVO_API_KEY", "test-key-brevo-abc")
+
+        with patch("api.email.httpx.post", side_effect=httpx.ConnectError("timeout")):
+            result = send_lead_email("PT Brevo Test", "2606291200", {"name": "Alice"})
+
+        assert result is False
+        records = _read_jsonl(ci_outbox / "outbox_emails.jsonl")
+        assert len(records) == 1
+        assert records[0]["_brevo_error"] is True
+
+    def test_no_brevo_key_falls_back_to_outbox(self, ci_outbox, monkeypatch):
+        """No BREVO_API_KEY and no EMAIL_HOST → outbox written, returns True."""
+        # ci_outbox already removed BREVO_API_KEY and EMAIL_HOST
+        result = send_lead_email("PT Fallback Test", "2606291300", {"name": "Bob"})
+
+        assert result is True
+        records = _read_jsonl(ci_outbox / "outbox_emails.jsonl")
+        assert len(records) == 1
+        assert "_brevo_error" not in records[0]
+
+    def test_brevo_key_never_in_outbox(self, ci_outbox, monkeypatch):
+        """Brevo API key must never appear in outbox records on error."""
+        monkeypatch.setenv("BREVO_API_KEY", "SECRET-brevo-key-xyz")
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        mock_resp.text = "Internal Server Error"
+
+        with patch("api.email.httpx.post", return_value=mock_resp):
+            send_lead_email("PT Secret Test", "2606291400", {"name": "Carol"})
+
+        content = (ci_outbox / "outbox_emails.jsonl").read_text(encoding="utf-8")
+        assert "SECRET-brevo-key-xyz" not in content
+        assert "BREVO_API_KEY" not in content
