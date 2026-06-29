@@ -109,4 +109,4 @@ action: "Fix the geometry and re-submit for screening."
 ---
 
 ## Commit
-(pending push)
+`2b6658c` — pushed to `main` — `feat(eudr): EUDR API endpoint + value-first per-plot blocker table (WO-EUDR-BLOCKER-004, E4)`
