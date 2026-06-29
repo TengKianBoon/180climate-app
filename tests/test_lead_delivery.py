@@ -100,17 +100,15 @@ class TestLeadEndpoint:
         assert len(records) == 1
         r = records[0]
         assert "PT Hutan Lestari Test" in r["subject"]
-        assert r["to"] == "info@180climate.net"
+        # recipient is LEAD_RECIPIENT_EMAIL default
+        assert r["to"] == "leoniches@gmail.com"
 
     def test_email_subject_format(self, ci_outbox):
-        """Subject must be '{concession} — {filename}'."""
+        """Subject must be 'New 180Climate lead — {name} · {concession}'."""
         client.post("/api/lead", json=_GOLDEN_LEAD)
         r = _read_jsonl(ci_outbox / "outbox_emails.jsonl")[0]
-        # filename_base is YYMMDDHHMM (10 digits)
-        parts = r["subject"].split(" — ")
-        assert len(parts) == 2
-        assert parts[0] == "PT Hutan Lestari Test"
-        assert len(parts[1]) == 10 and parts[1].isdigit()
+        assert r["subject"].startswith("New 180Climate lead — Jane Smith")
+        assert "PT Hutan Lestari Test" in r["subject"]
 
     def test_email_form_fields_present(self, ci_outbox):
         """All required form fields must appear in the outbox record."""
@@ -125,12 +123,12 @@ class TestLeadEndpoint:
         assert fd["permit_type"] == "HTI"
         assert fd["project_type"] == "REDD"
 
-    def test_email_has_docx_attachment(self, ci_outbox):
-        """DOCX must be generated and reported in outbox (geo provided)."""
+    def test_email_has_pdf_attachment(self, ci_outbox):
+        """PDF must be generated and reported in outbox (geo provided)."""
         client.post("/api/lead", json=_GOLDEN_LEAD)
         r = _read_jsonl(ci_outbox / "outbox_emails.jsonl")[0]
         assert r["attachment_filename"] is not None
-        assert r["attachment_filename"].endswith(".docx")
+        assert r["attachment_filename"].endswith(".pdf")
         assert r["attachment_size"] > 1000
 
     def test_sheet_outbox_written(self, ci_outbox):
@@ -147,7 +145,7 @@ class TestLeadEndpoint:
         assert "filename_base" in r
 
     def test_lead_without_geo_still_emails(self, ci_outbox):
-        """Lead without geo (minimal form) still sends email without DOCX."""
+        """Lead without geo (minimal form) still sends email without attachment."""
         minimal = {
             "name":  "Bob",
             "email": "bob@example.com",
@@ -160,7 +158,7 @@ class TestLeadEndpoint:
         records = _read_jsonl(ci_outbox / "outbox_emails.jsonl")
         assert len(records) == 1
         r = records[0]
-        assert r["attachment_filename"] is None  # no DOCX without geo
+        assert r["attachment_filename"] is None  # no attachment without geo
         assert r["attachment_size"] == 0
 
     def test_no_secrets_in_payload(self, ci_outbox):
@@ -193,19 +191,36 @@ class TestReportEndpoint:
         records = _read_jsonl(ci_outbox / "outbox_emails.jsonl")
         assert len(records) == 1
 
-    def test_report_email_has_docx_attachment(self, ci_outbox):
+    def test_report_email_has_pdf_attachment(self, ci_outbox):
+        """PDF download → email attaches the same PDF."""
         client.post("/api/report?fmt=pdf", json=_GOLDEN_CARBON_INPUT)
         r = _read_jsonl(ci_outbox / "outbox_emails.jsonl")[0]
-        assert r["attachment_filename"].endswith(".docx")
+        assert r["attachment_filename"].endswith(".pdf")
         assert r["attachment_size"] > 1000
 
-    def test_report_email_subject_format(self, ci_outbox):
+    def test_report_email_recipient(self, ci_outbox):
+        """Recipient must be LEAD_RECIPIENT_EMAIL default (leoniches@gmail.com)."""
         client.post("/api/report?fmt=pdf", json=_GOLDEN_CARBON_INPUT)
         r = _read_jsonl(ci_outbox / "outbox_emails.jsonl")[0]
-        parts = r["subject"].split(" — ")
-        assert len(parts) == 2
-        assert "PT Hutan Lestari Test" in parts[0]
-        assert len(parts[1]) == 10 and parts[1].isdigit()
+        assert r["to"] == "leoniches@gmail.com"
+
+    def test_report_email_subject_format(self, ci_outbox):
+        """Subject must be 'New 180Climate lead — {name} · {concession}'."""
+        client.post("/api/report?fmt=pdf", json=_GOLDEN_CARBON_INPUT)
+        r = _read_jsonl(ci_outbox / "outbox_emails.jsonl")[0]
+        assert r["subject"].startswith("New 180Climate lead — Jane Smith")
+        assert "PT Hutan Lestari Test" in r["subject"]
+
+    def test_report_email_body_has_carbon_fields(self, ci_outbox):
+        """Email form_data must include verdict and carbon range (per-year)."""
+        client.post("/api/report?fmt=pdf", json=_GOLDEN_CARBON_INPUT)
+        r = _read_jsonl(ci_outbox / "outbox_emails.jsonl")[0]
+        fd = r["form_data"]
+        assert "verdict" in fd
+        assert "quantity_low_tco2e" in fd
+        assert "quantity_high_tco2e" in fd
+        assert "quantity_low_per_yr_tco2e" in fd
+        assert "quantity_high_per_yr_tco2e" in fd
 
     def test_report_sheet_written(self, ci_outbox):
         client.post("/api/report?fmt=pdf", json=_GOLDEN_CARBON_INPUT)

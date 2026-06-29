@@ -199,11 +199,6 @@
     }
     .carrot-card .carrot-text { font-size: .88rem; color: var(--green); line-height: 1.65; }
 
-    /* ── Lead gate ────────────────────────────────────────────────────────── */
-    .lead-gate { border: 2px solid var(--green); }
-    .lead-gate h2 { color: var(--green); }
-    .lead-gate .btn { width: 100%; text-align: center; margin-top: .35rem; }
-
     /* ── Done step ────────────────────────────────────────────────────────── */
     .done-card { text-align: center; padding: 2.5rem 1.5rem; }
     .done-icon { font-size: 3rem; margin-bottom: 1rem; }
@@ -418,20 +413,6 @@
         <button class="btn" onclick="downloadReport('pdf')">Download PDF</button>
       </div>
       <div id="dl-status" style="font-size:.8rem;color:var(--muted);margin-top:.5rem"></div>
-    </div>
-
-    <!-- Lead gate -->
-    <div class="card lead-gate" id="lead-gate-card" style="display:none">
-      <h2>Get the full pre-feasibility report</h2>
-      <p style="font-size:.88rem;color:var(--muted);margin-bottom:1rem">
-        Receive a PDF report with hero number, derivation, forest findings, and your next steps.
-      </p>
-      <div id="lead-company-row" class="form-row" style="display:none">
-        <label>Company <span class="opt">(optional)</span></label>
-        <input id="lead-company" type="text" placeholder="Your company name">
-      </div>
-      <div id="lead-error" class="error-msg" style="display:none"></div>
-      <button class="btn btn-full" id="btn-lead" onclick="submitLead()">Send me the report →</button>
     </div>
 
     <!-- ONE footer disclaimer -->
@@ -699,10 +680,8 @@ function renderResult() {
   document.getElementById('move-land-detail').innerHTML = landDetail;
   document.getElementById('move-land').style.display = 'flex';
 
-  // ── Report download + lead gate ────────────────────────────────────────────
+  // ── Report download ────────────────────────────────────────────────────────
   document.getElementById('report-dl-card').style.display = hasRange ? 'block' : 'none';
-  document.getElementById('lead-gate-card').style.display = 'block';
-  document.getElementById('lead-company-row').style.display = _cache.company ? 'none' : 'block';
 
   // ── Footer ─────────────────────────────────────────────────────────────────
   document.getElementById('result-footer').style.display = 'block';
@@ -784,43 +763,6 @@ async function downloadReport(fmt) {
   }
 }
 
-// ── Submit lead (full report gate) ─────────────────────────────────────────
-async function submitLead() {
-  var errEl = document.getElementById('lead-error');
-  errEl.style.display = 'none';
-  var btn = document.getElementById('btn-lead');
-  btn.disabled = true; btn.textContent = 'Sending…';
-
-  try {
-    var company = _cache.company
-      || document.getElementById('lead-company').value.trim();
-    var body = {
-      name:    _cache.name,
-      email:   _cache.email,
-      mobile:  _cache.mobile || '',
-      company: company,
-      iup_name:             _cache.iup_name,
-      iup_address:          _cache.iup_address,
-      permit_type:          _cache.permit_type,
-      permit_years_remaining: _cache.permit_years_remaining,
-      project_type:         _cache.project_type,
-      payload_summary:      _result ? _result.summary : '',
-      geo:                  _cache.geo,
-    };
-    var res = await fetch('/api/lead', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error('Could not submit — please email info@180climate.net directly.');
-    document.getElementById('confirm-email').textContent = _cache.email;
-    showStep('step-done');
-  } catch(e) {
-    errEl.textContent = e.message; errEl.style.display = 'block';
-  } finally {
-    btn.disabled = false; btn.textContent = 'Send me the full report →';
-  }
-}
 </script>
 </body>
 </html>

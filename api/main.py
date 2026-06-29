@@ -149,6 +149,7 @@ def _build_form_data(
     ts: str,
     payload_summary: str,
 ) -> dict:
+    has_range = estimate.quantity_low_tco2e is not None
     return {
         "timestamp": ts,
         "name":    inp.contact.name,
@@ -163,15 +164,17 @@ def _build_form_data(
         "area_ha": round(boundary.area_ha, 1),
         "geometry_summary": _geometry_summary(boundary),
         "verdict": estimate.eligibility.verdict,
-        "quantity_low_tco2e": estimate.quantity_low_tco2e,   # None for peat (ADR-0013)
-        "quantity_high_tco2e": estimate.quantity_high_tco2e,
+        "quantity_low_tco2e": estimate.quantity_low_tco2e if has_range else None,
+        "quantity_high_tco2e": estimate.quantity_high_tco2e if has_range else None,
+        "quantity_low_per_yr_tco2e": estimate.quantity_low_per_yr_tco2e if has_range else None,
+        "quantity_high_per_yr_tco2e": estimate.quantity_high_per_yr_tco2e if has_range else None,
         "payload_summary": payload_summary,
     }
 
 
 def _deliver(
     form_data: dict,
-    docx_bytes: bytes,
+    pdf_bytes: bytes,
     filename_base: str,
 ) -> None:
     """Fire-and-forget: email + Sheet append. Errors are logged, never raised."""
@@ -179,7 +182,7 @@ def _deliver(
         iup_name=form_data.get("iup_name", "Lead"),
         filename_base=filename_base,
         form_data=form_data,
-        docx_bytes=docx_bytes,
+        pdf_bytes=pdf_bytes,
     )
     row = {k: form_data.get(k, "") for k in [
         "timestamp", "iup_name", "name", "email", "mobile", "company",
@@ -467,7 +470,7 @@ class LeadRequest(BaseModel):
 def lead(req: LeadRequest) -> dict[str, Any]:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
 
-    docx_bytes: bytes | None = None
+    pdf_bytes: bytes | None = None
     filename_base = make_filename()
     form_data: dict = {
         "timestamp": ts,
@@ -525,11 +528,11 @@ def lead(req: LeadRequest) -> dict[str, Any]:
             )
             lead_narr = generate_narrative(lead_narr_req)
             rdata = _build_report_data(carbon_inp, boundary, estimate, filename_base, lead_narr.text, forest)
-            docx_bytes = generate_docx(rdata)
+            pdf_bytes = generate_pdf(rdata)
         except Exception:
-            pass  # best-effort DOCX; email still sent without attachment
+            pass  # best-effort PDF; email still sent without attachment
 
-    _deliver(form_data, docx_bytes or b"", filename_base)
+    _deliver(form_data, pdf_bytes or b"", filename_base)
     return {"status": "emailed", "timestamp": ts}
 
 
@@ -572,19 +575,17 @@ def report(
     form_data = _build_form_data(inp, boundary, estimate, ts, summary)
     form_data["filename_base"] = filename_base
 
-    # Always generate DOCX for the email attachment (regardless of download format)
-    docx_bytes = generate_docx(rdata)
-    _deliver(form_data, docx_bytes, filename_base)
-
     if fmt == "pdf":
         content = generate_pdf(rdata)
         media   = "application/pdf"
         fname   = f"{filename_base}.pdf"
+        _deliver(form_data, content, filename_base)
     else:
-        content = docx_bytes
+        content = generate_docx(rdata)
         media   = ("application/vnd.openxmlformats-officedocument"
                    ".wordprocessingml.document")
         fname   = f"{filename_base}.docx"
+        _deliver(form_data, content, filename_base)
 
     return Response(
         content=content,
