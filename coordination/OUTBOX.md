@@ -1,87 +1,74 @@
-# OUTBOX — Builder → Cowork · WO-BREVO-EMAIL-001 · 2026-06-29
+# OUTBOX — Builder → Cowork · WO-CRM-GMAIL-001 · 2026-06-29
 
-## Status: CI GREEN ✅ — STOPPED for Cowork review (297 tests passed, 5 new)
+## Status: CI GREEN ✅ — STOPPED for Cowork review (299 tests passed, 2 new)
 
 ---
 
-## Change — `api/email.py`
+## Frontend — `frontend/index.html`
 
-### New fallback order
+**Removed entirely:**
+- `.lead-gate` CSS block
+- `<div id="lead-gate-card">` — "Get the full pre-feasibility report" card with "Send me the report →" button
+- `document.getElementById('lead-gate-card').style.display = 'block'` JS line
+- `document.getElementById('lead-company-row').style.display = ...` JS line
+- `submitLead()` function (~36 lines)
 
-| Priority | Condition | Action |
+**Kept:** "Download your report — Download PDF" card (`report-dl-card`), which calls `/api/report?fmt=pdf`. That endpoint now both serves the PDF download to the visitor and emails John the PDF + lead details.
+
+---
+
+## Backend — `api/email.py`
+
+| Change | Before | After |
 |---|---|---|
-| 1 | `BREVO_API_KEY` set | POST to Brevo HTTPS API (port 443 — Render-safe) |
-| 2 | `EMAIL_HOST` set | smtplib SMTP (non-Render envs; unchanged behaviour) |
-| 3 | Neither | JSONL outbox (CI / dev mode; unchanged behaviour) |
+| Recipient | `"info@180climate.net"` (hardcoded) | `LEAD_RECIPIENT_EMAIL` env var (default `leoniches@gmail.com`) |
+| Subject | `"{iup_name} — {filename_base}"` | `"New 180Climate lead — {contact_name} · {iup_name}"` |
+| Attachment | `{filename_base}.docx` | `{filename_base}.pdf` (MIME: `application/pdf`) |
+| Body | Contact + concession fields | + verdict + lifetime tCO2e range + per-year range |
 
-### Brevo request
+`_recipient()` function reads `LEAD_RECIPIENT_EMAIL` at call time (not import time) so tests and prod can override via env.
 
+Enhanced `_build_body()`:
 ```
-POST https://api.brevo.com/v3/smtp/email
-Headers: api-key: <BREVO_API_KEY>  (key never logged)
-         content-type: application/json
-         accept: application/json
-
-Body:
-  sender:      {name: "180Climate", email: "john@180climate.net"}
-  to:          [{email: "info@180climate.net"}]
-  subject:     "{iup_name} — {filename_base}"
-  htmlContent: <lead details wrapped in <pre> with html.escape()>
-  attachment:  [{name: "<filename_base>.docx", content: "<base64>"}]  (omitted if no DOCX)
+=== Carbon screening ===
+Verdict:      eligible
+Range:        6,680,000 – 11,530,000 tCO2e (lifetime) | 222,667 – 384,333 tCO2e/yr
+Summary:      ...
 ```
 
-### Logging
+Brevo `htmlContent` carries the same enhanced body, `<pre>`-wrapped + html-escaped. Key never logged.
 
-| Branch | Log line |
-|---|---|
-| HTTP 201 | `INFO EMAIL: SENT OK (Brevo) -> info@180climate.net (subject="…")` |
-| Non-201 | `ERROR EMAIL: BREVO ERROR: <status> <body[:500]>` + outbox fallback |
-| Exception | `ERROR EMAIL: BREVO ERROR: <exc>` + outbox fallback |
-| No BREVO_API_KEY, no EMAIL_HOST | `INFO EMAIL: EMAIL_HOST NOT SET -> outbox, NO email sent` (unchanged) |
+---
 
-**BREVO_API_KEY is never logged.**
+## Backend — `api/main.py`
 
-### Refactors
-
-- Extracted `_write_outbox()` helper — eliminates 3 identical outbox-write blocks
-- Added `_build_html_body()` — wraps plain-text body in `<pre>` with `html.escape()` for Brevo `htmlContent`
-- Extracted `_send_via_brevo()` and `_send_via_smtp()` private helpers
-
-### What did NOT change
-
-- SMTP path: identical behaviour, identical log lines
-- Outbox fallback: identical JSONL format (same fields; Brevo/SMTP error adds `_brevo_error` or `_smtp_error` key)
-- `_build_body()` text body: unchanged (used by smtplib + as source for HTML)
-- `_TO = "info@180climate.net"`, `_FROM_EMAIL = "john@180climate.net"` unchanged
+- `_deliver()`: `docx_bytes` → `pdf_bytes` parameter
+- `_build_form_data()`: added `quantity_low_per_yr_tco2e` + `quantity_high_per_yr_tco2e` to form_data dict
+- `/api/report?fmt=pdf`: generates PDF once → serves to visitor AND attaches to lead email (no DOCX generated for this path)
+- `/api/report?fmt=docx`: generates DOCX once → serves to visitor AND attaches to lead email
+- `/api/lead`: generates PDF (not DOCX) when geo provided (endpoint still exists; no longer triggered from UI)
 
 ---
 
 ## Tests — `tests/test_lead_delivery.py`
 
-**5 new tests in `TestBrevoEmail` class:**
+**Updated assertions:**
+- `r["to"]` → `"leoniches@gmail.com"` (was `"info@180climate.net"`)
+- `r["attachment_filename"].endswith(".pdf")` (was `.docx`)
+- Subject checks → `"New 180Climate lead — Jane Smith"` prefix + IUP name in body
 
-| Test | What it verifies |
-|---|---|
-| `test_brevo_201_sent_ok` | Mock 201 → True, api-key in request header, no outbox written |
-| `test_brevo_4xx_writes_outbox` | Mock 401 → False, outbox record with `_brevo_error=True` |
-| `test_brevo_network_exception_writes_outbox` | `ConnectError` → False, outbox record |
-| `test_no_brevo_key_falls_back_to_outbox` | No key + no EMAIL_HOST → True, outbox record |
-| `test_brevo_key_never_in_outbox` | Mock 500 → key string absent from outbox JSON |
-
-All use `unittest.mock.patch("api.email.httpx.post", ...)` — no network calls in CI.
-
-**Updated:**
-- `ci_outbox` fixture now also `delenv("BREVO_API_KEY")` to prevent env bleed into pre-existing tests
-- `test_no_secrets_in_payload` now also asserts `"BREVO_API_KEY" not in content`
+**New tests:**
+- `test_report_email_recipient` — asserts `leoniches@gmail.com` on `/api/report?fmt=pdf`
+- `test_report_email_body_has_carbon_fields` — asserts verdict, tCO2e range, per-year in `form_data`
 
 ---
 
 ## Deploy instruction (for John)
 
-Set `BREVO_API_KEY` as an environment variable in the Render dashboard. Once set, all lead emails will route via Brevo HTTPS rather than SMTP. No code change needed.
+Set `LEAD_RECIPIENT_EMAIL=leoniches@gmail.com` in Render env vars (or omit — that's the default). Combined with `BREVO_API_KEY`, every "Download PDF" click will email `leoniches@gmail.com` with the PDF attached.
 
 ---
 
 ## Commit
 
-`f5f9370` — pushed to `main` — `feat(email): send via Brevo HTTPS API when BREVO_API_KEY set (WO-BREVO-EMAIL-001)`
+`b5ef639` — pushed to `main` — `feat(crm): PDF-to-Gmail on Download PDF; drop lead-gate box (WO-CRM-GMAIL-001)`
