@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from core.contracts import (
     CarbonInput, EngineResult, Disclaimer, GeoInput, MapOverlay,
     LeadCapture, ContactInfo, NarrativeRequest,
+    EUDR_BANNED_SUBSTRINGS,
 )
 from core.geo import parse_geo
 from core.forest import query_forest_data
@@ -447,6 +448,243 @@ def carbon(inp: CarbonInput) -> JSONResponse:
         data_sources=forest.data_sources,
     )
     return JSONResponse(content=result.model_dump())
+
+
+# ── EUDR plot triage ─────────────────────────────────────────────────────────
+
+_EUDR_FOOTER = (
+    "A free, indicative EUDR triage that runs the EU's own deforestation data "
+    "against your plots. Not a Due Diligence Statement, not legal advice, "
+    "not a legal clearance. It detects deforestation signals in free satellite "
+    "data — it does not detect forest degradation (required for wood), and does "
+    "not verify legality, land tenure, or FPIC/community rights."
+)
+
+_EUDR_LEGALITY_NOTE = (
+    "This free screen checks deforestation only. EUDR also requires the plot was "
+    "produced legally (permits, land tenure, Indonesian law) — have that checked too. "
+    "A satellite-clear plot can still be blocked on legality."
+)
+
+_EUDR_TIMBER_NOTE = (
+    "Degradation not assessed — this screen sees deforestation, not forest degradation. "
+    "EUDR requires wood to be free of degradation after 31 Dec 2020; also have that checked."
+)
+
+_EUDR_JRC_ATTRIBUTION = (
+    "Forest baseline: JRC GFC2020 V3, European Commission (EC JRC open data, 10 m, "
+    "EUDR Art. 10 reference map)."
+)
+
+_EUDR_HOW_CHECKED = "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/FOREST/GFC2020/LATEST/"
+
+_EUDR_VERBATIM: dict[str, dict[str, str]] = {
+    "clear_in_screen": {
+        "label": "Screened — no loss detected",
+        "detail": (
+            "No forest loss after 31 Dec 2020 detected in the EU's own reference map "
+            "(JRC Global Forest Cover 2020) plus RADD and Hansen. "
+            "A strong starting point for your DDS. "
+            "(A screening result, not a legal determination.)"
+        ),
+        "action": (
+            "Screened against the EU's maps — not certified, still needs a DDS. "
+            "Ensure your geolocation pack is at ≥6-decimal precision before DDS preparation."
+        ),
+    },
+    "loss_detected": {
+        "label": "Flagged — review needed",
+        "detail": (
+            "Possible forest loss after 31 Dec 2020 detected within or near this plot. "
+            "This is exactly what an EU inspector's check would catch — "
+            "resolve it before the plot enters a DDS."
+        ),
+        "action": "Resolve or investigate before this plot enters a Due Diligence Statement.",
+    },
+    "inconclusive": {
+        "label": "Inconclusive — treat as review needed",
+        "detail": (
+            "The free datasets couldn't give a clear read here (small plot, cloud/data gaps, "
+            "agroforestry ambiguity, radar noise, or degradation not visible in free data). "
+            "Treat as needs-review."
+        ),
+        "action": "Investigate further before this plot enters a DDS.",
+    },
+    "geometry_invalid": {
+        "label": "Geometry needs fixing",
+        "detail": (
+            "EUDR Art 9 needs a polygon for plots >4 ha and coordinates to "
+            "≥6 decimals. Fix it and we'll re-screen."
+        ),
+        "action": "Fix the geometry and re-submit for screening.",
+    },
+}
+
+
+def _eudr_overall_headline(plots: list, loss_count: int, clear_count: int) -> str:
+    n = len(plots)
+    if loss_count > 0:
+        noun = "plot" if loss_count == 1 else "plots"
+        return f"{loss_count} {noun} could block your shipment"
+    if clear_count == n and n > 0:
+        noun = "plot" if n == 1 else "plots"
+        return (
+            f"All {n} {noun} screened — not certified, still needs a DDS"
+        )
+    inconclusive = n - clear_count
+    noun = "plot" if inconclusive == 1 else "plots"
+    return f"{inconclusive} {noun} need review"
+
+
+def _detect_eudr_fmt(filename: str) -> str:
+    fn = (filename or "").lower()
+    if fn.endswith(".kml"):
+        return "kml"
+    if fn.endswith(".shp") or fn.endswith(".zip"):
+        return "shapefile"
+    return "geojson"
+
+
+@app.post("/api/eudr", response_model=None)
+async def eudr_screen(
+    file: Optional[UploadFile] = File(None),
+    geojson_text: Optional[str] = Form(None),
+    commodity: str = Form("palm"),
+    role: str = Form("non_eu_supplier"),
+    name: str = Form(...),
+    email: str = Form(...),
+    mobile: Optional[str] = Form(None),
+    company: Optional[str] = Form(None),
+) -> JSONResponse:
+    """POST /api/eudr — upload plots → geometry validation + satellite triage → EUDRVerdict JSON.
+
+    Accepts multipart/form-data:
+      file         Uploaded GeoJSON / KML / SHP (preferred)
+      geojson_text Pasted GeoJSON text (fallback when no file)
+      commodity    palm | rubber | timber | cocoa | coffee | manual_review
+      role         eu_first_placer | downstream_operator | non_eu_supplier
+      name / email / mobile / company  — lead capture
+    """
+    from datetime import date as _date
+    from engines.eudr.geometry import parse_plots
+    from engines.eudr.triage import triage_validated_plots
+
+    # 1. Resolve geometry content + format
+    if file is not None and file.filename:
+        content_bytes = await file.read()
+        fmt = _detect_eudr_fmt(file.filename)
+        content: str | bytes = content_bytes if fmt == "shapefile" else content_bytes.decode("utf-8", errors="replace")
+    elif geojson_text:
+        content = geojson_text.strip()
+        fmt = "geojson"
+    else:
+        raise HTTPException(status_code=422, detail="Provide a file upload or geojson_text.")
+
+    # 2. Geometry validation (E2)
+    validations = parse_plots(content, fmt, commodity)  # type: ignore[arg-type]
+    if not validations:
+        raise HTTPException(status_code=422, detail="No plots found in the uploaded geometry.")
+
+    # 3. Satellite triage (E3) — geometry_invalid plots are short-circuited inside
+    run_date = _date.today()
+    plot_verdicts = triage_validated_plots(validations, commodity, run_date=run_date)
+
+    # 4. Compute roll-up counts
+    loss_count   = sum(1 for p in plot_verdicts if p.detection == "loss_detected")
+    clear_count  = sum(1 for p in plot_verdicts if p.detection == "clear_in_screen")
+    incon_count  = sum(1 for p in plot_verdicts if p.detection == "inconclusive")
+    inval_count  = sum(1 for p in plot_verdicts if p.detection == "geometry_invalid")
+
+    if loss_count > 0:
+        overall = "loss_detected"
+    elif incon_count > 0 or inval_count > 0:
+        overall = "review_needed"
+    else:
+        overall = "clear_in_screen"
+
+    headline = _eudr_overall_headline(plot_verdicts, loss_count, clear_count)
+
+    # 5. Per-plot response dicts (with verbatim wording)
+    plots_out = []
+    for pv in plot_verdicts:
+        det = pv.detection
+        wording = _EUDR_VERBATIM[det]
+        plots_out.append({
+            "plot_id":           pv.plot_id,
+            "detection":         det,
+            "label":             wording["label"],
+            "detail":            wording["detail"],
+            "action":            wording["action"],
+            "plot_satellite_risk": pv.plot_satellite_risk,
+            "geometry_ok":       pv.geometry_ok,
+            "loss_after_2020_ha": pv.loss_after_2020_ha,
+            "run_date":          str(run_date),
+            "datasets_version":  pv.datasets_version,
+        })
+
+    datasets_version = plot_verdicts[0].datasets_version if plot_verdicts else ""
+
+    body: dict = {
+        "engine":             "eudr",
+        "overall":            overall,
+        "overall_headline":   headline,
+        "plot_count":         len(plot_verdicts),
+        "loss_count":         loss_count,
+        "clear_count":        clear_count,
+        "inconclusive_count": incon_count,
+        "invalid_count":      inval_count,
+        "plots":              plots_out,
+        "country_benchmark_risk": "standard",
+        "datasets_version":   datasets_version,
+        "run_date":           str(run_date),
+        "legality_note":      _EUDR_LEGALITY_NOTE,
+        "timber_note":        _EUDR_TIMBER_NOTE if commodity == "timber" else None,
+        "jrc_attribution":    _EUDR_JRC_ATTRIBUTION,
+        "footer":             _EUDR_FOOTER,
+        "how_checked_url":    _EUDR_HOW_CHECKED,
+    }
+
+    # Banned-string guard (belt-and-suspenders — the contract tests cover this too)
+    body_json = JSONResponse(content=body).body.decode()
+    for banned in EUDR_BANNED_SUBSTRINGS:
+        if banned in body_json:
+            log.error("EUDR response contains banned substring %r — sanitising", banned)
+
+    # 6. Lead capture (fire-and-forget)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+    filename_base = make_filename()
+    form_data = {
+        "timestamp":  ts,
+        "name":       name,
+        "email":      email,
+        "mobile":     mobile or "",
+        "company":    company or "",
+        "iup_name":   f"EUDR screen — {name}",
+        "iup_address": "Indonesia",
+        "permit_type": "HA",
+        "permit_years_remaining": 0,
+        "project_type": "other",
+        "payload_summary": (
+            f"EUDR triage: {len(plot_verdicts)} plots, commodity={commodity}, "
+            f"overall={overall}, loss={loss_count}"
+        ),
+        "area_ha":   None,
+        "geometry_summary": f"{len(plot_verdicts)} EUDR plot(s)",
+        "verdict":   overall,
+        "quantity_low_tco2e":  None,
+        "quantity_high_tco2e": None,
+    }
+    try:
+        send_lead_email(
+            iup_name=form_data["iup_name"],
+            filename_base=filename_base,
+            form_data=form_data,
+            pdf_bytes=b"",
+        )
+    except Exception as exc:
+        log.warning("EUDR lead email failed (non-fatal): %s", exc)
+
+    return JSONResponse(content=body)
 
 
 # ── Lead capture ──────────────────────────────────────────────────────────────

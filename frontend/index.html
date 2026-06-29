@@ -209,6 +209,92 @@
       padding: 1rem 1.25rem; font-size: .88rem; color: var(--green); line-height: 1.7;
     }
     .consent-note { font-size: .71rem; color: var(--muted); text-align: center; margin-top: -.5rem; margin-bottom: 1.5rem; }
+
+    /* ── Screen switcher nav ─────────────────────────────────────────────── */
+    .screen-nav {
+      background: var(--surface); border-bottom: 1px solid var(--line-soft);
+      display: flex; justify-content: center; gap: .5rem; padding: .6rem 1.25rem;
+    }
+    .screen-tab {
+      padding: .45rem 1.1rem; border: 1px solid var(--line); border-radius: 999px;
+      font-size: .82rem; font-weight: 600; color: var(--muted); background: #F7F9FB;
+      cursor: pointer; font-family: inherit; transition: all .15s;
+    }
+    .screen-tab.active { background: var(--green); color: #fff; border-color: var(--green); }
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── EUDR blocker table ──────────────────────────────────────────────── */
+    .eudr-hero-red {
+      background: linear-gradient(135deg, #7f1d1d, #991b1b);
+    }
+    .eudr-hero-amber {
+      background: linear-gradient(135deg, #78350f, #92400e);
+    }
+    .eudr-hero-clear {
+      /* Deliberately NOT the same green as the carbon 'all clear' — teal to signal caution */
+      background: linear-gradient(135deg, #065f46, #047857);
+    }
+    .eudr-hero-review {
+      background: linear-gradient(135deg, #1e3a5f, #1e40af);
+    }
+    .eudr-headline {
+      font-size: 1.55rem; font-weight: 800; letter-spacing: -.02em;
+      margin: .3rem 0 .15rem; line-height: 1.1;
+    }
+    .eudr-subline { font-size: .9rem; font-weight: 500; opacity: .9; }
+    .eudr-chip {
+      display: inline-block; margin-top: .85rem; font-size: .73rem; font-weight: 600;
+      background: rgba(255,255,255,.18); padding: .2rem .65rem; border-radius: 999px;
+    }
+
+    /* Per-plot rows */
+    .plot-table { margin: 1.25rem 0; display: flex; flex-direction: column; gap: .6rem; }
+    .plot-row {
+      border-radius: 10px; padding: 1rem 1.2rem;
+      border-left: 4px solid #ccc; background: #fafafa;
+    }
+    .plot-row.loss-detected {
+      border-left-color: #dc2626; background: #fef2f2;
+    }
+    .plot-row.inconclusive {
+      border-left-color: #d97706; background: #fffbeb;
+    }
+    .plot-row.clear-in-screen {
+      /* Muted teal — NOT the same as a 'certified compliant' green */
+      border-left-color: #0d9488; background: #f0fdfa;
+    }
+    .plot-row.geometry-invalid {
+      border-left-color: #6b7280; background: #f9fafb;
+    }
+    .plot-row-head {
+      display: flex; align-items: center; gap: .6rem; margin-bottom: .4rem;
+    }
+    .plot-icon { font-size: 1.15rem; flex: 0 0 auto; }
+    .plot-id { font-size: .82rem; font-weight: 700; color: var(--muted); }
+    .plot-label { font-size: .9rem; font-weight: 700; color: var(--ink); }
+    .plot-detail { font-size: .85rem; color: var(--muted); line-height: 1.55; margin-bottom: .3rem; }
+    .plot-action {
+      font-size: .8rem; font-weight: 600; color: #1e293b;
+      background: rgba(0,0,0,.04); border-radius: 6px;
+      padding: .35rem .65rem; margin-top: .4rem; display: inline-block;
+    }
+    .plot-meta { font-size: .72rem; color: #94a3b8; margin-top: .45rem; }
+
+    /* EUDR next-actions section */
+    .eudr-next-h { font-size: 1.05rem; font-weight: 800; margin: 1.5rem 0 .7rem; letter-spacing: -.01em; }
+    .eudr-note {
+      font-size: .85rem; color: #2c3742; line-height: 1.65;
+      background: #F3F5F8; border-radius: 8px; padding: .85rem 1rem; margin-bottom: .7rem;
+    }
+    .eudr-note strong { color: var(--ink); }
+    .eudr-note.warn { background: #FFFBEB; border-left: 3px solid #D97706; }
+    .eudr-attr { font-size: .72rem; color: var(--muted); margin-top: .3rem; }
+    .eudr-footer { margin: 1.5rem 0 2.5rem; font-size: .75rem; color: var(--muted); text-align: center; line-height: 1.6; }
+    .eudr-footer a { color: var(--green-deep); text-decoration: underline; }
+    .eudr-cta-move { background: linear-gradient(135deg, #0E7A30, #15913A); color: #fff; margin-top: .5rem; }
+    .eudr-cta-move .bd { color: rgba(255,255,255,.95); }
+    .eudr-cta-move .bd b { color: #fff; }
   </style>
 </head>
 <body>
@@ -216,9 +302,17 @@
 <div class="topbar"></div>
 <header>
   <img src="/brand/logo.png" alt="180Climate" class="logo-img">
-  <span class="header-tag">Carbon Pre-Feasibility Screening</span>
+  <span class="header-tag" id="header-tag-text">Carbon Pre-Feasibility Screening</span>
 </header>
 
+<!-- Screen switcher -->
+<nav class="screen-nav">
+  <button class="screen-tab active" onclick="switchScreen('carbon')">Carbon Screening</button>
+  <button class="screen-tab" onclick="switchScreen('eudr')">EUDR Plot Check</button>
+</nav>
+
+<!-- ══ Carbon screen (existing) ══════════════════════════════════════════════ -->
+<div id="screen-carbon" class="screen active">
 <div class="container">
 
   <!-- ══ Step 1: Input ══════════════════════════════════════════════════════ -->
@@ -441,6 +535,166 @@
   </div>
 
 </div><!-- /container -->
+</div><!-- /screen-carbon -->
+
+<!-- ══ EUDR screen (new) ═════════════════════════════════════════════════════ -->
+<div id="screen-eudr" class="screen">
+<div class="container">
+
+  <!-- ── EUDR Step 1: Intake ──────────────────────────────────────────────── -->
+  <div id="eudr-step-form" class="step active">
+
+    <div class="hero">
+      <h1>EUDR Plot Check</h1>
+      <p>Upload your plots — checked against the EU's own forest maps, free, in minutes.</p>
+    </div>
+
+    <!-- Contact -->
+    <div class="card">
+      <h2><span class="dot"></span>Your details<span class="hint">— to receive your result</span></h2>
+      <div class="grid2">
+        <div class="form-row">
+          <label>Name <span class="req">*</span></label>
+          <input id="eudr-name" type="text" placeholder="Jane Smith">
+        </div>
+        <div class="form-row">
+          <label>Email <span class="req">*</span></label>
+          <input id="eudr-email" type="email" placeholder="jane@example.com">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="form-row">
+          <label>Mobile (WhatsApp) <span class="opt">(optional)</span></label>
+          <input id="eudr-mobile" type="tel" placeholder="+62 811 ...">
+        </div>
+        <div class="form-row">
+          <label>Company <span class="opt">(optional)</span></label>
+          <input id="eudr-company" type="text" placeholder="Forestry Co.">
+        </div>
+      </div>
+    </div>
+
+    <!-- Commodity + role -->
+    <div class="card">
+      <h2><span class="dot"></span>What you grow and your EU role</h2>
+      <div class="grid2">
+        <div class="form-row">
+          <label>Commodity <span class="req">*</span></label>
+          <select id="eudr-commodity">
+            <option value="palm">Palm oil</option>
+            <option value="rubber">Rubber</option>
+            <option value="timber">Timber / wood</option>
+            <option value="cocoa">Cocoa</option>
+            <option value="coffee">Coffee</option>
+            <option value="manual_review">Other (manual review)</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Your role <span class="req">*</span></label>
+          <select id="eudr-role">
+            <option value="non_eu_supplier">Indonesian supplier / exporter</option>
+            <option value="eu_first_placer">EU first placer (your EU buyer)</option>
+            <option value="downstream_operator">Downstream operator / trader</option>
+          </select>
+        </div>
+      </div>
+      <div class="help" style="margin-top:-.2rem">
+        The DDS is filed by the <strong>EU company that first places the product on the EU market</strong>
+        — usually your EU buyer, not you. Your job is to provide the geolocation pack.
+      </div>
+    </div>
+
+    <!-- Plot upload -->
+    <div class="card">
+      <h2><span class="dot"></span>Upload your plots</h2>
+      <div class="tabs">
+        <div class="tab active" onclick="eudrSwitchTab('file')">Upload file</div>
+        <div class="tab" onclick="eudrSwitchTab('paste')">Paste GeoJSON</div>
+      </div>
+
+      <div id="eudr-tab-file" class="tab-content active">
+        <div class="form-row">
+          <input id="eudr-file" type="file" accept=".geojson,.json,.kml,.shp"
+            style="padding:.45rem .6rem;font-size:.88rem">
+          <div class="help">GeoJSON, KML, or SHP. Each feature = one plot. Coordinates must be in WGS-84 (EPSG:4326) to ≥6 decimal places (EUDR Art. 9).</div>
+        </div>
+      </div>
+
+      <div id="eudr-tab-paste" class="tab-content">
+        <div class="form-row">
+          <textarea id="eudr-geojson" rows="6"
+            placeholder='{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"id":"plot_1"},"geometry":{"type":"Polygon","coordinates":[[[117.123456,-0.654321],[117.223456,-0.654321],[117.223456,-0.754321],[117.123456,-0.754321],[117.123456,-0.654321]]]}}]}'></textarea>
+          <div class="help">Paste a GeoJSON Polygon, Feature, or FeatureCollection. Coordinates in [lon, lat] order. Use ≥6 decimal places.</div>
+        </div>
+      </div>
+
+      <div id="eudr-form-error" class="error-msg" style="display:none"></div>
+      <div style="margin-top:.75rem">
+        <button class="btn" id="eudr-btn-submit" onclick="submitEudr()">
+          Check my plots against the EU maps →
+        </button>
+      </div>
+    </div>
+
+    <p class="consent-note">
+      By submitting you agree to 180Climate using your details to follow up on this screening.
+    </p>
+  </div><!-- /eudr-step-form -->
+
+  <!-- ── EUDR Step 2: Results ──────────────────────────────────────────────── -->
+  <div id="eudr-step-result" class="step">
+
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <button class="btn btn-outline" onclick="eudrShowStep('eudr-step-form')">← New check</button>
+    </div>
+
+    <!-- Roll-up hero -->
+    <div id="eudr-hero" class="result-hero eudr-hero-review" style="margin-bottom:1rem">
+      <div class="rlbl">EUDR plot triage result</div>
+      <div class="eudr-headline" id="eudr-headline">Checking your plots…</div>
+      <div class="eudr-subline" id="eudr-subline"></div>
+      <span class="eudr-chip" id="eudr-chip">Checked against the EU's own forest maps (JRC GFC2020 + Hansen)</span>
+    </div>
+
+    <!-- Per-plot blocker table (the hero) -->
+    <div class="card">
+      <h2><span class="dot"></span>Your plots — red / amber / green
+        <span class="hint"> &nbsp;·&nbsp;
+          <a id="eudr-how-link" href="#" target="_blank" style="color:var(--muted);font-weight:400;font-size:.78rem">
+            how this is checked
+          </a>
+        </span>
+      </h2>
+      <div id="eudr-plot-table" class="plot-table"></div>
+    </div>
+
+    <!-- Next actions -->
+    <h2 class="eudr-next-h">What to do next</h2>
+
+    <div class="eudr-note warn" id="eudr-legality-note"></div>
+    <div class="eudr-note warn" id="eudr-timber-note" style="display:none"></div>
+
+    <div class="move eudr-cta-move">
+      <div class="ic">&#x1f91d;</div>
+      <div class="bd">
+        <b>180Climate prepares your DDS — and verifies flagged plots on the ground.</b>
+        DDS prep, legality verification, forest-degradation assessment, and EU TRACES submission.
+        <div style="margin-top:.75rem">
+          <a href="mailto:info@180climate.net" style="color:#fff;font-weight:700;font-size:.95rem">
+            Talk to 180Climate &rarr; info@180climate.net
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="eudr-attr" id="eudr-jrc-attr"></div>
+
+    <p class="eudr-footer" id="eudr-footer-text"></p>
+
+  </div><!-- /eudr-step-result -->
+
+</div><!-- /container -->
+</div><!-- /screen-eudr -->
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -724,6 +978,176 @@ function renderLossChart(data) {
     + '2016–2022 averaging window (avg ' + winAvg.toFixed(0) + ' ha/yr used in estimate)';
 
   wrap.style.display = 'block';
+}
+
+// ── Screen switcher ────────────────────────────────────────────────────────
+function switchScreen(which) {
+  ['carbon', 'eudr'].forEach(function(s) {
+    var scr = document.getElementById('screen-' + s);
+    if (scr) scr.classList.toggle('active', s === which);
+  });
+  document.querySelectorAll('.screen-tab').forEach(function(t, i) {
+    t.classList.toggle('active', (i === 0 && which === 'carbon') || (i === 1 && which === 'eudr'));
+  });
+  var tag = document.getElementById('header-tag-text');
+  if (tag) tag.textContent = which === 'eudr' ? 'EUDR Plot Check' : 'Carbon Pre-Feasibility Screening';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── EUDR state ─────────────────────────────────────────────────────────────
+var _eudrResult = null;
+var _eudrTab = 'file';
+
+function eudrSwitchTab(tab) {
+  _eudrTab = tab;
+  document.querySelectorAll('#eudr-step-form .tab').forEach(function(t) {
+    t.classList.toggle('active', t.textContent.toLowerCase().includes(tab === 'file' ? 'upload' : 'paste'));
+  });
+  document.getElementById('eudr-tab-file').classList.toggle('active', tab === 'file');
+  document.getElementById('eudr-tab-paste').classList.toggle('active', tab === 'paste');
+}
+
+function eudrShowStep(id) {
+  document.querySelectorAll('#screen-eudr .step').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Submit EUDR form ────────────────────────────────────────────────────────
+async function submitEudr() {
+  var errEl = document.getElementById('eudr-form-error');
+  errEl.style.display = 'none';
+  var btn = document.getElementById('eudr-btn-submit');
+  btn.disabled = true; btn.textContent = 'Checking against EU maps…';
+
+  try {
+    var name  = document.getElementById('eudr-name').value.trim();
+    var email = document.getElementById('eudr-email').value.trim();
+    if (!name)  throw new Error('Name is required.');
+    if (!email) throw new Error('Email is required.');
+
+    var commodity = document.getElementById('eudr-commodity').value;
+    var role      = document.getElementById('eudr-role').value;
+    var mobile    = document.getElementById('eudr-mobile').value.trim();
+    var company   = document.getElementById('eudr-company').value.trim();
+
+    var fd = new FormData();
+    fd.append('name',      name);
+    fd.append('email',     email);
+    fd.append('mobile',    mobile || '');
+    fd.append('company',   company || '');
+    fd.append('commodity', commodity);
+    fd.append('role',      role);
+
+    if (_eudrTab === 'file') {
+      var fileInput = document.getElementById('eudr-file');
+      if (!fileInput.files || !fileInput.files[0]) throw new Error('Please select a GeoJSON, KML, or SHP file.');
+      fd.append('file', fileInput.files[0]);
+    } else {
+      var txt = document.getElementById('eudr-geojson').value.trim();
+      if (!txt) throw new Error('Paste a GeoJSON Polygon or FeatureCollection.');
+      try { JSON.parse(txt); } catch(e) { throw new Error('Invalid JSON — please paste a valid GeoJSON object.'); }
+      fd.append('geojson_text', txt);
+    }
+
+    var res = await fetch('/api/eudr', { method: 'POST', body: fd });
+    if (!res.ok) {
+      var err = await res.json().catch(function() { return {}; });
+      throw new Error(err.detail || ('Error ' + res.status + ' — please try again.'));
+    }
+    _eudrResult = await res.json();
+    renderEudrResult();
+    eudrShowStep('eudr-step-result');
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Check my plots against the EU maps →';
+  }
+}
+
+// ── Render EUDR result (the blocker table) ─────────────────────────────────
+function renderEudrResult() {
+  var r = _eudrResult;
+
+  // ── Hero colour + headline ──────────────────────────────────────────────
+  var heroEl = document.getElementById('eudr-hero');
+  heroEl.className = 'result-hero';
+  if (r.overall === 'loss_detected') {
+    heroEl.classList.add('eudr-hero-red');
+  } else if (r.overall === 'review_needed') {
+    heroEl.classList.add('eudr-hero-amber');
+  } else {
+    // clear_in_screen — muted teal, NOT the same as carbon compliance green
+    heroEl.classList.add('eudr-hero-clear');
+  }
+
+  document.getElementById('eudr-headline').textContent = r.overall_headline || '';
+  document.getElementById('eudr-subline').textContent =
+    r.plot_count + ' plot' + (r.plot_count !== 1 ? 's' : '') + ' checked · run date ' + r.run_date;
+
+  // ── Per-plot blocker table ──────────────────────────────────────────────
+  var icons = {
+    'loss_detected':   '&#x274c;',   // red X
+    'inconclusive':    '&#x2753;',   // ?
+    'clear_in_screen': '&#x1f7e2;',  // green circle (but detail always carries DDS framing)
+    'geometry_invalid':'&#x1f6ab;',  // blocked
+  };
+  var cssClass = {
+    'loss_detected':   'loss-detected',
+    'inconclusive':    'inconclusive',
+    'clear_in_screen': 'clear-in-screen',
+    'geometry_invalid':'geometry-invalid',
+  };
+
+  var tableEl = document.getElementById('eudr-plot-table');
+  tableEl.innerHTML = (r.plots || []).map(function(p) {
+    var cls  = cssClass[p.detection] || '';
+    var icon = icons[p.detection]   || '&#x2022;';
+    var lossLine = (p.detection === 'loss_detected' && p.loss_after_2020_ha > 0)
+      ? '<span class="plot-meta">Est. loss: ' + p.loss_after_2020_ha.toFixed(1) + ' ha post-2020 · </span>'
+      : '';
+    return '<div class="plot-row ' + cls + '">'
+      + '<div class="plot-row-head">'
+      +   '<span class="plot-icon">' + icon + '</span>'
+      +   '<div>'
+      +     '<div class="plot-id">' + escHtml(p.plot_id) + '</div>'
+      +     '<div class="plot-label">' + escHtml(p.label) + '</div>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="plot-detail">' + escHtml(p.detail) + '</div>'
+      + '<div class="plot-action">' + escHtml(p.action) + '</div>'
+      + '<div class="plot-meta">'
+      +   lossLine
+      +   '<span>Screened: ' + p.run_date + '</span>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  // ── Next-action notes ───────────────────────────────────────────────────
+  document.getElementById('eudr-legality-note').innerHTML =
+    '<strong>Legality is a separate check:</strong> ' + escHtml(r.legality_note);
+
+  var timberEl = document.getElementById('eudr-timber-note');
+  if (r.timber_note) {
+    timberEl.innerHTML = '<strong>For timber:</strong> ' + escHtml(r.timber_note);
+    timberEl.style.display = 'block';
+  } else {
+    timberEl.style.display = 'none';
+  }
+
+  // ── Attribution + footer ────────────────────────────────────────────────
+  document.getElementById('eudr-jrc-attr').textContent = r.jrc_attribution || '';
+  document.getElementById('eudr-footer-text').innerHTML =
+    escHtml(r.footer || '') + '<br>'
+    + '<a href="' + (r.how_checked_url || '#') + '" target="_blank">How this is checked &amp; data sources</a>';
+
+  if (r.how_checked_url) {
+    document.getElementById('eudr-how-link').href = r.how_checked_url;
+  }
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // ── Download report ────────────────────────────────────────────────────────

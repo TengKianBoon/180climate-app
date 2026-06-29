@@ -1,8 +1,8 @@
-phase: P4 · Pre-launch — CARBON ENGINE COMPLETE & DEFENSIBLE. Remaining = deploy-time (Gate L) + EUDR (post-carbon, Gate E).
-active_wo: WO-VALUEFIRST-001 COMPLETE — value-first report/UI overhaul + ADR-0017 (30yr fixed + per-year + indicative $). STOPPED for Cowork review.
-status: WO-VALUEFIRST-001 DONE. ADR-0017 (30yr fixed, per-year fields), golden re-baseline (HTI 20yr→30yr ~1.5×, HA/IFM 15yr→30yr ~2×), PDF+DOCX value-first rewrite (hero + why-qualifies + strengths + derivation + what-we-found + CTA, ZERO body disclaimers, ONE footer line), frontend result page rewritten (hero card + worth box + 3 move cards + flags-as-opportunities). 285 tests green.
-last_commit: 5fb562c feat(value-first): ADR-0017 30yr fixed + value-first report/UI overhaul (WO-VALUEFIRST-001)
-remaining_to_gate_L: deploy-time (John) per docs/deploy-runbook.md + docs/pre-launch-backlog.md — REAL maps (KHG + PIPPIB overlays + the NEW KLHK Penutupan Lahan plantation map + PIPPIB snapshot), SMTP/Sheets/ANTHROPIC creds, Render deploy, app.180climate.net DNS, Gate-P end-to-end test -> sign Gate L.
-eudr: DEFERRED to post-carbon (Gate E); corrected design locked in docs/eudr-design-v2.md.
-next_step: John drives the deploy-time list; Cowork supports + routes Gate-L/Gate-E evidence. Advisor does a final EUDR field-name/wording divergence check at Gate E.
-updated: 2026-06-27
+phase: P4 · Pre-launch — CARBON ENGINE COMPLETE & DEFENSIBLE. EUDR blocker table (E4) DONE.
+active_wo: WO-EUDR-BLOCKER-004 (E4) DONE — STOPPED for Cowork review.
+status: WO-EUDR-BLOCKER-004 (E4) DONE. POST /api/eudr + value-first EUDR result page (per-plot blocker table). 384 tests green (+25 new). All render guards pass. API smoke: 2-plot mixed batch (loss_detected + clear_in_screen) → "1 plot could block your shipment". clear_in_screen headline "not certified, still needs a DDS". geometry_invalid detected. No banned strings. Brevo lead delivery reused. Frontend: screen-nav toggle Carbon / EUDR, EUDR intake (file upload + paste GeoJSON, commodity, role, contact), result page (hero + blocker table + next-actions + legality + timber notes + JRC attribution + footer disclaimer).
+last_commit: (pending)
+remaining_to_gate_L: deploy-time (John) per docs/deploy-runbook.md + docs/pre-launch-backlog.md — REAL maps (KHG + PIPPIB overlays + KLHK Penutupan Lahan plantation map + PIPPIB snapshot), SMTP/Sheets/ANTHROPIC creds, Render deploy, app.180climate.net DNS, Gate-P end-to-end test -> sign Gate L.
+eudr_status: E1 (contracts/ADR-0018) DONE; E2 (geometry validation) DONE; E3 (satellite triage) DONE; E4 (API + blocker table) DONE — STOPPED. E5–E7 (checklist/export/PDF) deferred.
+next_step: Cowork review of E4 blocker table; confirm RADD API key decision (FLAG-2 from E3); E5+ when ready.
+updated: 2026-06-30
