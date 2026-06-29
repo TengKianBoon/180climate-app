@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import date
 from typing import Literal, Optional
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, computed_field, model_validator
 
 # ---------- Shared ----------
 class ContactInfo(BaseModel):
@@ -252,9 +252,28 @@ class PlotVerdict(BaseModel):
     detection: Literal["clear_in_screen", "loss_detected", "inconclusive", "geometry_invalid"]
     loss_after_2020_ha: float                 # vs 31 Dec 2020 cutoff
     commodity: str
-    geometry_ok: bool
-    # ADR-0018: per-plot satellite-triage risk — a SEPARATE axis from country_benchmark_risk.
-    plot_satellite_risk: Literal["low", "high", "inconclusive"]
+    # ADR-0018 micro-amendment: geometry_ok and plot_satellite_risk are DERIVED from detection.
+    # detection is the single source of truth — no stored booleans or risk strings that can drift.
+    @computed_field
+    @property
+    def geometry_ok(self) -> bool:
+        """True iff detection != "geometry_invalid". Derived; cannot drift from detection."""
+        return self.detection != "geometry_invalid"
+
+    # ADR-0018 micro-amendment: plot_satellite_risk is DERIVED from detection.
+    # clear_in_screen→low, loss_detected→high, inconclusive→inconclusive, geometry_invalid→inconclusive.
+    # Separate axis from country_benchmark_risk (which stays on EUDRInput + EUDRVerdict).
+    @computed_field
+    @property
+    def plot_satellite_risk(self) -> Literal["low", "high", "inconclusive"]:
+        """Satellite-triage risk derived from detection. Separate from country_benchmark_risk."""
+        return {
+            "clear_in_screen": "low",
+            "loss_detected": "high",
+            "inconclusive": "inconclusive",
+            "geometry_invalid": "inconclusive",
+        }[self.detection]
+
     # ADR-0018: provenance stamp on every verdict (dataset versions + screening date).
     datasets_version: str                     # e.g. "Hansen v1.11; JRC GFC2020; RADD 2026-06"
     run_date: date

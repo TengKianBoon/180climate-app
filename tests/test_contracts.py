@@ -104,14 +104,13 @@ def _make_plot(plot_id: str = "P1", commodity: str = "palm") -> Plot:
     return Plot(plot_id=plot_id, geo=_GEO, commodity=commodity, geometry_type="polygon")
 
 
-def _make_plot_verdict(plot_id: str, detection: str, risk: str) -> PlotVerdict:
+def _make_plot_verdict(plot_id: str, detection: str) -> PlotVerdict:
+    """geometry_ok and plot_satellite_risk are computed from detection — not passed here."""
     return PlotVerdict(
         plot_id=plot_id,
         detection=detection,
         loss_after_2020_ha=0.0 if detection == "clear_in_screen" else 3.2,
         commodity="palm",
-        geometry_ok=detection != "geometry_invalid",
-        plot_satellite_risk=risk,
         datasets_version="Hansen v1.11; JRC GFC2020; RADD 2026-06",
         run_date=date(2026, 6, 29),
     )
@@ -120,10 +119,10 @@ def _make_plot_verdict(plot_id: str, detection: str, risk: str) -> PlotVerdict:
 def _make_eudr_verdict() -> EUDRVerdict:
     """A fully-populated verdict exercising every detection + risk value."""
     plots = [
-        _make_plot_verdict("P1", "clear_in_screen", "low"),
-        _make_plot_verdict("P2", "loss_detected", "high"),
-        _make_plot_verdict("P3", "inconclusive", "inconclusive"),
-        _make_plot_verdict("P4", "geometry_invalid", "inconclusive"),
+        _make_plot_verdict("P1", "clear_in_screen"),
+        _make_plot_verdict("P2", "loss_detected"),
+        _make_plot_verdict("P3", "inconclusive"),
+        _make_plot_verdict("P4", "geometry_invalid"),
     ]
     return EUDRVerdict(
         overall="review_needed",
@@ -164,16 +163,16 @@ def test_eudr_input_role_commodity_and_country_risk():
 
 def test_plot_verdict_uses_detection_enum_not_bool():
     """PlotVerdict.detection replaced the deforestation_free bool (ADR-0018)."""
-    pv = _make_plot_verdict("P1", "clear_in_screen", "low")
+    pv = _make_plot_verdict("P1", "clear_in_screen")
     assert pv.detection == "clear_in_screen"
     # The boolean clearance field must be gone — no legal "deforestation-free" verdict.
     assert not hasattr(pv, "deforestation_free")
     # detection is a first-class 4-state enum
     for det in ("clear_in_screen", "loss_detected", "inconclusive", "geometry_invalid"):
-        assert _make_plot_verdict("Px", det, "low").detection == det
+        assert _make_plot_verdict("Px", det).detection == det
     # rejects anything outside the enum
     with pytest.raises(Exception):
-        _make_plot_verdict("Pbad", "deforestation_free", "low")
+        _make_plot_verdict("Pbad", "deforestation_free")
 
 
 def test_eudr_readiness_is_categorical_no_numeric_score():
@@ -189,8 +188,10 @@ def test_eudr_country_and_plot_risk_are_distinct_fields():
     """country_benchmark_risk and plot_satellite_risk are separate, never conflated (ADR-0018)."""
     verdict = _make_eudr_verdict()
     assert "country_benchmark_risk" in EUDRVerdict.model_fields
-    assert "plot_satellite_risk" in PlotVerdict.model_fields
-    # Country risk lives on the verdict; satellite risk lives per-plot — different axes.
+    # plot_satellite_risk is now a computed field (ADR-0018 micro-amendment)
+    assert "plot_satellite_risk" in PlotVerdict.model_computed_fields
+    assert "plot_satellite_risk" not in PlotVerdict.model_fields
+    # Country risk on verdict; satellite risk derived per-plot — different axes.
     assert "plot_satellite_risk" not in EUDRVerdict.model_fields
     assert "country_benchmark_risk" not in PlotVerdict.model_fields
     assert verdict.country_benchmark_risk == "standard"
@@ -205,6 +206,44 @@ def test_eudr_provenance_stamp_present():
     for pv in verdict.plots:
         assert pv.datasets_version
         assert isinstance(pv.run_date, date)
+
+
+# ── ADR-0018 micro-amendments: computed geometry_ok + plot_satellite_risk ────────
+
+def test_geometry_ok_is_computed_from_detection():
+    """PlotVerdict.geometry_ok is a computed property derived from detection — not a stored field.
+    Drift between geometry_ok and detection is structurally impossible (ADR-0018 micro-amendment)."""
+    assert "geometry_ok" not in PlotVerdict.model_fields, (
+        "geometry_ok must be a computed property, not a stored field — it cannot drift from detection."
+    )
+    assert "geometry_ok" in PlotVerdict.model_computed_fields
+    for det in ("clear_in_screen", "loss_detected", "inconclusive"):
+        pv = _make_plot_verdict("Px", det)
+        assert pv.geometry_ok is True, f"Expected geometry_ok=True for detection={det!r}"
+    pv_inv = _make_plot_verdict("Pi", "geometry_invalid")
+    assert pv_inv.geometry_ok is False
+
+
+def test_plot_satellite_risk_is_derived_from_detection():
+    """PlotVerdict.plot_satellite_risk is a computed property — not a stored field.
+    Derivation: clear_in_screen→low, loss_detected→high, inconclusive→inconclusive,
+    geometry_invalid→inconclusive (ADR-0018 micro-amendment)."""
+    assert "plot_satellite_risk" not in PlotVerdict.model_fields, (
+        "plot_satellite_risk must be computed from detection — not stored (can't drift)."
+    )
+    assert "plot_satellite_risk" in PlotVerdict.model_computed_fields
+    expected = {
+        "clear_in_screen": "low",
+        "loss_detected": "high",
+        "inconclusive": "inconclusive",
+        "geometry_invalid": "inconclusive",
+    }
+    for det, expected_risk in expected.items():
+        pv = _make_plot_verdict("Px", det)
+        assert pv.plot_satellite_risk == expected_risk, (
+            f"detection={det!r} should yield plot_satellite_risk={expected_risk!r}, "
+            f"got {pv.plot_satellite_risk!r}"
+        )
 
 
 # ── Banned-string contract guard (mirrors the carbon contract-guard hook) ──────
