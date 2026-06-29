@@ -1,74 +1,60 @@
-# OUTBOX — Builder → Cowork · WO-CRM-GMAIL-001 · 2026-06-29
+# OUTBOX — Builder → Cowork · WO-EUDR-CONTRACTS-001 (E1) · 2026-06-29
 
-## Status: CI GREEN ✅ — STOPPED for Cowork review (299 tests passed, 2 new)
+## Status: CI GREEN ✅ — Reviewer PASS — STOPPED for Cowork review (306 tests passed, 7 new)
 
----
-
-## Frontend — `frontend/index.html`
-
-**Removed entirely:**
-- `.lead-gate` CSS block
-- `<div id="lead-gate-card">` — "Get the full pre-feasibility report" card with "Send me the report →" button
-- `document.getElementById('lead-gate-card').style.display = 'block'` JS line
-- `document.getElementById('lead-company-row').style.display = ...` JS line
-- `submitLead()` function (~36 lines)
-
-**Kept:** "Download your report — Download PDF" card (`report-dl-card`), which calls `/api/report?fmt=pdf`. That endpoint now both serves the PDF download to the visitor and emails John the PDF + lead details.
+Implements **ADR-0018** (Gate C signed). EUDR section of `core/contracts` only — **carbon contracts untouched**. Triage & DDS-prep screen, never a compliance verdict.
 
 ---
 
-## Backend — `api/email.py`
+## Change — `core/contracts/__init__.py` (EUDR section)
 
-| Change | Before | After |
+| ADR-0018 point | Before | After |
 |---|---|---|
-| Recipient | `"info@180climate.net"` (hardcoded) | `LEAD_RECIPIENT_EMAIL` env var (default `leoniches@gmail.com`) |
-| Subject | `"{iup_name} — {filename_base}"` | `"New 180Climate lead — {contact_name} · {iup_name}"` |
-| Attachment | `{filename_base}.docx` | `{filename_base}.pdf` (MIME: `application/pdf`) |
-| Body | Contact + concession fields | + verdict + lifetime tCO2e range + per-year range |
+| 1. Detection | `PlotVerdict.deforestation_free: bool` | `detection: Literal["clear_in_screen","loss_detected","inconclusive","geometry_invalid"]` |
+| 2. Readiness | `EUDRVerdict.readiness_score: int` (0–100) | `readiness: list[ReadinessItem]` (new model; `status: Literal["complete","incomplete"]`) — **no numeric score** |
+| 3. Role | `EUDRInput.role: Literal["operator","trader"]` | `Literal["eu_first_placer","downstream_operator","non_eu_supplier"]` |
+| 3. Commodity | (only on `Plot`) | `EUDRInput.commodity` enum (5 + `manual_review`); `Plot.commodity` also extended with `manual_review` |
+| 4. Risk axes | `EUDRVerdict.indonesia_risk_tier` (single) | **two separate fields**: `country_benchmark_risk` (Indonesia→`standard`, on `EUDRInput`+`EUDRVerdict`) and `plot_satellite_risk: Literal["low","high","inconclusive"]` (on `PlotVerdict`) |
+| 5. Provenance | — | `datasets_version: str` + `run_date: date` on **both** `PlotVerdict` and `EUDRVerdict` |
+| 6. Overall verdict | `Literal["compliant","non_compliant","needs_review"]` | `Literal["clear_in_screen","loss_detected","review_needed"]` — removes the banned `compliant` |
+| 6. Export naming | `dds_pack: dict` | `geolocation_pack: dict` ("geolocation pack for DDS preparation") |
+| 6. Banned guard | — | `EUDR_BANNED_SUBSTRINGS` module constant (single source of truth) |
 
-`_recipient()` function reads `LEAD_RECIPIENT_EMAIL` at call time (not import time) so tests and prod can override via env.
-
-Enhanced `_build_body()`:
-```
-=== Carbon screening ===
-Verdict:      eligible
-Range:        6,680,000 – 11,530,000 tCO2e (lifetime) | 222,667 – 384,333 tCO2e/yr
-Summary:      ...
-```
-
-Brevo `htmlContent` carries the same enhanced body, `<pre>`-wrapped + html-escaped. Key never logged.
+Added `from datetime import date`. No LLM/HTTP imports — determinism intact.
 
 ---
 
-## Backend — `api/main.py`
+## Banned-string contract-guard (ADR-0018 §6)
 
-- `_deliver()`: `docx_bytes` → `pdf_bytes` parameter
-- `_build_form_data()`: added `quantity_low_per_yr_tco2e` + `quantity_high_per_yr_tco2e` to form_data dict
-- `/api/report?fmt=pdf`: generates PDF once → serves to visitor AND attaches to lead email (no DOCX generated for this path)
-- `/api/report?fmt=docx`: generates DOCX once → serves to visitor AND attaches to lead email
-- `/api/lead`: generates PDF (not DOCX) when geo provided (endpoint still exists; no longer triggered from UI)
+Banned substrings (case-insensitive): **`compliant`** (also catches `non_compliant`), **`deforestation-free`**, **`dds-ready`**, **`due diligence statement ready`**.
 
----
+`test_eudr_banned_strings_absent_from_serialized_output_and_schema` scans, for every EUDR model:
+- `model_dump_json()` of fully-populated instances (covers runtime values), **and**
+- `model_json_schema()` (covers enum literals, field names, defaults, and class docstrings-as-descriptions).
 
-## Tests — `tests/test_lead_delivery.py`
-
-**Updated assertions:**
-- `r["to"]` → `"leoniches@gmail.com"` (was `"info@180climate.net"`)
-- `r["attachment_filename"].endswith(".pdf")` (was `.docx`)
-- Subject checks → `"New 180Climate lead — Jane Smith"` prefix + IUP name in body
-
-**New tests:**
-- `test_report_email_recipient` — asserts `leoniches@gmail.com` on `/api/report?fmt=pdf`
-- `test_report_email_body_has_carbon_fields` — asserts verdict, tCO2e range, per-year in `form_data`
+All clean. `test_eudr_banned_string_guard_catches_a_violation` proves the guard fires on a deliberately-bad fixture. **Additionally verified out-of-band** that injecting a banned phrase into a real `EUDRVerdict` free-text field is caught (`compliant` + `dds-ready` detected) — bad fixture discarded, not committed.
 
 ---
 
-## Deploy instruction (for John)
+## Tests — `tests/test_contracts.py` (7 new)
 
-Set `LEAD_RECIPIENT_EMAIL=leoniches@gmail.com` in Render env vars (or omit — that's the default). Combined with `BREVO_API_KEY`, every "Download PDF" click will email `leoniches@gmail.com` with the PDF attached.
+`test_eudr_input_role_commodity_and_country_risk`, `test_plot_verdict_uses_detection_enum_not_bool`, `test_eudr_readiness_is_categorical_no_numeric_score`, `test_eudr_country_and_plot_risk_are_distinct_fields`, `test_eudr_provenance_stamp_present`, `test_eudr_banned_strings_absent_from_serialized_output_and_schema`, `test_eudr_banned_string_guard_catches_a_violation`.
+
+**306 tests green** (was 299). Carbon contract tests unchanged + green.
+
+---
+
+## Reviewer (white-box) — PASS
+
+All 8 ADR-0018 decision points satisfied; carbon contracts confirmed untouched (only `date` import + EUDR section changed); determinism intact (stdlib + pydantic only).
+
+### Advisor-divergence flags to resolve before E4+ (informational — NOT blockers; ADR-0018 sanctions current names)
+1. **Three vocabularies for the "middle" (not-clear, not-loss) state**: `EUDRVerdict.overall="review_needed"` vs `PlotVerdict.detection="inconclusive"` vs readiness `"incomplete"`. Deliberate (`review_needed` avoids `needs_review`→compliant-family), but an advisor may want one consistent term.
+2. **`plot_satellite_risk` = `["low","high","inconclusive"]`** omits a `standard` mid-tier, unlike `country_benchmark_risk = ["low","standard","high"]`. Intentional asymmetry (binary triage + inconclusive escape vs EU 3-tier benchmark); ADR-0018 §4 doesn't pin the plot set — advisor nod wanted.
+3. **`detection="geometry_invalid"` vs `PlotVerdict.geometry_ok: bool`** — mild redundancy. Engine (E2+) must keep them consistent; advisor may ask whether one is derivable.
 
 ---
 
 ## Commit
 
-`b5ef639` — pushed to `main` — `feat(crm): PDF-to-Gmail on Download PDF; drop lead-gate box (WO-CRM-GMAIL-001)`
+`90d4a3e` — pushed to `main` — `feat(contracts): EUDR detection enum + categorical readiness + provenance (ADR-0018, Gate C)`
