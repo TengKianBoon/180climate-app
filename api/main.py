@@ -11,11 +11,21 @@ Run locally:
   python -m uvicorn api.main:app --reload --port 8000
 """
 from __future__ import annotations
+import logging
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%SZ",
+    force=True,
+)
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 

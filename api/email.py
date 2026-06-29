@@ -21,8 +21,11 @@ Secrets MUST NOT appear in the repo (ADR-0004).
 """
 from __future__ import annotations
 import json
+import logging
 import os
 import smtplib
+
+log = logging.getLogger(__name__)
 from datetime import datetime, timezone
 from email import encoders
 from email.mime.base import MIMEBase
@@ -84,6 +87,7 @@ def send_lead_email(
 
     host = os.environ.get("EMAIL_HOST", "")
     if not host:
+        log.info("EMAIL: EMAIL_HOST NOT SET -> outbox, NO email sent")
         # CI / dev mode: write structured record to JSONL outbox
         record = {
             "ts": ts,
@@ -104,6 +108,7 @@ def send_lead_email(
     password  = os.environ.get("EMAIL_PASSWORD", "")
     from_addr = os.environ.get("EMAIL_FROM", "john@180climate.net")
 
+    log.info("EMAIL: connecting %s:%s ssl=%s FROM=%s TO=%s", host, port, use_ssl, from_addr, _TO)
     try:
         msg = MIMEMultipart()
         msg["From"]    = from_addr
@@ -138,8 +143,10 @@ def send_lead_email(
                 if user and password:
                     server.login(user, password)
                 server.sendmail(from_addr, [_TO], msg.as_string())
+        log.info("EMAIL: SENT OK")
         return True
     except Exception as exc:
+        log.error("EMAIL: SMTP ERROR: %s", exc)
         # Fallback: write failure record to outbox so no lead is silently lost
         record = {
             "ts": ts,

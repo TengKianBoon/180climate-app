@@ -17,9 +17,12 @@ Secrets MUST NOT appear in the repo (ADR-0004).
 """
 from __future__ import annotations
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 _COORD_EVIDENCE = Path(__file__).parent.parent / "coordination" / "evidence"
 
@@ -51,6 +54,7 @@ def append_lead(row: dict) -> bool:
     ts = row.get("timestamp") or datetime.now(timezone.utc).isoformat()
 
     if not sheets_id:
+        log.info("SHEETS: GOOGLE_SHEETS_ID NOT SET -> outbox")
         # CI / dev mode: write to JSONL outbox
         record = {"ts": ts, **row}
         path = _outbox_path()
@@ -71,9 +75,11 @@ def append_lead(row: dict) -> bool:
         ws = gc.open_by_key(sheets_id).sheet1
         values = [str(row.get(col, "")) for col in _COLUMNS]
         ws.append_row(values, value_input_option="USER_ENTERED")
+        log.info("SHEETS: appended row to %s", sheets_id)
         return True
 
     except Exception as exc:
+        log.error("SHEETS: ERROR: %s", exc)
         # Fallback: write failure record to JSONL so no lead is lost
         record = {"ts": ts, "_sheets_error": str(exc), **row}
         path = _outbox_path()
