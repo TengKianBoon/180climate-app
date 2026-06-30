@@ -1109,8 +1109,29 @@ function switchScreen(which) {
   });
   var tag = document.getElementById('header-tag-text');
   if (tag) tag.textContent = which === 'eudr' ? 'EUDR Plot Check' : 'Carbon Pre-Feasibility Screening';
+  document.title = which === 'eudr'
+    ? '180Climate — EUDR Plot Check'
+    : '180Climate — Carbon Pre-Feasibility Screening';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// ── Subdomain + ?tool= routing (WO-SUBDOMAIN-ROUTING-010) ─────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  var params = new URLSearchParams(window.location.search);
+  var toolParam = (params.get('tool') || '').toLowerCase();
+  var host = (window.location.hostname || '').toLowerCase();
+  var defaultTool;
+  if (toolParam === 'eudr' || toolParam === 'carbon') {
+    defaultTool = toolParam;               // ?tool= wins
+  } else if (host.indexOf('eudr.') === 0) {
+    defaultTool = 'eudr';                  // eudr.180climate.net
+  } else if (host.indexOf('carbon.') === 0) {
+    defaultTool = 'carbon';               // carbon.180climate.net
+  } else {
+    defaultTool = 'carbon';               // onrender.com / localhost / app.*
+  }
+  switchScreen(defaultTool);
+});
 
 // ── EUDR state ─────────────────────────────────────────────────────────────
 var _eudrResult      = null;
