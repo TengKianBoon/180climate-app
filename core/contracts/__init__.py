@@ -254,7 +254,7 @@ class PlotVerdict(BaseModel):
     commodity: str
     # ADR-0018 micro-amendment: geometry_ok and plot_satellite_risk are DERIVED from detection.
     # detection is the single source of truth — no stored booleans or risk strings that can drift.
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def geometry_ok(self) -> bool:
         """True iff detection != "geometry_invalid". Derived; cannot drift from detection."""
@@ -263,16 +263,15 @@ class PlotVerdict(BaseModel):
     # ADR-0018 micro-amendment: plot_satellite_risk is DERIVED from detection.
     # clear_in_screen→low, loss_detected→high, inconclusive→inconclusive, geometry_invalid→inconclusive.
     # Separate axis from country_benchmark_risk (which stays on EUDRInput + EUDRVerdict).
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def plot_satellite_risk(self) -> Literal["low", "high", "inconclusive"]:
         """Satellite-triage risk derived from detection. Separate from country_benchmark_risk."""
-        return {
-            "clear_in_screen": "low",
-            "loss_detected": "high",
-            "inconclusive": "inconclusive",
-            "geometry_invalid": "inconclusive",
-        }[self.detection]
+        if self.detection == "loss_detected":
+            return "high"
+        if self.detection == "clear_in_screen":
+            return "low"
+        return "inconclusive"
 
     # ADR-0018: provenance stamp on every verdict (dataset versions + screening date).
     datasets_version: str                     # e.g. "Hansen v1.11; JRC GFC2020; RADD 2026-06"
