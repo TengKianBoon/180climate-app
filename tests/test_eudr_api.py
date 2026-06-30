@@ -718,3 +718,108 @@ def test_geolocation_pack_no_banned_strings():
         assert banned not in pack_json, (
             f"Banned substring {banned!r} found in geolocation_pack_geojson"
         )
+
+
+# ── E7: EUDR PDF report + /api/eudr/report endpoint ───────────────────────────
+
+
+def test_eudr_report_endpoint_returns_pdf():
+    """POST /api/eudr/report returns non-empty PDF bytes."""
+    triage = _post(_fc([_POLY_LOSS, _POLY_CLEAR]))
+    r = client.post("/api/eudr/report", json={
+        "result":       triage,
+        "contact_name": "Test User",
+        "commodity":    "palm",
+    })
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+    assert r.headers["content-type"] == "application/pdf"
+    assert len(r.content) > 1000, "PDF should be non-trivial"
+
+
+def test_eudr_report_starts_with_pdf_magic_bytes():
+    """PDF output begins with %%PDF."""
+    triage = _post(_fc([_POLY_CLEAR]))
+    r = client.post("/api/eudr/report", json={
+        "result":       triage,
+        "contact_name": "Jane Doe",
+        "commodity":    "timber",
+    })
+    assert r.content[:4] == b"%PDF", "Response should start with PDF magic bytes"
+
+
+def test_eudr_report_content_disposition_has_filename():
+    """Content-Disposition header carries a filename."""
+    triage = _post(_fc([_POLY_LOSS]))
+    r = client.post("/api/eudr/report", json={
+        "result": triage, "contact_name": "X", "commodity": "palm",
+    })
+    cd = r.headers.get("content-disposition", "")
+    assert "filename=" in cd, f"Expected filename in Content-Disposition: {cd}"
+    assert cd.endswith(".pdf\""), f"Filename should end with .pdf: {cd}"
+
+
+def test_eudr_report_no_banned_strings_in_pdf():
+    """E1 guard: banned strings must not appear in the raw PDF bytes."""
+    triage = _post(_fc([_POLY_LOSS, _POLY_CLEAR]))
+    r = client.post("/api/eudr/report", json={
+        "result": triage, "contact_name": "Test", "commodity": "palm",
+    })
+    pdf_bytes = r.content
+    for banned in EUDR_BANNED_SUBSTRINGS:
+        assert banned.encode() not in pdf_bytes, (
+            f"Banned substring {banned!r} found in EUDR PDF bytes"
+        )
+
+
+def test_eudr_report_loss_response_non_empty():
+    """PDF generated for a loss-detected result is non-empty."""
+    triage = _post(_fc([_POLY_LOSS]))
+    r = client.post("/api/eudr/report", json={
+        "result": triage, "contact_name": "A", "commodity": "timber",
+    })
+    assert r.status_code == 200
+    assert len(r.content) > 500
+
+
+def test_eudr_report_clear_response_non_empty():
+    """PDF generated for an all-clear result is non-empty."""
+    triage = _post(_fc([_POLY_CLEAR]))
+    r = client.post("/api/eudr/report", json={
+        "result": triage, "contact_name": "B", "commodity": "cocoa",
+    })
+    assert r.status_code == 200
+    assert len(r.content) > 500
+
+
+def test_eudr_lead_email_subject_format(monkeypatch):
+    """Lead email subject follows the spec: 'New 180Climate EUDR lead — {name} · N plots, X flagged'."""
+    captured: list[dict] = []
+
+    def _fake_send(iup_name, filename_base, form_data, pdf_bytes=None, subject_override=None):
+        captured.append({"subject": subject_override, "iup_name": iup_name})
+        return True
+
+    monkeypatch.setattr("api.main.send_lead_email", _fake_send)
+    _post(_fc([_POLY_LOSS, _POLY_CLEAR]))
+    assert captured, "send_lead_email was not called"
+    subj = captured[0]["subject"] or ""
+    assert "EUDR lead" in subj, f"Subject missing 'EUDR lead': {subj!r}"
+    assert "plots" in subj, f"Subject missing plot count: {subj!r}"
+    assert "flagged" in subj, f"Subject missing 'flagged': {subj!r}"
+
+
+def test_eudr_lead_email_has_pdf_bytes(monkeypatch):
+    """Lead email is called with non-empty PDF bytes (not b'')."""
+    captured: list[dict] = []
+
+    def _fake_send(iup_name, filename_base, form_data, pdf_bytes=None, subject_override=None):
+        captured.append({"pdf_bytes": pdf_bytes})
+        return True
+
+    monkeypatch.setattr("api.main.send_lead_email", _fake_send)
+    _post(_fc([_POLY_CLEAR]))
+    assert captured, "send_lead_email was not called"
+    pdf = captured[0]["pdf_bytes"]
+    assert pdf is not None and len(pdf) > 100, (
+        f"Expected non-empty PDF bytes, got: {repr(pdf)[:40]}"
+    )

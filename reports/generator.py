@@ -749,3 +749,353 @@ def generate_docx(data: ReportData) -> bytes:
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+# ── EUDR PDF ──────────────────────────────────────────────────────────────────
+
+def generate_eudr_pdf(body: dict) -> bytes:
+    """Return PDF bytes for the value-first EUDR triage report (WO-EUDR-REPORT-009).
+
+    Takes the full POST /api/eudr response body (enriched with contact_name,
+    commodity, filename_base before calling).
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, HRFlowable,
+        Image as RLImage, Table as RLTable, TableStyle as RLTS,
+    )
+
+    # ── Extract fields ────────────────────────────────────────────────────────
+    overall       = body.get("overall", "review_needed")
+    headline      = body.get("overall_headline", "")
+    plot_count    = body.get("plot_count", 0)
+    loss_count    = body.get("loss_count", 0)
+    plots         = body.get("plots", [])
+    readiness     = body.get("readiness", [])
+    commodity_ev  = body.get("commodity_evidence", [])
+    who_files_d   = body.get("who_files", {})
+    indonesia     = body.get("indonesia_context", {})
+    pack          = body.get("geolocation_pack_geojson", {})
+    pack_count    = len(pack.get("features", []))
+    run_date      = body.get("run_date", "")
+    contact_name  = body.get("contact_name", "")
+    commodity     = body.get("commodity", "")
+    filename_base = body.get("filename_base", make_filename())
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=2.5 * cm,
+        rightMargin=2.5 * cm,
+        topMargin=2.5 * cm,
+        bottomMargin=2.5 * cm,
+        title="180Climate EUDR Triage Report",
+        author="180Climate",
+    )
+
+    styles = getSampleStyleSheet()
+    navy    = colors.HexColor("#13212E")
+    green   = colors.HexColor("#15913A")
+    gdeep   = colors.HexColor("#0E7A30")
+    grey    = colors.HexColor("#475463")
+    ltgrey  = colors.HexColor("#8A97A3")
+    white   = colors.HexColor("#FFFFFF")
+    red_bg  = colors.HexColor("#C0392B")
+    cta_bg  = colors.HexColor("#0E7A30")
+
+    H2   = ParagraphStyle("H2E",     parent=styles["Heading2"], textColor=gdeep,
+                          fontSize=11, leading=14, spaceBefore=18, spaceAfter=5,
+                          fontName="Helvetica-Bold")
+    BODY = ParagraphStyle("BodyE",   parent=styles["Normal"],   textColor=navy,
+                          fontSize=9.5, leading=14, spaceAfter=6)
+    SMALL= ParagraphStyle("SmallE",  parent=styles["Normal"],   textColor=grey,
+                          fontSize=8,   leading=12)
+    FOOT = ParagraphStyle("FootE",   parent=styles["Normal"],   textColor=ltgrey,
+                          fontSize=7.5, leading=11)
+    META = ParagraphStyle("MetaE",   parent=styles["Normal"],   textColor=grey,
+                          fontSize=8.5, leading=13)
+    LABEL= ParagraphStyle("LabelE",  parent=styles["Normal"],   textColor=colors.HexColor("#CDEBD5"),
+                          fontSize=8,   fontName="Helvetica-Bold", spaceAfter=2)
+    HERO_H  = ParagraphStyle("HeroHE",  parent=styles["Normal"], textColor=white,
+                             fontSize=15, leading=19, fontName="Helvetica-Bold", spaceAfter=4)
+    HERO_SUB= ParagraphStyle("HeroSE",  parent=styles["Normal"], textColor=white,
+                             fontSize=9,  leading=12, spaceAfter=0)
+    CTA_H   = ParagraphStyle("CtaHE",   parent=styles["Normal"], textColor=white,
+                             fontSize=11, leading=14, fontName="Helvetica-Bold", spaceAfter=4)
+    CTA_B   = ParagraphStyle("CtaBE",   parent=styles["Normal"], textColor=white,
+                             fontSize=9.5, leading=14, spaceAfter=4)
+    SUB     = ParagraphStyle("SubE",    parent=styles["Normal"], textColor=navy,
+                             fontSize=13, fontName="Helvetica-Bold", spaceBefore=0, spaceAfter=4)
+
+    def _hr(thick: float = 0.5):
+        return HRFlowable(width="100%", thickness=thick,
+                           color=colors.HexColor("#E7ECF0"), spaceAfter=6, spaceBefore=2)
+
+    def _sec():
+        return HRFlowable(width="100%", thickness=1.5,
+                           color=colors.HexColor("#EDF4EE"), spaceAfter=4, spaceBefore=2)
+
+    story = []
+
+    # ── 1. Header ────────────────────────────────────────────────────────────
+    meta_pairs = [
+        ("Screened for", contact_name or "—"),
+        ("Commodity",    commodity    or "—"),
+        ("Plots",        str(plot_count)),
+        ("Run date",     run_date     or "—"),
+        ("Reference",    filename_base),
+    ]
+    left_col = [Paragraph("EUDR Triage Report", SUB)]
+    left_col += [Paragraph(f"<b>{k}:</b> {v}", META) for k, v in meta_pairs]
+
+    logo_h = 1.6 * cm
+    logo_w = logo_h * _LOGO_ASPECT
+    right_col: list = (
+        [RLImage(str(_LOGO_PATH), width=logo_w, height=logo_h)]
+        if _LOGO_PATH.exists()
+        else [Paragraph("180Climate", ParagraphStyle(
+            "BrandE", parent=styles["Normal"], fontSize=16,
+            textColor=green, fontName="Helvetica-Bold"))]
+    )
+    hdr_tbl = RLTable([[left_col, right_col]],
+                      colWidths=[doc.width - logo_w - 0.4 * cm, logo_w + 0.4 * cm])
+    hdr_tbl.setStyle(RLTS([
+        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",        (1, 0), (1,  0),  "RIGHT"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
+    ]))
+    story.append(hdr_tbl)
+    story.append(_hr())
+
+    # ── 2. Hero ──────────────────────────────────────────────────────────────
+    hero_bg = red_bg if loss_count > 0 else cta_bg
+    dds_sub = (
+        "Plots flagged — your shipment may be affected. See per-plot detail below."
+        if loss_count > 0
+        else (
+            "Screened against the EU's own maps — not certified, still needs a "
+            "Due Diligence Statement (DDS). See readiness checklist below."
+        )
+    )
+    hero_inner = [
+        Paragraph("EU Deforestation Regulation — Triage Result", LABEL),
+        Paragraph(headline, HERO_H),
+        Paragraph(dds_sub, HERO_SUB),
+    ]
+    hero_tbl = RLTable([[hero_inner]], colWidths=["100%"])
+    hero_tbl.setStyle(RLTS([
+        ("BACKGROUND",    (0, 0), (-1, -1), hero_bg),
+        ("ROUNDEDCORNERS", [8]),
+        ("TOPPADDING",    (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 16),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 16),
+    ]))
+    story.append(hero_tbl)
+    story.append(Spacer(1, 6))
+
+    # ── 3. Per-plot status ────────────────────────────────────────────────────
+    if plots:
+        story.append(_sec())
+        story.append(Paragraph("Per-Plot Screening Status", H2))
+        _row_bg = {
+            "loss_detected":    colors.HexColor("#FDEDEC"),
+            "inconclusive":     colors.HexColor("#FEF9E7"),
+            "clear_in_screen":  colors.HexColor("#EAFAF1"),
+            "geometry_invalid": colors.HexColor("#F2F3F4"),
+        }
+        _det_label = {
+            "loss_detected":    "FLAGGED",
+            "inconclusive":     "REVIEW",
+            "clear_in_screen":  "SCREENED CLEAR",
+            "geometry_invalid": "INVALID GEOMETRY",
+        }
+        hdr_row = [
+            Paragraph("<b>Plot ID</b>",     SMALL),
+            Paragraph("<b>Status</b>",      SMALL),
+            Paragraph("<b>Finding</b>",     SMALL),
+            Paragraph("<b>Next action</b>", SMALL),
+        ]
+        tbl_data = [hdr_row]
+        bg_cmds: list = [("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E7ECF0"))]
+        BOLD_SMALL = ParagraphStyle("BS", parent=SMALL, fontName="Helvetica-Bold")
+        for i, p in enumerate(plots, start=1):
+            det = p.get("detection", "inconclusive")
+            bg_cmds.append(("BACKGROUND", (0, i), (-1, i),
+                             _row_bg.get(det, colors.HexColor("#F2F3F4"))))
+            tbl_data.append([
+                Paragraph(p.get("plot_id", "—"), SMALL),
+                Paragraph(_det_label.get(det, det.upper()), BOLD_SMALL),
+                Paragraph(p.get("label",  "—"), SMALL),
+                Paragraph(p.get("action", "—"), SMALL),
+            ])
+        col_ws = [doc.width * w for w in (0.18, 0.18, 0.32, 0.32)]
+        ptbl = RLTable(tbl_data, colWidths=col_ws)
+        ptbl.setStyle(RLTS([
+            ("INNERGRID",     (0, 0), (-1, -1), 0.3,  colors.HexColor("#D5DCE4")),
+            ("BOX",           (0, 0), (-1, -1), 0.5,  colors.HexColor("#D5DCE4")),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ] + bg_cmds))
+        story.append(ptbl)
+        story.append(Spacer(1, 4))
+
+    # ── 4. Readiness checklist ────────────────────────────────────────────────
+    if readiness:
+        story.append(_sec())
+        story.append(Paragraph("DDS Readiness Checklist", H2))
+        BODY_BOLD = ParagraphStyle("BB", parent=BODY, fontName="Helvetica-Bold", spaceAfter=2)
+        for item in readiness:
+            status = item.get("status", "incomplete")
+            icon   = "✓" if status == "complete" else "○"
+            comp   = item.get("component", "")
+            note   = item.get("note", "")
+            icon_colour = "#0E7A30" if status == "complete" else "#C0392B"
+            story.append(Paragraph(
+                f'<font color="{icon_colour}">{icon}</font>  <b>{comp}</b>', BODY))
+            if note:
+                story.append(Paragraph(f"    {note}", SMALL))
+        story.append(Spacer(1, 4))
+
+    # ── 5. Commodity evidence ─────────────────────────────────────────────────
+    if commodity_ev:
+        story.append(_sec())
+        story.append(Paragraph("What to Gather for Your DDS", H2))
+        story.append(Paragraph(
+            "Documents typically required to support your Due Diligence Statement. "
+            "Your EU buyer or importer may ask for these or for additional certifications.",
+            BODY))
+        items_list = (
+            commodity_ev if isinstance(commodity_ev, list)
+            else commodity_ev.get("items", [])
+        )
+        for ev in items_list:
+            story.append(Paragraph(f"•  {ev}", BODY))
+        story.append(Spacer(1, 4))
+
+    # ── 6. Who files the DDS ─────────────────────────────────────────────────
+    if who_files_d:
+        story.append(_sec())
+        story.append(Paragraph("Who Files the Due Diligence Statement", H2))
+        who_inner = [
+            Paragraph(f"<b>{who_files_d.get('who', '')}</b>", BODY),
+            Paragraph(who_files_d.get("detail", ""), BODY),
+        ]
+        act = who_files_d.get("action", "")
+        if act:
+            who_inner.append(Paragraph(f"<b>Action:</b> {act}", SMALL))
+        who_tbl = RLTable([[who_inner]], colWidths=["100%"])
+        who_tbl.setStyle(RLTS([
+            ("BOX",           (0, 0), (-1, -1), 0.5,  colors.HexColor("#D5DCE4")),
+            ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#F4F6F8")),
+            ("TOPPADDING",    (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+        ]))
+        story.append(who_tbl)
+        story.append(Spacer(1, 4))
+
+    # ── 7. Indonesia context ──────────────────────────────────────────────────
+    if indonesia:
+        story.append(_sec())
+        story.append(Paragraph("Indonesia — EUDR Risk Level and Deadlines", H2))
+        note_text = (
+            f"<b>{indonesia.get('risk_level', 'Standard risk')}.</b> "
+            f"{indonesia.get('due_diligence', '')}. "
+            f"{indonesia.get('simplified_route_note', '')}"
+        )
+        story.append(Paragraph(note_text, BODY))
+        deadlines = indonesia.get("deadlines", [])
+        if deadlines:
+            story.append(Paragraph("<b>Compliance deadlines:</b>", SMALL))
+            dl_data = [
+                [Paragraph(d.get("group", ""), SMALL),
+                 Paragraph(f"<b>{d.get('deadline', '')}</b>", SMALL)]
+                for d in deadlines
+            ]
+            dl_tbl = RLTable(dl_data, colWidths=[doc.width * 0.65, doc.width * 0.35])
+            dl_tbl.setStyle(RLTS([
+                ("INNERGRID",     (0, 0), (-1, -1), 0.3, colors.HexColor("#E7ECF0")),
+                ("BOX",           (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DCE4")),
+                ("TOPPADDING",    (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+            ]))
+            story.append(dl_tbl)
+        act = indonesia.get("action", "")
+        if act:
+            story.append(Paragraph(f"<b>Action:</b> {act}", SMALL))
+        story.append(Spacer(1, 4))
+
+    # ── 8. Geolocation pack note ──────────────────────────────────────────────
+    story.append(_sec())
+    story.append(Paragraph("Your Art-9 Geolocation Pack", H2))
+    if pack_count > 0:
+        story.append(Paragraph(
+            f"•  Your geolocation pack is ready — {pack_count} plot(s), "
+            "polygon or point per Art-9 rules, WGS84 coordinates at ≥6 decimal places.",
+            BODY))
+    else:
+        story.append(Paragraph(
+            "•  No valid plots available for the geolocation pack "
+            "(check geometry errors in the per-plot table above).",
+            BODY))
+    story.append(Paragraph(
+        "Download the GeoJSON from the 180Climate EUDR triage page. "
+        "Share it with your EU buyer or importer — they need it to file the DDS. "
+        "Not a Due Diligence Statement — geolocation pack for DDS preparation only.",
+        SMALL))
+    story.append(Spacer(1, 8))
+
+    # ── 9. CTA ───────────────────────────────────────────────────────────────
+    _EUDR_CTA = (
+        "Your next step — engage 180Climate.\n\n"
+        "EUDR Pre-Feasibility: DDS preparation, on-the-ground verification, "
+        "geolocation pack review, legality audit, and buyer-ready supply-chain documentation.\n\n"
+        "info@180climate.net   ·   www.180climate.net"
+    )
+    cta_inner: list = []
+    for line in _EUDR_CTA.split("\n"):
+        if line.strip():
+            cta_inner.append(Paragraph(line, CTA_H if line.startswith("Your next step") else CTA_B))
+        else:
+            cta_inner.append(Spacer(1, 4))
+    cta_tbl = RLTable([[cta_inner]], colWidths=["100%"])
+    cta_tbl.setStyle(RLTS([
+        ("BACKGROUND",    (0, 0), (-1, -1), cta_bg),
+        ("ROUNDEDCORNERS", [10]),
+        ("TOPPADDING",    (0, 0), (-1, -1), 16),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 18),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 18),
+    ]))
+    story.append(cta_tbl)
+
+    # ── 10. Footer — ONE line ────────────────────────────────────────────
+    _EUDR_FOOT = (
+        "Free indicative triage — not a Due Diligence Statement, not legal advice. "
+        "Checks deforestation signals only; EUDR also requires legality "
+        "(permits, land tenure, Indonesian law) — a satellite-clear plot can still be blocked on legality. "
+        "Forest baseline: JRC GFC2020 V3, European Commission (EC JRC open data, 10 m, EUDR Art. 10 reference map). "
+        f"Report ref: {filename_base}."
+    )
+    story.append(Spacer(1, 12))
+    story.append(HRFlowable(width="100%", thickness=0.5,
+                              color=colors.HexColor("#E7ECF0"),
+                              spaceAfter=6, spaceBefore=2))
+    story.append(Paragraph(_EUDR_FOOT, FOOT))
+
+    doc.build(story)
+    return buf.getvalue()

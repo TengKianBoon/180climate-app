@@ -40,7 +40,7 @@ from engines.carbon.engine import run_carbon_engine, run_mixed_stratification
 from narrative.narrator import generate_narrative
 from api.email import send_lead_email
 from api.sheets import append_lead
-from reports.generator import generate_pdf, generate_docx, ReportData, make_filename
+from reports.generator import generate_pdf, generate_docx, generate_eudr_pdf, ReportData, make_filename
 
 app = FastAPI(title="180Climate Pre-FS API", version="0.1.0-slice")
 
@@ -913,16 +913,60 @@ async def eudr_screen(
         "quantity_high_tco2e": None,
     }
     try:
+        eudr_pdf_body = {
+            **body,
+            "contact_name":  name,
+            "commodity":     commodity,
+            "filename_base": filename_base,
+        }
+        eudr_pdf_bytes = generate_eudr_pdf(eudr_pdf_body)
+        eudr_subject = (
+            f"New 180Climate EUDR lead — {name} · "
+            f"{len(plot_verdicts)} plots, {loss_count} flagged"
+        )
         send_lead_email(
             iup_name=form_data["iup_name"],
             filename_base=filename_base,
             form_data=form_data,
-            pdf_bytes=b"",
+            pdf_bytes=eudr_pdf_bytes,
+            subject_override=eudr_subject,
         )
     except Exception as exc:
         log.warning("EUDR lead email failed (non-fatal): %s", exc)
 
     return JSONResponse(content=body)
+
+
+# ── EUDR report download ───────────────────────────────────────────────────────
+
+class EudrReportRequest(BaseModel):
+    result: dict          # the full /api/eudr response body (from client _eudrResult)
+    contact_name: str = ""
+    commodity: str = ""
+
+
+@app.post("/api/eudr/report")
+def eudr_report(req: EudrReportRequest) -> Response:
+    """Return an EUDR triage PDF for download.
+
+    The client passes the cached triage result to avoid re-running triage.
+    """
+    filename_base = make_filename()
+    body_for_pdf = {
+        **req.result,
+        "contact_name":  req.contact_name,
+        "commodity":     req.commodity,
+        "filename_base": filename_base,
+    }
+    try:
+        content = generate_eudr_pdf(body_for_pdf)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename_base}.pdf"'},
+    )
 
 
 # ── Lead capture ──────────────────────────────────────────────────────────────

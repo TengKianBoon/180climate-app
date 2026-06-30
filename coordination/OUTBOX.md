@@ -1,87 +1,85 @@
-# OUTBOX — Builder → Cowork · WO-EUDR-EXPORT-008 (E6) · 2026-06-30
+# OUTBOX — Builder → Cowork · WO-EUDR-REPORT-009 (E7) · 2026-06-30
 
-## Status: CI GREEN ✅ — 438 tests pass (+12 new E6 tests) — STOPPED for Cowork review
+## Status: CI GREEN ✅ — 446 tests pass (+8 new E7 tests) — STOPPED for Cowork review
 
-Art-9 GeoJSON geolocation pack export added to `POST /api/eudr` response + frontend download button.
+EUDR MVP build complete (E1–E7). Value-first PDF report generated and attached to every EUDR lead email.
 
 ---
 
 ## What shipped
 
-### `api/main.py` — new helpers + `geolocation_pack_geojson` response field
+### `reports/generator.py` — `generate_eudr_pdf(body: dict) -> bytes`
 
-**`_round_coords()` / `_round_geojson_coords()`**
-Recursively round all GeoJSON coordinate values to ≥6 decimal places. Handles nested lists (Polygon, MultiPolygon, etc.). Never rounds below 6.
+New ReportLab PDF function. Sections (in value-first order):
 
-**`_build_geolocation_pack(validations, plot_verdicts, commodity, producer_name, run_date)`**
-Returns an Art-9 GeoJSON FeatureCollection:
-- `geometry_invalid` plots **excluded** (Art-9 non-conforming — cannot enter a DDS)
-- Area >4 ha → **Polygon** geometry (rounded to ≥6dp)
-- Area ≤4 ha → **Point** geometry (centroid, rounded to ≥6dp)
-- Properties: `plot_id`, `commodity`, `detection`, `area_ha`, `producer_name`, `run_date`, `pack_note`
-- `pack_note`: "Screened against JRC GFC2020 + Hansen + RADD. Not a Due Diligence Statement. Geolocation pack for DDS preparation." (no banned strings)
+1. **Header** — logo + "EUDR Triage Report" + contact/commodity/plot-count/run-date/reference meta
+2. **Hero** — red table (`#C0392B`) for any flagged plots; green (`#0E7A30`) for all-clear. Headline from `overall_headline` (ADR-0018 render-safe wording). Sub: DDS framing always present.
+3. **Per-plot status table** — red/amber/green/grey row backgrounds by detection state; columns: Plot ID / Status / Finding / Next action
+4. **DDS Readiness checklist** — ✓/○ per component (no numeric score)
+5. **Commodity evidence** — list from E5
+6. **Who files the DDS** — role-keyed box from E5
+7. **Indonesia context** — risk level + deadlines table (30 Dec 2026 / 30 Jun 2027)
+8. **Geolocation pack note** — pack count + Art-9 rules note; never "DDS-ready" or "compliant"
+9. **CTA** — green box: "Engage 180Climate — DDS preparation + on-the-ground verification"
+10. **Footer** — ONE combined line: legality limb + JRC attribution + report ref
 
-**`geolocation_pack_geojson`** key added to `POST /api/eudr` response body (dict, not a separate endpoint — avoids re-running triage).
+No banned strings in any section (tested in `test_eudr_report_no_banned_strings_in_pdf`).
 
-### `frontend/index.html` — download button + JS
+### `api/email.py` — `subject_override: Optional[str] = None`
 
-New card above the readiness checklist: "Download your geolocation pack (GeoJSON)"
+`send_lead_email()` accepts an optional subject override. When set, skips the auto-built subject.
 
-Copy (verbatim — no banned strings):
-> "Your plot coordinates formatted for the EU's system — a geolocation pack for **DDS preparation**. The DDS itself is filed in TRACES by the operator placing on the EU market."
+### `api/main.py` — E7 wiring
 
-**`downloadGeopack()`** JS function:
-- Reads `_eudrResult.geolocation_pack_geojson` (cached from the triage response)
-- Guards: no result → message; empty features → message (all plots had geometry errors)
-- Creates `Blob` → `URL.createObjectURL` → triggers `<a download>` click
-- Filename: `180climate_geolocation_pack_{YYMMDDHHMM}.geojson`
-- Shows plot count in status line after download
+**`POST /api/eudr`** — now generates PDF before the email call:
+```python
+eudr_pdf_body = {**body, "contact_name": name, "commodity": commodity, "filename_base": filename_base}
+eudr_pdf_bytes = generate_eudr_pdf(eudr_pdf_body)
+eudr_subject = f"New 180Climate EUDR lead — {name} · {len(plot_verdicts)} plots, {loss_count} flagged"
+send_lead_email(..., pdf_bytes=eudr_pdf_bytes, subject_override=eudr_subject)
+```
+
+**`POST /api/eudr/report`** — new download endpoint:
+- Request body: `{"result": <triage JSON from _eudrResult>, "contact_name": "...", "commodity": "..."}`
+- Returns `application/pdf` with `Content-Disposition: attachment; filename="{YYMMDDHHMM}.pdf"`
+- No re-running triage — client passes cached result
+
+### `frontend/index.html`
+
+New card above the geolocation pack card:
+```html
+<h3>Download your triage report (PDF)</h3>
+<button onclick="downloadEudrReport()">Download triage report (PDF)</button>
+```
+
+`downloadEudrReport()` JS:
+- Guards: no result → "Run a plot check first."
+- Shows "Generating PDF…" while fetching
+- POSTs `{result: _eudrResult, contact_name: _eudrContactName, commodity: _eudrCommodity}` to `/api/eudr/report`
+- On success: Blob → `<a download>` click → PDF saved
+
+`_eudrContactName` and `_eudrCommodity` variables set on each successful EUDR submission.
 
 ---
 
-## API smoke
-
-```
-2-plot batch (1 loss + 1 clear), palm:
-  geolocation_pack_geojson.type = FeatureCollection
-  features: 2
-
-  plot_loss    det=loss_detected     area=492.29 ha  geom=Polygon
-    first coord: lon=112.989999 lat=-1.009999  (6dp ✓)
-  plot_clear   det=clear_in_screen   area=492.07 ha  geom=Polygon
-    first coord: lon=113.989999 lat=-2.009999  (6dp ✓)
-```
-
----
-
-## Tests — `tests/test_eudr_api.py` (12 new E6 tests)
+## Tests — `tests/test_eudr_api.py` (+8 new E7 tests)
 
 | Test | Assertion |
 |---|---|
-| `test_geolocation_pack_field_present` | field present, type=FeatureCollection |
-| `test_geolocation_pack_is_valid_feature_collection` | 2-plot batch → 2 features, each Feature+geometry+properties |
-| `test_geolocation_pack_properties_present` | plot_id, commodity, detection, area_ha, producer_name |
-| `test_geolocation_pack_commodity_matches` | commodity=timber → properties.commodity=timber |
-| `test_geolocation_pack_detection_matches_triage` | pack detection == plots[0].detection |
-| `test_geolocation_pack_large_plot_is_polygon` | >4 ha plot → Polygon geometry |
-| `test_geolocation_pack_small_plot_is_point` | tiny plot (≤4 ha) → Point geometry with [lon, lat] floats |
-| `test_geolocation_pack_at_least_6_decimal_places` | all Polygon coord values: round(v, 6) == v |
-| `test_geolocation_pack_point_has_6_decimal_places` | centroid coords at 6dp |
-| `test_geolocation_pack_excludes_geometry_invalid` | _POLY_BADGEO → 0 features in pack |
-| `test_geolocation_pack_mixed_batch_excludes_invalid` | valid + invalid → only valid in pack |
-| `test_geolocation_pack_no_banned_strings` | none of the 4 banned substrings in pack JSON |
+| `test_eudr_report_endpoint_returns_pdf` | 200, content-type=application/pdf, len>1000 |
+| `test_eudr_report_starts_with_pdf_magic_bytes` | `b"%PDF"` at start |
+| `test_eudr_report_content_disposition_has_filename` | Content-Disposition has `.pdf"` |
+| `test_eudr_report_no_banned_strings_in_pdf` | 4 banned substrings absent from raw bytes |
+| `test_eudr_report_loss_response_non_empty` | loss-detected PDF > 500 bytes |
+| `test_eudr_report_clear_response_non_empty` | all-clear PDF > 500 bytes |
+| `test_eudr_lead_email_subject_format` | subject has "EUDR lead", "plots", "flagged" |
+| `test_eudr_lead_email_has_pdf_bytes` | `pdf_bytes` is non-empty bytes |
 
 ---
 
-## OPEN ITEM (flagged for John)
+## OPEN ITEM (carried from E6)
 
-**Live TRACES uploader validation** — whether this GeoJSON file loads correctly into the **EU TRACES EUDR module** cannot be tested here. This is a **pre-launch check for John + legal**:
-1. Download a sample geolocation pack from the deployed app (using real Indonesian plot coordinates at ≥6dp)
-2. Attempt to import it in the TRACES EUDR pilot environment (available to EU operators)
-3. Verify that the FeatureCollection → per-plot mapping is accepted
-4. If TRACES requires a specific schema (e.g., ISO-19115 metadata, specific property names), adjust `_build_geolocation_pack()` accordingly
-
-The current format follows the Art-9 requirements as published in the regulation: polygon for >4 ha, point for ≤4 ha, WGS84/EPSG:4326, ≥6 decimal coordinates. Schema adjustment is a one-function edit if TRACES expects different property names.
+**Live TRACES uploader validation** — John's pre-launch check. Cannot test locally. One-function edit if TRACES needs different GeoJSON property names.
 
 ---
 
@@ -89,5 +87,5 @@ The current format follows the Art-9 requirements as published in the regulation
 
 ```
 mypy core/contracts/__init__.py --ignore-missing-imports → Success: no issues found
-pytest tests/ → 438 passed, 1 warning (was 426; +12 new E6 tests)
+pytest tests/ → 446 passed, 1 warning (was 438; +8 new E7 tests)
 ```

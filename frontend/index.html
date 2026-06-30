@@ -737,6 +737,19 @@
     <div class="eudr-note warn" id="eudr-legality-note"></div>
     <div class="eudr-note warn" id="eudr-timber-note" style="display:none"></div>
 
+    <!-- E7: PDF report download -->
+    <h3 class="eudr-section-h">Download your triage report (PDF)</h3>
+    <div class="card" style="padding:1.1rem 1.4rem">
+      <p style="font-size:.88rem;color:var(--muted);line-height:1.6;margin-bottom:.9rem">
+        Your value-first EUDR triage report — blocker summary, per-plot status,
+        readiness checklist, and next steps. Not a Due Diligence Statement.
+      </p>
+      <button class="btn" id="eudr-pdf-btn" onclick="downloadEudrReport()" style="font-size:.88rem">
+        Download triage report (PDF)
+      </button>
+      <div id="eudr-pdf-status" style="font-size:.8rem;color:var(--muted);margin-top:.4rem"></div>
+    </div>
+
     <!-- E6: Geolocation pack download -->
     <h3 class="eudr-section-h">Download your geolocation pack</h3>
     <div class="card" style="padding:1.1rem 1.4rem">
@@ -1100,8 +1113,10 @@ function switchScreen(which) {
 }
 
 // ── EUDR state ─────────────────────────────────────────────────────────────
-var _eudrResult = null;
-var _eudrTab = 'file';
+var _eudrResult      = null;
+var _eudrContactName = '';
+var _eudrCommodity   = '';
+var _eudrTab         = 'file';
 
 function eudrSwitchTab(tab) {
   _eudrTab = tab;
@@ -1160,7 +1175,9 @@ async function submitEudr() {
       var err = await res.json().catch(function() { return {}; });
       throw new Error(err.detail || ('Error ' + res.status + ' — please try again.'));
     }
-    _eudrResult = await res.json();
+    _eudrResult      = await res.json();
+    _eudrContactName = name;
+    _eudrCommodity   = commodity;
     renderEudrResult();
     eudrShowStep('eudr-step-result');
   } catch(e) {
@@ -1327,6 +1344,47 @@ function downloadGeopack() {
     status.textContent = pack.features.length + ' plot(s) exported.';
   } catch(e) {
     status.textContent = 'Export failed — ' + e.message;
+  }
+}
+
+// ── Download EUDR triage report (PDF) ─────────────────────────────────────
+async function downloadEudrReport() {
+  var status = document.getElementById('eudr-pdf-status');
+  var btn    = document.getElementById('eudr-pdf-btn');
+  if (!_eudrResult) {
+    status.textContent = 'Run a plot check first.';
+    return;
+  }
+  status.textContent = 'Generating PDF…';
+  btn.disabled = true;
+  try {
+    var payload = {
+      result:       _eudrResult,
+      contact_name: (_eudrContactName || ''),
+      commodity:    (_eudrCommodity   || ''),
+    };
+    var res = await fetch('/api/eudr/report', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('PDF generation failed — please try again.');
+    var blob = await res.blob();
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    var cd   = res.headers.get('content-disposition') || '';
+    var fnM  = cd.match(/filename="([^"]+)"/);
+    a.href     = url;
+    a.download = fnM ? fnM[1] : '180climate_eudr_report.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    status.textContent = 'Report downloaded.';
+  } catch(e) {
+    status.textContent = e.message;
+  } finally {
+    btn.disabled = false;
   }
 }
 

@@ -122,13 +122,14 @@ def send_lead_email(
     filename_base: str,
     form_data: dict,
     pdf_bytes: Optional[bytes] = None,
+    subject_override: Optional[str] = None,
 ) -> bool:
     """Send lead notification with PDF attached.
 
     Returns True on success (Brevo / SMTP) or outbox-write (CI/dev fallback).
     """
     contact_name = form_data.get("name") or iup_name
-    subject = f"New 180Climate lead — {contact_name} · {iup_name}"
+    subject = subject_override or f"New 180Climate lead — {contact_name} · {iup_name}"
     ts = datetime.now(timezone.utc).isoformat()
 
     brevo_key = os.environ.get("BREVO_API_KEY", "")
