@@ -801,7 +801,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
         rightMargin=2.5 * cm,
         topMargin=2.5 * cm,
         bottomMargin=2.5 * cm,
-        title="180Climate EUDR Triage Report",
+        title="180Climate EUDR Plot Check Report",
         author="180Climate",
     )
 
@@ -837,6 +837,21 @@ def generate_eudr_pdf(body: dict) -> bytes:
                              fontSize=9.5, leading=14, spaceAfter=4)
     SUB     = ParagraphStyle("SubE",    parent=styles["Normal"], textColor=navy,
                              fontSize=13, fontName="Helvetica-Bold", spaceBefore=0, spaceAfter=4)
+    INTRO   = ParagraphStyle("IntroE",  parent=styles["Normal"], textColor=navy,
+                             fontSize=9, leading=13, spaceAfter=3)
+    INTRO_H = ParagraphStyle("IntroHE", parent=styles["Normal"], textColor=navy,
+                             fontSize=9, leading=13, fontName="Helvetica-Bold",
+                             spaceBefore=0, spaceAfter=2)
+    GLOSS_H = ParagraphStyle("GlossH",  parent=styles["Normal"], textColor=navy,
+                             fontSize=9, leading=13, fontName="Helvetica-Bold",
+                             spaceBefore=0, spaceAfter=3)
+    GLOSS_B = ParagraphStyle("GlossB",  parent=styles["Normal"], textColor=grey,
+                             fontSize=8.5, leading=12, spaceAfter=2)
+    ITEM_H  = ParagraphStyle("ItemH",   parent=styles["Normal"], textColor=navy,
+                             fontSize=9.5, leading=14, fontName="Helvetica-Bold",
+                             spaceBefore=12, spaceAfter=2)
+    ITEM_NOTE = ParagraphStyle("ItemNote", parent=styles["Normal"], textColor=grey,
+                               fontSize=8, leading=12, spaceBefore=0, spaceAfter=2)
 
     def _hr(thick: float = 0.5):
         return HRFlowable(width="100%", thickness=thick,
@@ -856,7 +871,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
         ("Run date",     run_date     or "—"),
         ("Reference",    filename_base),
     ]
-    left_col = [Paragraph("EUDR Triage Report", SUB)]
+    left_col = [Paragraph("EUDR Plot Check — your EU deforestation-rule report", SUB)]
     left_col += [Paragraph(f"<b>{k}:</b> {v}", META) for k, v in meta_pairs]
 
     logo_h = 1.6 * cm
@@ -881,6 +896,42 @@ def generate_eudr_pdf(body: dict) -> bytes:
     story.append(hdr_tbl)
     story.append(_hr())
 
+    # ── 1b. "What this is" intro ──────────────────────────────────────────────
+    _intro_bg = colors.HexColor("#F3F8FF")
+    _intro_bd = colors.HexColor("#C7DCF5")
+    intro_inner = [
+        Paragraph("<b>What this check is — and who it's for.</b>", INTRO_H),
+        Paragraph(
+            "This is a free early check for Indonesian producers and exporters of palm oil, "
+            "rubber, timber, cocoa and coffee. From the end of 2026 the EU's new "
+            "anti-deforestation law — the <b>EU Deforestation Regulation (EUDR)</b> — will block "
+            "these goods from the EU if they come from land where forest was cleared after "
+            "31 December 2020. We check your plots against the EU's own satellite forest maps "
+            "and show you, in plain terms, which plots could be a problem, what to prepare, "
+            "who files the EU paperwork, and your deadline. This is an early check to help you "
+            "get ready — not the official EU filing itself.", INTRO),
+        Paragraph(
+            "The EU filing is a <b>Due Diligence Statement (DDS)</b> — the declaration filed in "
+            "the EU's online system (TRACES) confirming your goods are deforestation-free and "
+            "legally produced.", INTRO),
+    ]
+    intro_tbl = RLTable([[intro_inner]], colWidths=["100%"])
+    intro_tbl.setStyle(RLTS([
+        ("BACKGROUND",    (0, 0), (-1, -1), _intro_bg),
+        ("BOX",           (0, 0), (-1, -1), 0.5, _intro_bd),
+        ("ROUNDEDCORNERS", [6]),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+    ]))
+    story.append(intro_tbl)
+    story.append(Paragraph(
+        "<i>Maps used: JRC Global Forest Cover 2020, Hansen Global Forest Change, and RADD "
+        "alerts — public satellite data the EU itself references.</i>",
+        ParagraphStyle("FnE", parent=SMALL, fontSize=7.5, spaceAfter=6, spaceBefore=3)))
+    story.append(Spacer(1, 4))
+
     # ── 2. Hero ──────────────────────────────────────────────────────────────
     # Single source-of-truth: overall → colour (never collapse 3 states to 2)
     hero_bg = colors.HexColor(EUDR_HERO_COLOUR.get(overall, EUDR_HERO_COLOUR["review_needed"]))
@@ -897,7 +948,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
             "See per-plot detail and readiness checklist below."
         )
     hero_inner = [
-        Paragraph("EU Deforestation Regulation — Triage Result", LABEL),
+        Paragraph("EU Deforestation Regulation — Plot Check", LABEL),
         Paragraph(headline, HERO_H),
         Paragraph(dds_sub, HERO_SUB),
     ]
@@ -965,8 +1016,8 @@ def generate_eudr_pdf(body: dict) -> bytes:
     # ── 4. Readiness checklist ────────────────────────────────────────────────
     if readiness:
         story.append(_sec())
-        story.append(Paragraph("DDS Readiness Checklist", H2))
-        BODY_BOLD = ParagraphStyle("BB", parent=BODY, fontName="Helvetica-Bold", spaceAfter=2)
+        story.append(Paragraph(
+            "Your readiness checklist — what you'll need for the EU filing (the DDS).", H2))
         for item in readiness:
             status = item.get("status", "incomplete")
             icon   = "✓" if status == "complete" else "○"
@@ -974,9 +1025,9 @@ def generate_eudr_pdf(body: dict) -> bytes:
             note   = item.get("note", "")
             icon_colour = "#0E7A30" if status == "complete" else "#C0392B"
             story.append(Paragraph(
-                f'<font color="{icon_colour}">{icon}</font>  <b>{comp}</b>', BODY))
+                f'<font color="{icon_colour}">{icon}</font>  <b>{comp}</b>', ITEM_H))
             if note:
-                story.append(Paragraph(f"    {note}", SMALL))
+                story.append(Paragraph(f"    {note}", ITEM_NOTE))
         story.append(Spacer(1, 4))
 
     # ── 5. Commodity evidence ─────────────────────────────────────────────────
@@ -1053,11 +1104,12 @@ def generate_eudr_pdf(body: dict) -> bytes:
 
     # ── 8. Geolocation pack note ──────────────────────────────────────────────
     story.append(_sec())
-    story.append(Paragraph("Your Art-9 Geolocation Pack", H2))
+    story.append(Paragraph("Your Geolocation Pack (the EU's 'Article 9' rule)", H2))
+    _plot_noun = "plot" if pack_count == 1 else "plots"
     if pack_count > 0:
         story.append(Paragraph(
-            f"•  Your geolocation pack is ready — {pack_count} plot(s), "
-            "polygon or point per Art-9 rules, WGS84 coordinates at ≥6 decimal places.",
+            f"•  Your geolocation pack is ready — {pack_count} {_plot_noun} with exact GPS "
+            "boundaries (the EU's 'Article 9' rule), WGS84 coordinates at ≥6 decimal places.",
             BODY))
     else:
         story.append(Paragraph(
@@ -1071,7 +1123,54 @@ def generate_eudr_pdf(body: dict) -> bytes:
         SMALL))
     story.append(Spacer(1, 8))
 
-    # ── 9. CTA ───────────────────────────────────────────────────────────────
+    # ── 9. Plain-language glossary ───────────────────────────────────────────
+    story.append(_sec())
+    story.append(Paragraph("The words we use, in plain language", H2))
+    _gloss_items = [
+        ("EUDR (EU Deforestation Regulation)",
+         "The EU's new law; from end-2026 it blocks palm, rubber, timber, cocoa, coffee "
+         "(plus cattle, soy) from the EU if grown on land cleared of forest after 31 Dec 2020."),
+        ("DDS (Due Diligence Statement)",
+         "The official declaration filed in the EU's system before your goods can enter the EU; "
+         "states they're deforestation-free and legal."),
+        ("Geolocation pack",
+         "Your plot boundaries as exact GPS coordinates (EU requires ≥6 decimals; the "
+         "'Article 9' rule). We prepare this for you."),
+        ("TRACES",
+         "The EU's online system where the DDS is filed."),
+        ("Operator / 'first placer'",
+         "The company that first brings your goods into the EU; it files the DDS — "
+         "usually your EU buyer, not you."),
+        ("Standard risk",
+         "The EU's rating for Indonesia; means full checks apply (no simplified shortcut)."),
+        ("SVLK",
+         "Indonesia's official timber-legality certificate (V-Legal)."),
+        ("HGU (Hak Guna Usaha)",
+         "Your legal right to use and cultivate the land."),
+    ]
+    _gloss_bg = colors.HexColor("#F9F9FB")
+    _gloss_bd = colors.HexColor("#D5DCE4")
+    gloss_rows: list = []
+    for term, defn in _gloss_items:
+        gloss_rows.append([
+            Paragraph(f"<b>{term}</b>", GLOSS_H),
+            Paragraph(defn, GLOSS_B),
+        ])
+    gloss_tbl = RLTable(gloss_rows, colWidths=[doc.width * 0.35, doc.width * 0.65])
+    gloss_tbl.setStyle(RLTS([
+        ("BACKGROUND",    (0, 0), (-1, -1), _gloss_bg),
+        ("BOX",           (0, 0), (-1, -1), 0.5,  _gloss_bd),
+        ("INNERGRID",     (0, 0), (-1, -1), 0.3,  colors.HexColor("#EAEEF2")),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(gloss_tbl)
+    story.append(Spacer(1, 8))
+
+    # ── 10. CTA ───────────────────────────────────────────────────────────────
     _EUDR_CTA = (
         "Your next step — engage 180Climate.\n\n"
         "EUDR Pre-Feasibility: DDS preparation, on-the-ground verification, "
@@ -1095,7 +1194,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
     ]))
     story.append(cta_tbl)
 
-    # ── 10. Footer — ONE line ────────────────────────────────────────────
+    # ── 11. Footer — ONE line ────────────────────────────────────────────
     _EUDR_FOOT = (
         "Free indicative triage — not a Due Diligence Statement, not legal advice. "
         "Checks deforestation signals only; EUDR also requires legality "

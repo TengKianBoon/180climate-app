@@ -303,7 +303,7 @@
     }
 
     /* Readiness checklist */
-    .readiness-list { display: flex; flex-direction: column; gap: .45rem; margin-top: .25rem; }
+    .readiness-list { display: flex; flex-direction: column; gap: .7rem; margin-top: .25rem; }
     .readiness-item {
       display: flex; align-items: flex-start; gap: .7rem;
       font-size: .88rem; line-height: 1.55; padding: .6rem .85rem;
@@ -609,7 +609,24 @@
 
     <div class="hero">
       <h1>EUDR Plot Check</h1>
-      <p>Upload your plots — checked against the EU's own forest maps, free, in minutes.</p>
+      <p>Upload your plots — checked against the EU's own satellite forest maps, free, in minutes.</p>
+    </div>
+
+    <!-- What this is intro -->
+    <div class="card" style="background:#f3f8ff;border-left:4px solid #3b82f6;padding:1rem 1.2rem;margin-bottom:.5rem">
+      <p style="font-size:.9rem;font-weight:700;color:#1e3a5f;margin-bottom:.4rem">What this check is — and who it's for</p>
+      <p style="font-size:.86rem;color:#2c3742;line-height:1.65;margin-bottom:.5rem">
+        This is a free early check for Indonesian producers and exporters of palm oil, rubber, timber, cocoa and coffee.
+        From the end of 2026 the EU's new anti-deforestation law — the <strong>EU Deforestation Regulation (EUDR)</strong>
+        — will block these goods from the EU if they come from land where forest was cleared after 31 December 2020.
+        We check your plots against the EU's own satellite forest maps and show you, in plain terms, which plots could be
+        a problem, what to prepare, who files the EU paperwork, and your deadline.
+        This is an early check to help you get ready — not the official EU filing itself.
+      </p>
+      <p style="font-size:.84rem;color:#475463;line-height:1.6">
+        The EU filing is a <strong>Due Diligence Statement (DDS)</strong> — the declaration filed in the EU's online
+        system (TRACES) confirming your goods are deforestation-free and legally produced.
+      </p>
     </div>
 
     <!-- Contact -->
@@ -713,10 +730,10 @@
 
     <!-- Roll-up hero -->
     <div id="eudr-hero" class="result-hero eudr-hero-review" style="margin-bottom:1rem">
-      <div class="rlbl">EUDR plot triage result</div>
+      <div class="rlbl">EUDR Plot Check result</div>
       <div class="eudr-headline" id="eudr-headline">Checking your plots…</div>
       <div class="eudr-subline" id="eudr-subline"></div>
-      <span class="eudr-chip" id="eudr-chip">Checked against the EU's own forest maps (JRC GFC2020 + Hansen)</span>
+      <span class="eudr-chip" id="eudr-chip">Checked against the EU's own satellite forest maps</span>
     </div>
 
     <!-- Per-plot blocker table (the hero) -->
@@ -764,7 +781,7 @@
     </div>
 
     <!-- E5: Readiness checklist -->
-    <h3 class="eudr-section-h">DDS readiness checklist</h3>
+    <h3 class="eudr-section-h">Your readiness checklist — what you'll need for the EU filing (the DDS)</h3>
     <div class="card" style="padding:1rem 1.4rem">
       <div class="readiness-list" id="eudr-readiness-list"></div>
     </div>
@@ -791,6 +808,31 @@
       <div class="indonesia-note" id="eudr-indonesia-note"></div>
       <div class="indonesia-action" id="eudr-indonesia-action"></div>
     </div>
+
+    <!-- Plain-language glossary -->
+    <details class="card" style="padding:1rem 1.4rem;margin-bottom:.5rem">
+      <summary style="font-size:.95rem;font-weight:700;color:var(--ink);cursor:pointer">
+        Plain-language guide — the words we use explained
+      </summary>
+      <dl style="margin-top:.75rem;font-size:.84rem;line-height:1.65">
+        <dt style="font-weight:700;color:var(--ink);margin-top:.6rem"><abbr title="EU Deforestation Regulation">EUDR</abbr> (EU Deforestation Regulation)</dt>
+        <dd style="color:#475463;margin-left:0">The EU's new law; from end-2026 it blocks palm, rubber, timber, cocoa, coffee (plus cattle, soy) from the EU if grown on land cleared of forest after 31 Dec 2020.</dd>
+        <dt style="font-weight:700;color:var(--ink);margin-top:.6rem"><abbr title="Due Diligence Statement">DDS</abbr> (Due Diligence Statement)</dt>
+        <dd style="color:#475463;margin-left:0">The official declaration filed in the EU's system before your goods can enter the EU; states they're deforestation-free and legal.</dd>
+        <dt style="font-weight:700;color:var(--ink);margin-top:.6rem">Geolocation pack</dt>
+        <dd style="color:#475463;margin-left:0">Your plot boundaries as exact GPS coordinates (EU requires ≥6 decimals; the "Article 9" rule). We prepare this for you.</dd>
+        <dt style="font-weight:700;color:var(--ink);margin-top:.6rem">TRACES</dt>
+        <dd style="color:#475463;margin-left:0">The EU's online system where the DDS is filed.</dd>
+        <dt style="font-weight:700;color:var(--ink);margin-top:.6rem">Operator / "first placer"</dt>
+        <dd style="color:#475463;margin-left:0">The company that first brings your goods into the EU; it files the DDS — usually your EU buyer, not you.</dd>
+        <dt style="font-weight:700;color:var(--ink);margin-top:.6rem">Standard risk</dt>
+        <dd style="color:#475463;margin-left:0">The EU's rating for Indonesia; means full checks apply (no simplified shortcut).</dd>
+        <dt style="font-weight:700;color:var(--ink);margin-top:.6rem">SVLK</dt>
+        <dd style="color:#475463;margin-left:0">Indonesia's official timber-legality certificate (V-Legal).</dd>
+        <dt style="font-weight:700;color:var(--ink);margin-top:.6rem">HGU (Hak Guna Usaha)</dt>
+        <dd style="color:#475463;margin-left:0">Your legal right to use and cultivate the land.</dd>
+      </dl>
+    </details>
 
     <div class="move eudr-cta-move">
       <div class="ic">&#x1f91d;</div>
@@ -1361,7 +1403,8 @@ function downloadGeopack() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    status.textContent = pack.features.length + ' plot(s) exported.';
+    var exportN = pack.features.length;
+    status.textContent = exportN + (exportN === 1 ? ' plot exported.' : ' plots exported.');
   } catch(e) {
     status.textContent = 'Export failed — ' + e.message;
   }

@@ -26,6 +26,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%SZ",
     force=True,
 )
+log = logging.getLogger(__name__)
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
@@ -731,7 +732,7 @@ _EUDR_VERBATIM: dict[str, dict[str, str]] = {
         "action": "Resolve or investigate before this plot enters a Due Diligence Statement.",
     },
     "inconclusive": {
-        "label": "Inconclusive — treat as review needed",
+        "label": "Inconclusive — review needed",
         "detail": (
             "The free datasets couldn't give a clear read here (small plot, cloud/data gaps, "
             "agroforestry ambiguity, radar noise, or degradation not visible in free data). "
@@ -756,10 +757,9 @@ def _eudr_overall_headline(plots: list, loss_count: int, clear_count: int) -> st
         noun = "plot" if loss_count == 1 else "plots"
         return f"{loss_count} {noun} could block your shipment"
     if clear_count == n and n > 0:
-        noun = "plot" if n == 1 else "plots"
-        return (
-            f"All {n} {noun} screened — not certified, still needs a DDS"
-        )
+        if n == 1:
+            return "1 plot screened — not certified, still needs a DDS"
+        return f"All {n} plots screened — not certified, still needs a DDS"
     inconclusive = n - clear_count
     noun = "plot" if inconclusive == 1 else "plots"
     verb = "needs" if inconclusive == 1 else "need"
@@ -833,6 +833,16 @@ async def eudr_screen(
         overall = "clear_in_screen"
 
     headline = _eudr_overall_headline(plot_verdicts, loss_count, clear_count)
+
+    # Amber-rate log (WO-013): overall + per-plot detection + reason — for rate monitoring
+    log.info(
+        "EUDR run: overall=%s plots=%d loss=%d clear=%d inconclusive=%d invalid=%d "
+        "detections=%s",
+        overall, len(plot_verdicts), loss_count, clear_count, incon_count, inval_count,
+        [{"id": pv.plot_id, "detection": pv.detection,
+          "forest_2020": getattr(pv, "forest_2020", None),
+          "geometry_ok": pv.geometry_ok} for pv in plot_verdicts],
+    )
 
     # 5. Per-plot response dicts (with verbatim wording)
     plots_out = []

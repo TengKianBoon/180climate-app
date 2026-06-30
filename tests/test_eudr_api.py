@@ -903,3 +903,31 @@ def test_eudr_geometry_note_no_plot_s():
         assert "plot(s)" not in item.get("note", ""), (
             f"Literal 'plot(s)' in readiness note: {item['note']!r}"
         )
+
+
+# ── WO-EUDR-LAYMAN-013 tests ──────────────────────────────────────────────────
+
+def test_eudr_inconclusive_label_not_flagged():
+    """inconclusive label must say 'Inconclusive', not 'Flagged' (reserved for loss_detected)."""
+    body = _post(_fc([_POLY_INCON]))
+    for p in body["plots"]:
+        if p["detection"] == "inconclusive":
+            assert "Flagged" not in p["label"], (
+                f"'Flagged' must be reserved for loss_detected, got: {p['label']!r}"
+            )
+            assert "Inconclusive" in p["label"], (
+                f"inconclusive label must say 'Inconclusive', got: {p['label']!r}"
+            )
+
+
+def test_eudr_clear_headline_singular_no_all_1():
+    """Single clear plot: headline must not say 'All 1 plot' — smooth singular."""
+    body = _post(_fc([_POLY_CLEAR]))
+    if body["overall"] == "clear_in_screen" and body["clear_count"] == 1:
+        hl = body["overall_headline"]
+        assert "All 1" not in hl, (
+            f"Singular clear headline must not say 'All 1': {hl!r}"
+        )
+        assert "not certified" in hl or "needs a DDS" in hl, (
+            f"Singular clear must carry DDS framing: {hl!r}"
+        )
