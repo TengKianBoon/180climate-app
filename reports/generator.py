@@ -912,8 +912,8 @@ def generate_eudr_pdf(body: dict) -> bytes:
             "get ready — not the official EU filing itself.", INTRO),
         Paragraph(
             "The EU filing is a <b>Due Diligence Statement (DDS)</b> — the declaration filed in "
-            "the EU's online system (TRACES) confirming your goods are deforestation-free and "
-            "legally produced.", INTRO),
+            "the EU's online system (TRACES) stating your goods were not grown on land cleared "
+            "of forest after 2020, and were produced legally.", INTRO),
     ]
     intro_tbl = RLTable([[intro_inner]], colWidths=["100%"])
     intro_tbl.setStyle(RLTS([
@@ -1132,7 +1132,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
          "(plus cattle, soy) from the EU if grown on land cleared of forest after 31 Dec 2020."),
         ("DDS (Due Diligence Statement)",
          "The official declaration filed in the EU's system before your goods can enter the EU; "
-         "states they're deforestation-free and legal."),
+         "it states they were not grown on deforested land (after 2020) and were produced legally."),
         ("Geolocation pack",
          "Your plot boundaries as exact GPS coordinates (EU requires ≥6 decimals; the "
          "'Article 9' rule). We prepare this for you."),

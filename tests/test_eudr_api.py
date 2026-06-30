@@ -931,3 +931,52 @@ def test_eudr_clear_headline_singular_no_all_1():
         assert "not certified" in hl or "needs a DDS" in hl, (
             f"Singular clear must carry DDS framing: {hl!r}"
         )
+
+
+# ── WO-EUDR-BANGUARD-014 tests — guard gap closed ─────────────────────────────
+
+def test_no_banned_strings_in_eudr_pdf_render():
+    """generate_eudr_pdf() rendered text must not contain any EUDR_BANNED_SUBSTRINGS.
+
+    Closes the guard gap where banned strings in static report copy were not caught
+    by the JSON-level guard (which only checks serialized API response output).
+    """
+    import io
+    import pypdf
+    from reports.generator import generate_eudr_pdf
+
+    body = _post(_fc([_POLY_LOSS]))
+    pdf_bytes = generate_eudr_pdf({
+        **body,
+        "contact_name": "Test User",
+        "commodity": "palm",
+        "filename_base": "test_banguard",
+    })
+    reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+    full_text = " ".join(
+        page.extract_text() or "" for page in reader.pages
+    ).lower()
+    for banned in EUDR_BANNED_SUBSTRINGS:
+        assert banned not in full_text, (
+            f"Banned substring {banned!r} found in rendered EUDR PDF text"
+        )
+
+
+def test_no_banned_strings_in_eudr_frontend_copy():
+    """The EUDR section of frontend/index.html must not contain any EUDR_BANNED_SUBSTRINGS.
+
+    Closes the guard gap where static HTML copy was not checked by the API-level guard.
+    """
+    from pathlib import Path
+
+    frontend_path = Path(__file__).parent.parent / "frontend" / "index.html"
+    html = frontend_path.read_text(encoding="utf-8")
+    # Extract only the EUDR screen section to avoid false positives in comments/docs
+    eudr_start = html.find('id="screen-eudr"')
+    eudr_end   = html.find('</div><!-- /screen-eudr -->')
+    assert eudr_start != -1, "EUDR screen section not found in index.html"
+    eudr_section = html[eudr_start:eudr_end].lower() if eudr_end != -1 else html[eudr_start:].lower()
+    for banned in EUDR_BANNED_SUBSTRINGS:
+        assert banned not in eudr_section, (
+            f"Banned substring {banned!r} found in EUDR frontend copy (index.html)"
+        )
