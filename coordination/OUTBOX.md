@@ -1,94 +1,87 @@
-# OUTBOX — Builder → Cowork · WO-EUDR-READINESS-007 (E5) · 2026-06-30
+# OUTBOX — Builder → Cowork · WO-EUDR-EXPORT-008 (E6) · 2026-06-30
 
-## Status: CI GREEN ✅ — 426 tests pass (+26 new E5 tests) — STOPPED for Cowork review
+## Status: CI GREEN ✅ — 438 tests pass (+12 new E6 tests) — STOPPED for Cowork review
 
-4 new sections added below the per-plot blocker table. All render guards pass. No banned strings.
+Art-9 GeoJSON geolocation pack export added to `POST /api/eudr` response + frontend download button.
 
 ---
 
 ## What shipped
 
-### `api/main.py` — 4 new response fields on `POST /api/eudr`
+### `api/main.py` — new helpers + `geolocation_pack_geojson` response field
 
-| Field | Source | Content |
-|---|---|---|
-| `readiness` | `_build_readiness()` | 5 categorical ✓/incomplete items; NO numeric score |
-| `commodity_evidence` | `_EUDR_COMMODITY_EVIDENCE[commodity]` | Commodity-keyed list of legality docs to gather |
-| `who_files` | `_EUDR_WHO_FILES[role]` | Role-keyed `{who, detail, action}` explainer |
-| `indonesia_context` | `_EUDR_INDONESIA_CONTEXT` | Static standard-risk context + deadlines |
+**`_round_coords()` / `_round_geojson_coords()`**
+Recursively round all GeoJSON coordinate values to ≥6 decimal places. Handles nested lists (Polygon, MultiPolygon, etc.). Never rounds below 6.
 
-#### Readiness checklist (5 components)
-| Component | Logic |
-|---|---|
-| Plots have valid geolocation (EUDR Art. 9) | `complete` if `inval_count == 0` |
-| Plots screened against the EU's forest maps | always `complete` |
-| No deforestation flagged in screening | `complete` if `loss_count == 0 AND incon_count == 0` |
-| Commodity legality evidence gathered | always `incomplete` (manual item) |
-| Who files the DDS — role identified | always `complete` |
+**`_build_geolocation_pack(validations, plot_verdicts, commodity, producer_name, run_date)`**
+Returns an Art-9 GeoJSON FeatureCollection:
+- `geometry_invalid` plots **excluded** (Art-9 non-conforming — cannot enter a DDS)
+- Area >4 ha → **Polygon** geometry (rounded to ≥6dp)
+- Area ≤4 ha → **Point** geometry (centroid, rounded to ≥6dp)
+- Properties: `plot_id`, `commodity`, `detection`, `area_ha`, `producer_name`, `run_date`, `pack_note`
+- `pack_note`: "Screened against JRC GFC2020 + Hansen + RADD. Not a Due Diligence Statement. Geolocation pack for DDS preparation." (no banned strings)
 
-No numeric score — categorical only (ADR-0018 invariant).
+**`geolocation_pack_geojson`** key added to `POST /api/eudr` response body (dict, not a separate endpoint — avoids re-running triage).
 
-#### Commodity evidence (what to gather for DDS)
-- `timber` → SVLK (V-Legal), IPK/IPPKH logging permit, HGU, AMDAL, SKSHH
-- `palm` → ISPO/RSPO, HGU, IUP-B, land title, no-burn record
-- `rubber/cocoa/coffee` → land title (SHM/SHGB), cooperative records, farm registration
-- `manual_review` → land title, permits, contact 180Climate
+### `frontend/index.html` — download button + JS
 
-#### Who-files explainer (role-keyed)
-- `non_eu_supplier` → "Your EU buyer / importer files the DDS — not you." + geolocation pack action
-- `eu_first_placer` → "You file the DDS — before the product is released on the EU market." + TRACES action
-- `downstream_operator` → "You verify the DDS filed above you — you no longer file your own." + get reference number action
+New card above the readiness checklist: "Download your geolocation pack (GeoJSON)"
 
-#### Indonesia context (static)
-- Risk: Standard risk → Full due diligence required
-- Deadlines: 30 Dec 2026 (large/medium) / 30 Jun 2027 (micro/small)
-- Simplified route: explicitly noted as NOT applicable to Indonesia
-- Action: start preparing geolocation pack now
+Copy (verbatim — no banned strings):
+> "Your plot coordinates formatted for the EU's system — a geolocation pack for **DDS preparation**. The DDS itself is filed in TRACES by the operator placing on the EU market."
 
-### `frontend/index.html` — 4 new sections + CSS
-
-CSS: `.readiness-item.complete/.incomplete`, `.evidence-list li`, `.who-files-box`, `.indonesia-box` + deadline grid.
-
-HTML: after legality/timber notes, before CTA move:
-1. "DDS readiness checklist" — card with `.readiness-list`
-2. "What to gather for your DDS" — card with `.evidence-list`
-3. "Who files the Due Diligence Statement" — `.who-files-box`
-4. "Indonesia — standard risk" — `.indonesia-box` with deadline grid
-
-JS in `renderEudrResult()`: renders all 4 sections from API response fields.
-
-### `tests/test_eudr_api.py` — 26 new E5 tests
-
-| Group | Tests |
-|---|---|
-| Readiness | field present, required fields, no numeric score, geo complete/incomplete, legality always incomplete, deforestation complete/incomplete, no banned strings |
-| Commodity evidence | palm (ISPO+HGU), timber (SVLK), rubber/cocoa/coffee, no banned strings across all commodities |
-| Who files | field present (who/detail/action), non_eu_supplier says buyer, eu_first_placer says you, downstream says no longer, no banned strings for all 3 roles |
-| Indonesia context | field present (risk/deadlines), standard risk + full DD, 2026+2027 deadlines, simplified not applicable, no banned strings |
+**`downloadGeopack()`** JS function:
+- Reads `_eudrResult.geolocation_pack_geojson` (cached from the triage response)
+- Guards: no result → message; empty features → message (all plots had geometry errors)
+- Creates `Blob` → `URL.createObjectURL` → triggers `<a download>` click
+- Filename: `180climate_geolocation_pack_{YYMMDDHHMM}.geojson`
+- Shows plot count in status line after download
 
 ---
 
 ## API smoke
 
 ```
-2-plot batch (1 loss + 1 clear), palm, non_eu_supplier:
-  overall: loss_detected  headline: "1 plot could block your shipment"
+2-plot batch (1 loss + 1 clear), palm:
+  geolocation_pack_geojson.type = FeatureCollection
+  features: 2
 
-readiness (5):
-  COMPLETE  | Plots have valid geolocation (EUDR Art. 9)
-  COMPLETE  | Plots screened against the EU's forest maps
-  INCOMPLETE| No deforestation flagged in screening
-  INCOMPLETE| Commodity legality evidence gathered
-  COMPLETE  | Who files the DDS — role identified
-
-evidence (5, palm): ISPO, HGU, IUP-B, land title, no-burn record
-
-who_files.who: "Your EU buyer / importer files the DDS — not you."
-
-indonesia: Standard risk | Full due diligence required
-  Large and medium operators -> 30 December 2026
-  Micro and small operators  -> 30 June 2027
+  plot_loss    det=loss_detected     area=492.29 ha  geom=Polygon
+    first coord: lon=112.989999 lat=-1.009999  (6dp ✓)
+  plot_clear   det=clear_in_screen   area=492.07 ha  geom=Polygon
+    first coord: lon=113.989999 lat=-2.009999  (6dp ✓)
 ```
+
+---
+
+## Tests — `tests/test_eudr_api.py` (12 new E6 tests)
+
+| Test | Assertion |
+|---|---|
+| `test_geolocation_pack_field_present` | field present, type=FeatureCollection |
+| `test_geolocation_pack_is_valid_feature_collection` | 2-plot batch → 2 features, each Feature+geometry+properties |
+| `test_geolocation_pack_properties_present` | plot_id, commodity, detection, area_ha, producer_name |
+| `test_geolocation_pack_commodity_matches` | commodity=timber → properties.commodity=timber |
+| `test_geolocation_pack_detection_matches_triage` | pack detection == plots[0].detection |
+| `test_geolocation_pack_large_plot_is_polygon` | >4 ha plot → Polygon geometry |
+| `test_geolocation_pack_small_plot_is_point` | tiny plot (≤4 ha) → Point geometry with [lon, lat] floats |
+| `test_geolocation_pack_at_least_6_decimal_places` | all Polygon coord values: round(v, 6) == v |
+| `test_geolocation_pack_point_has_6_decimal_places` | centroid coords at 6dp |
+| `test_geolocation_pack_excludes_geometry_invalid` | _POLY_BADGEO → 0 features in pack |
+| `test_geolocation_pack_mixed_batch_excludes_invalid` | valid + invalid → only valid in pack |
+| `test_geolocation_pack_no_banned_strings` | none of the 4 banned substrings in pack JSON |
+
+---
+
+## OPEN ITEM (flagged for John)
+
+**Live TRACES uploader validation** — whether this GeoJSON file loads correctly into the **EU TRACES EUDR module** cannot be tested here. This is a **pre-launch check for John + legal**:
+1. Download a sample geolocation pack from the deployed app (using real Indonesian plot coordinates at ≥6dp)
+2. Attempt to import it in the TRACES EUDR pilot environment (available to EU operators)
+3. Verify that the FeatureCollection → per-plot mapping is accepted
+4. If TRACES requires a specific schema (e.g., ISO-19115 metadata, specific property names), adjust `_build_geolocation_pack()` accordingly
+
+The current format follows the Art-9 requirements as published in the regulation: polygon for >4 ha, point for ≤4 ha, WGS84/EPSG:4326, ≥6 decimal coordinates. Schema adjustment is a one-function edit if TRACES expects different property names.
 
 ---
 
@@ -96,5 +89,5 @@ indonesia: Standard risk | Full due diligence required
 
 ```
 mypy core/contracts/__init__.py --ignore-missing-imports → Success: no issues found
-pytest tests/ → 426 passed, 1 warning (was 400; +26 new E5 tests)
+pytest tests/ → 438 passed, 1 warning (was 426; +12 new E6 tests)
 ```

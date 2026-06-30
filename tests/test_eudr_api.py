@@ -565,3 +565,156 @@ def test_indonesia_context_no_banned_strings():
         assert banned not in ic_json, (
             f"Banned substring {banned!r} in indonesia_context"
         )
+
+
+# ══ E6: geolocation pack (Art-9 GeoJSON export) ══════════════════════════════
+
+
+def test_geolocation_pack_field_present():
+    body = _post(_fc([_POLY_LOSS]))
+    assert "geolocation_pack_geojson" in body
+    pack = body["geolocation_pack_geojson"]
+    assert pack["type"] == "FeatureCollection"
+    assert "features" in pack
+
+
+def test_geolocation_pack_is_valid_feature_collection():
+    body = _post(_fc([_POLY_LOSS, _POLY_CLEAR]))
+    pack = body["geolocation_pack_geojson"]
+    assert pack["type"] == "FeatureCollection"
+    assert len(pack["features"]) == 2
+    for feat in pack["features"]:
+        assert feat["type"] == "Feature"
+        assert "geometry" in feat
+        assert "properties" in feat
+
+
+def test_geolocation_pack_properties_present():
+    body = _post(_fc([_POLY_LOSS]))
+    feat = body["geolocation_pack_geojson"]["features"][0]
+    props = feat["properties"]
+    assert "plot_id" in props
+    assert "commodity" in props
+    assert "detection" in props
+    assert "area_ha" in props
+    assert "producer_name" in props
+
+
+def test_geolocation_pack_commodity_matches():
+    body = _post(_fc([_POLY_CLEAR]), commodity="timber")
+    feat = body["geolocation_pack_geojson"]["features"][0]
+    assert feat["properties"]["commodity"] == "timber"
+
+
+def test_geolocation_pack_detection_matches_triage():
+    body = _post(_fc([_POLY_LOSS]))
+    pack_det = body["geolocation_pack_geojson"]["features"][0]["properties"]["detection"]
+    triage_det = body["plots"][0]["detection"]
+    assert pack_det == triage_det
+
+
+def test_geolocation_pack_large_plot_is_polygon():
+    """Plots >4 ha must be exported as Polygon (Art-9)."""
+    body = _post(_fc([_POLY_LOSS]))
+    feat = body["geolocation_pack_geojson"]["features"][0]
+    # _POLY_LOSS is ~4.4 km × 4.4 km → well over 4 ha; should be polygon
+    assert feat["geometry"]["type"] == "Polygon", (
+        "Large plot (>4 ha) should be a Polygon in the geolocation pack"
+    )
+
+
+def test_geolocation_pack_small_plot_is_point():
+    """Plots ≤4 ha must be exported as Point (Art-9)."""
+    # Build a tiny polygon (≈0.01 ha) that passes Art-9 precision but is ≤4 ha
+    tiny = {
+        "type": "Polygon",
+        "coordinates": [[[
+            113.000001, -1.000001
+        ], [
+            113.000011, -1.000001
+        ], [
+            113.000011, -0.999991
+        ], [
+            113.000001, -0.999991
+        ], [
+            113.000001, -1.000001
+        ]]],
+    }
+    body = _post(_fc([tiny]))
+    feat = body["geolocation_pack_geojson"]["features"][0]
+    assert feat["geometry"]["type"] == "Point", (
+        "Small plot (≤4 ha) should be exported as a Point (Art-9)"
+    )
+    # Point coordinates: [lon, lat] — both must be floats
+    coords = feat["geometry"]["coordinates"]
+    assert len(coords) == 2
+    assert all(isinstance(c, float) for c in coords)
+
+
+def test_geolocation_pack_at_least_6_decimal_places():
+    """All polygon coordinate values must have ≥6 decimal places."""
+    body = _post(_fc([_POLY_CLEAR]))
+    pack = body["geolocation_pack_geojson"]
+    for feat in pack["features"]:
+        geom = feat["geometry"]
+        if geom["type"] == "Polygon":
+            for ring in geom["coordinates"]:
+                for lon, lat in ring:
+                    # round() to 6 should equal the value itself (already at 6dp)
+                    assert round(lon, 6) == lon or len(str(lon).rstrip("0").split(".")[-1]) >= 6, (
+                        f"Longitude {lon} has fewer than 6 decimal places"
+                    )
+
+
+def test_geolocation_pack_point_has_6_decimal_places():
+    """Point coordinates must also have ≥6 decimal places."""
+    tiny = {
+        "type": "Polygon",
+        "coordinates": [[[
+            113.000001, -1.000001
+        ], [
+            113.000011, -1.000001
+        ], [
+            113.000011, -0.999991
+        ], [
+            113.000001, -0.999991
+        ], [
+            113.000001, -1.000001
+        ]]],
+    }
+    body = _post(_fc([tiny]))
+    feat = body["geolocation_pack_geojson"]["features"][0]
+    assert feat["geometry"]["type"] == "Point"
+    lon, lat = feat["geometry"]["coordinates"]
+    # centroid coords should be at 6dp (rounded from input)
+    assert round(lon, 6) == lon
+    assert round(lat, 6) == lat
+
+
+def test_geolocation_pack_excludes_geometry_invalid():
+    """geometry_invalid plots must NOT appear in the geolocation pack (Art-9 non-conforming)."""
+    body = _post(_fc([_POLY_BADGEO]))
+    pack = body["geolocation_pack_geojson"]
+    # _POLY_BADGEO has only 4 decimal places → geometry_invalid
+    assert len(pack["features"]) == 0, (
+        "geometry_invalid plot should be excluded from the geolocation pack"
+    )
+
+
+def test_geolocation_pack_mixed_batch_excludes_invalid():
+    """Valid plots included; geometry_invalid excluded."""
+    body = _post(_fc([_POLY_LOSS, _POLY_BADGEO]))
+    pack = body["geolocation_pack_geojson"]
+    # Only _POLY_LOSS (valid) should appear
+    assert len(pack["features"]) == 1
+    assert pack["features"][0]["properties"]["plot_id"] == "plot_1"
+
+
+def test_geolocation_pack_no_banned_strings():
+    """E1 guard: no banned strings in the geolocation pack JSON."""
+    body = _post(_fc([_POLY_LOSS, _POLY_CLEAR]))
+    pack_json = json.dumps(body["geolocation_pack_geojson"])
+    for banned in EUDR_BANNED_SUBSTRINGS:
+        assert banned not in pack_json, (
+            f"Banned substring {banned!r} found in geolocation_pack_geojson"
+        )

@@ -737,6 +737,19 @@
     <div class="eudr-note warn" id="eudr-legality-note"></div>
     <div class="eudr-note warn" id="eudr-timber-note" style="display:none"></div>
 
+    <!-- E6: Geolocation pack download -->
+    <h3 class="eudr-section-h">Download your geolocation pack</h3>
+    <div class="card" style="padding:1.1rem 1.4rem">
+      <p style="font-size:.88rem;color:var(--muted);line-height:1.6;margin-bottom:.9rem">
+        Your plot coordinates formatted for the EU's system — a geolocation pack for <strong>DDS preparation</strong>.
+        The DDS itself is filed in TRACES by the operator placing on the EU market.
+      </p>
+      <button class="btn btn-outline" id="eudr-dl-btn" onclick="downloadGeopack()" style="font-size:.88rem">
+        Download your geolocation pack (GeoJSON)
+      </button>
+      <div id="eudr-dl-status" style="font-size:.8rem;color:var(--muted);margin-top:.4rem"></div>
+    </div>
+
     <!-- E5: Readiness checklist -->
     <h3 class="eudr-section-h">DDS readiness checklist</h3>
     <div class="card" style="padding:1rem 1.4rem">
@@ -1280,6 +1293,41 @@ function renderEudrResult() {
 
 function escHtml(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Download Art-9 GeoJSON geolocation pack ────────────────────────────────
+function downloadGeopack() {
+  var status = document.getElementById('eudr-dl-status');
+  if (!_eudrResult || !_eudrResult.geolocation_pack_geojson) {
+    status.textContent = 'Run a plot check first to generate your geolocation pack.';
+    return;
+  }
+  try {
+    var pack = _eudrResult.geolocation_pack_geojson;
+    if (!pack.features || pack.features.length === 0) {
+      status.textContent = 'No valid plots to export — fix geometry errors and re-screen.';
+      return;
+    }
+    var json = JSON.stringify(pack, null, 2);
+    var blob = new Blob([json], { type: 'application/geo+json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    // Filename: 180climate_geolocation_pack_YYMMDDHHMM.geojson
+    var now = new Date();
+    var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+    var ts = ('' + now.getFullYear()).slice(2)
+      + pad(now.getMonth() + 1) + pad(now.getDate())
+      + pad(now.getHours()) + pad(now.getMinutes());
+    a.href = url;
+    a.download = '180climate_geolocation_pack_' + ts + '.geojson';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    status.textContent = pack.features.length + ' plot(s) exported.';
+  } catch(e) {
+    status.textContent = 'Export failed — ' + e.message;
+  }
 }
 
 // ── Download report ────────────────────────────────────────────────────────

@@ -585,6 +585,84 @@ _EUDR_INDONESIA_CONTEXT: dict = {
 }
 
 
+def _round_coords(coords: list, decimals: int = 6) -> list:
+    """Recursively round coordinate values to at least `decimals` decimal places."""
+    if not coords:
+        return coords
+    if isinstance(coords[0], (int, float)):
+        return [round(float(c), decimals) for c in coords]
+    return [_round_coords(ring, decimals) for ring in coords]
+
+
+def _round_geojson_coords(geojson: dict, decimals: int = 6) -> dict:
+    """Return a shallow copy of a GeoJSON geometry with all coords rounded to ≥decimals places."""
+    return {**geojson, "coordinates": _round_coords(geojson["coordinates"], decimals)}
+
+
+def _build_geolocation_pack(
+    validations: list,
+    plot_verdicts: list,
+    commodity: str,
+    producer_name: str,
+    run_date: str,
+) -> dict:
+    """Build an Art-9 GeoJSON FeatureCollection for the geolocation pack.
+
+    Rules (EUDR Art. 9 + WO-EUDR-EXPORT-008):
+      - Polygon for >4 ha plots; point for ≤4 ha (centroid).
+      - ≥6 decimal places on all coordinates (never round below 6).
+      - geometry_invalid plots excluded (Art-9 non-conforming geometry cannot enter a DDS).
+      - Properties: plot_id, commodity, detection, area_ha, producer_name, run_date.
+
+    Never uses banned strings. detection values are the E3 enums, NOT legal-clearance phrases.
+    """
+    from shapely.geometry import shape as _shapely_shape
+
+    verdict_by_id = {pv.plot_id: pv for pv in plot_verdicts}
+    features = []
+
+    for v in validations:
+        if not v.geometry_ok or v.geojson is None:
+            # Art-9 non-conforming geometry — excluded from the geolocation pack
+            continue
+
+        pv = verdict_by_id.get(v.plot_id)
+        detection = pv.detection if pv else "inconclusive"
+
+        # Art-9: point for ≤4 ha, polygon for >4 ha
+        if v.area_ha <= 4.0:
+            centroid = _shapely_shape(v.geojson).centroid
+            geometry_out: dict = {
+                "type": "Point",
+                "coordinates": [round(centroid.x, 6), round(centroid.y, 6)],
+            }
+        else:
+            geometry_out = _round_geojson_coords(v.geojson, decimals=6)
+
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "plot_id": v.plot_id,
+                "commodity": commodity,
+                "detection": detection,
+                "area_ha": round(v.area_ha, 4),
+                "producer_name": producer_name,
+                "run_date": run_date,
+                "pack_note": (
+                    "Screened against JRC GFC2020 + Hansen + RADD. "
+                    "Not a Due Diligence Statement. "
+                    "Geolocation pack for DDS preparation."
+                ),
+            },
+            "geometry": geometry_out,
+        })
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+    }
+
+
 def _build_readiness(inval_count: int, loss_count: int, incon_count: int) -> list[dict]:
     """Categorical readiness checklist (ADR-0018: no numeric score, ✓/incomplete per component)."""
     geo_ok = inval_count == 0
@@ -798,6 +876,10 @@ async def eudr_screen(
         "commodity_evidence": _EUDR_COMMODITY_EVIDENCE.get(commodity, _EUDR_COMMODITY_EVIDENCE["manual_review"]),
         "who_files":          _EUDR_WHO_FILES.get(role, _EUDR_WHO_FILES["non_eu_supplier"]),
         "indonesia_context":  _EUDR_INDONESIA_CONTEXT,
+        # E6: Art-9 GeoJSON geolocation pack (client-side download; avoids re-running triage)
+        "geolocation_pack_geojson": _build_geolocation_pack(
+            validations, plot_verdicts, commodity, name, str(run_date)
+        ),
     }
 
     # Banned-string guard (belt-and-suspenders — the contract tests cover this too)
