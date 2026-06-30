@@ -295,6 +295,69 @@
     .eudr-cta-move { background: linear-gradient(135deg, #0E7A30, #15913A); color: #fff; margin-top: .5rem; }
     .eudr-cta-move .bd { color: rgba(255,255,255,.95); }
     .eudr-cta-move .bd b { color: #fff; }
+
+    /* ── E5 readiness + get-ready kit ───────────────────────────────────────── */
+    .eudr-section-h {
+      font-size: 1.05rem; font-weight: 800; margin: 1.75rem 0 .75rem;
+      letter-spacing: -.01em; color: var(--ink);
+    }
+
+    /* Readiness checklist */
+    .readiness-list { display: flex; flex-direction: column; gap: .45rem; margin-top: .25rem; }
+    .readiness-item {
+      display: flex; align-items: flex-start; gap: .7rem;
+      font-size: .88rem; line-height: 1.55; padding: .6rem .85rem;
+      border-radius: 8px; background: #f8fafb;
+    }
+    .readiness-item.complete { background: #f0fdf4; }
+    .readiness-item.incomplete { background: #fffbeb; }
+    .readiness-icon { font-size: 1rem; flex: 0 0 auto; margin-top: .05rem; }
+    .readiness-body { flex: 1; }
+    .readiness-component { font-weight: 700; color: var(--ink); }
+    .readiness-note { color: var(--muted); font-size: .8rem; margin-top: .1rem; }
+
+    /* Evidence checklist */
+    .evidence-list { margin: .5rem 0 .25rem; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: .35rem; }
+    .evidence-list li {
+      font-size: .87rem; color: #2c3742; line-height: 1.55;
+      padding: .45rem .8rem; border-radius: 7px;
+      background: #f3f5f8; border-left: 3px solid var(--green);
+    }
+    .evidence-list li::before { content: ""; }
+
+    /* Who-files box */
+    .who-files-box {
+      border-radius: 10px; padding: 1rem 1.2rem; background: #eef6ff;
+      border-left: 4px solid #3b82f6; margin-top: .25rem;
+    }
+    .who-files-who { font-weight: 700; color: #1e3a5f; font-size: .95rem; margin-bottom: .4rem; }
+    .who-files-detail { font-size: .86rem; color: #2c3742; line-height: 1.6; }
+    .who-files-action {
+      margin-top: .6rem; font-size: .82rem; font-weight: 600; color: #1e3a5f;
+      background: rgba(59,130,246,.12); border-radius: 6px;
+      padding: .3rem .7rem; display: inline-block;
+    }
+
+    /* Indonesia context */
+    .indonesia-box {
+      border-radius: 10px; padding: 1rem 1.2rem; background: #f5f3ff;
+      border-left: 4px solid #7c3aed; margin-top: .25rem;
+    }
+    .indonesia-risk { font-weight: 700; color: #4c1d95; font-size: .9rem; margin-bottom: .45rem; }
+    .indonesia-deadlines { margin: .45rem 0; }
+    .indonesia-deadline-row {
+      display: flex; justify-content: space-between; font-size: .84rem;
+      padding: .3rem 0; border-bottom: 1px solid rgba(124,58,237,.1);
+    }
+    .indonesia-deadline-row:last-child { border-bottom: none; }
+    .indonesia-deadline-group { color: #2c3742; }
+    .indonesia-deadline-date { font-weight: 700; color: #4c1d95; }
+    .indonesia-note { font-size: .82rem; color: var(--muted); margin-top: .5rem; line-height: 1.55; }
+    .indonesia-action {
+      margin-top: .65rem; font-size: .82rem; font-weight: 600; color: #4c1d95;
+      background: rgba(124,58,237,.1); border-radius: 6px;
+      padding: .3rem .7rem; display: inline-block;
+    }
   </style>
 </head>
 <body>
@@ -673,6 +736,35 @@
 
     <div class="eudr-note warn" id="eudr-legality-note"></div>
     <div class="eudr-note warn" id="eudr-timber-note" style="display:none"></div>
+
+    <!-- E5: Readiness checklist -->
+    <h3 class="eudr-section-h">DDS readiness checklist</h3>
+    <div class="card" style="padding:1rem 1.4rem">
+      <div class="readiness-list" id="eudr-readiness-list"></div>
+    </div>
+
+    <!-- E5: Commodity evidence -->
+    <h3 class="eudr-section-h" id="eudr-evidence-h">What to gather for your DDS</h3>
+    <div class="card" style="padding:1rem 1.4rem">
+      <ul class="evidence-list" id="eudr-evidence-list"></ul>
+    </div>
+
+    <!-- E5: Who files the DDS -->
+    <h3 class="eudr-section-h">Who files the Due Diligence Statement</h3>
+    <div class="who-files-box" id="eudr-who-files-box">
+      <div class="who-files-who" id="eudr-who-files-who"></div>
+      <div class="who-files-detail" id="eudr-who-files-detail"></div>
+      <div class="who-files-action" id="eudr-who-files-action"></div>
+    </div>
+
+    <!-- E5: Indonesia context -->
+    <h3 class="eudr-section-h">Indonesia — standard risk</h3>
+    <div class="indonesia-box" id="eudr-indonesia-box">
+      <div class="indonesia-risk" id="eudr-indonesia-risk"></div>
+      <div class="indonesia-deadlines" id="eudr-indonesia-deadlines"></div>
+      <div class="indonesia-note" id="eudr-indonesia-note"></div>
+      <div class="indonesia-action" id="eudr-indonesia-action"></div>
+    </div>
 
     <div class="move eudr-cta-move">
       <div class="ic">&#x1f91d;</div>
@@ -1134,6 +1226,46 @@ function renderEudrResult() {
   } else {
     timberEl.style.display = 'none';
   }
+
+  // ── E5: Readiness checklist ─────────────────────────────────────────────
+  var readList = document.getElementById('eudr-readiness-list');
+  readList.innerHTML = (r.readiness || []).map(function(item) {
+    var ok = item.status === 'complete';
+    var icon = ok ? '&#x2705;' : '&#x26a0;&#xfe0f;';
+    return '<div class="readiness-item ' + (ok ? 'complete' : 'incomplete') + '">'
+      + '<span class="readiness-icon">' + icon + '</span>'
+      + '<div class="readiness-body">'
+      +   '<div class="readiness-component">' + escHtml(item.component) + '</div>'
+      +   '<div class="readiness-note">' + escHtml(item.note || '') + '</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  // ── E5: Commodity evidence ───────────────────────────────────────────────
+  var evItems = r.commodity_evidence || [];
+  document.getElementById('eudr-evidence-list').innerHTML = evItems.map(function(ev) {
+    return '<li>' + escHtml(ev) + '</li>';
+  }).join('');
+
+  // ── E5: Who files ────────────────────────────────────────────────────────
+  var wf = r.who_files || {};
+  document.getElementById('eudr-who-files-who').textContent    = wf.who || '';
+  document.getElementById('eudr-who-files-detail').textContent = wf.detail || '';
+  document.getElementById('eudr-who-files-action').textContent = wf.action || '';
+
+  // ── E5: Indonesia context ────────────────────────────────────────────────
+  var ic = r.indonesia_context || {};
+  document.getElementById('eudr-indonesia-risk').innerHTML =
+    escHtml(ic.risk_level || '') + ' &mdash; ' + escHtml(ic.due_diligence || '');
+  var deadlineHtml = (ic.deadlines || []).map(function(d) {
+    return '<div class="indonesia-deadline-row">'
+      + '<span class="indonesia-deadline-group">' + escHtml(d.group) + '</span>'
+      + '<span class="indonesia-deadline-date">' + escHtml(d.deadline) + '</span>'
+      + '</div>';
+  }).join('');
+  document.getElementById('eudr-indonesia-deadlines').innerHTML = deadlineHtml;
+  document.getElementById('eudr-indonesia-note').textContent   = ic.simplified_route_note || '';
+  document.getElementById('eudr-indonesia-action').textContent = ic.action || '';
 
   // ── Attribution + footer ────────────────────────────────────────────────
   document.getElementById('eudr-jrc-attr').textContent = r.jrc_attribution || '';

@@ -334,3 +334,234 @@ def test_file_upload_geojson():
     assert r.status_code == 200
     body = r.json()
     assert body["overall"] == "loss_detected"
+
+
+# ══ E5: readiness checklist ══════════════════════════════════════════════════
+
+
+def test_readiness_field_present():
+    body = _post(_fc([_POLY_LOSS]))
+    assert "readiness" in body
+    assert isinstance(body["readiness"], list)
+    assert len(body["readiness"]) >= 4
+
+
+def test_readiness_items_have_required_fields():
+    body = _post(_fc([_POLY_LOSS]))
+    for item in body["readiness"]:
+        assert "component" in item
+        assert "status" in item
+        assert item["status"] in ("complete", "incomplete"), (
+            f"Unexpected status: {item['status']!r}"
+        )
+
+
+def test_readiness_no_numeric_score():
+    """Categorical only — no numeric score field (ADR-0018)."""
+    body = _post(_fc([_POLY_LOSS]))
+    body_json = json.dumps(body["readiness"])
+    assert "score" not in body_json
+
+
+def test_readiness_geo_ok_when_no_invalid_plots():
+    body = _post(_fc([_POLY_CLEAR]))
+    geo_item = next(
+        (r for r in body["readiness"] if "geolocation" in r["component"].lower()), None
+    )
+    assert geo_item is not None, "Readiness should include a geolocation item"
+    assert geo_item["status"] == "complete"
+
+
+def test_readiness_geo_incomplete_when_invalid_plots():
+    body = _post(_fc([_POLY_BADGEO]))
+    geo_item = next(
+        (r for r in body["readiness"] if "geolocation" in r["component"].lower()), None
+    )
+    assert geo_item is not None
+    assert geo_item["status"] == "incomplete"
+
+
+def test_readiness_legality_always_incomplete():
+    """Legality evidence is always a manual item — never auto-completed."""
+    body_clear = _post(_fc([_POLY_CLEAR]))
+    leg_item = next(
+        (r for r in body_clear["readiness"] if "legality" in r["component"].lower()), None
+    )
+    assert leg_item is not None, "Readiness should include a legality evidence item"
+    assert leg_item["status"] == "incomplete"
+
+
+def test_readiness_no_deforestation_complete_for_clear():
+    body = _post(_fc([_POLY_CLEAR]))
+    def_item = next(
+        (r for r in body["readiness"] if "deforestation" in r["component"].lower()), None
+    )
+    assert def_item is not None
+    assert def_item["status"] == "complete"
+
+
+def test_readiness_no_deforestation_incomplete_for_loss():
+    body = _post(_fc([_POLY_LOSS]))
+    def_item = next(
+        (r for r in body["readiness"] if "deforestation" in r["component"].lower()), None
+    )
+    assert def_item is not None
+    assert def_item["status"] == "incomplete"
+
+
+def test_readiness_no_banned_strings():
+    body = _post(_fc([_POLY_CLEAR]))
+    body_json = json.dumps(body["readiness"])
+    for banned in EUDR_BANNED_SUBSTRINGS:
+        assert banned not in body_json, (
+            f"Banned substring {banned!r} in readiness field"
+        )
+
+
+# ══ E5: commodity evidence ════════════════════════════════════════════════════
+
+
+def test_commodity_evidence_field_present():
+    body = _post(_fc([_POLY_LOSS]), commodity="palm")
+    assert "commodity_evidence" in body
+    assert isinstance(body["commodity_evidence"], list)
+    assert len(body["commodity_evidence"]) >= 2
+
+
+def test_commodity_evidence_timber_contains_svlk():
+    body = _post(_fc([_POLY_LOSS]), commodity="timber")
+    evidence_text = " ".join(body["commodity_evidence"]).lower()
+    assert "svlk" in evidence_text or "v-legal" in evidence_text
+
+
+def test_commodity_evidence_palm_contains_ispo_hgu():
+    body = _post(_fc([_POLY_LOSS]), commodity="palm")
+    evidence_text = " ".join(body["commodity_evidence"]).lower()
+    assert "ispo" in evidence_text
+    assert "hgu" in evidence_text
+
+
+def test_commodity_evidence_rubber_contains_land_tenure():
+    body = _post(_fc([_POLY_LOSS]), commodity="rubber")
+    evidence_text = " ".join(body["commodity_evidence"]).lower()
+    assert "land" in evidence_text
+
+
+def test_commodity_evidence_cocoa():
+    body = _post(_fc([_POLY_LOSS]), commodity="cocoa")
+    assert len(body["commodity_evidence"]) >= 2
+
+
+def test_commodity_evidence_coffee():
+    body = _post(_fc([_POLY_LOSS]), commodity="coffee")
+    assert len(body["commodity_evidence"]) >= 2
+
+
+def test_commodity_evidence_no_banned_strings():
+    for commodity in ("palm", "rubber", "timber", "cocoa", "coffee"):
+        body = _post(_fc([_POLY_CLEAR]), commodity=commodity)
+        ev_json = json.dumps(body["commodity_evidence"])
+        for banned in EUDR_BANNED_SUBSTRINGS:
+            assert banned not in ev_json, (
+                f"Banned substring {banned!r} in commodity_evidence for {commodity}"
+            )
+
+
+# ══ E5: who-files explainer ═══════════════════════════════════════════════════
+
+
+def _post_role(role: str) -> dict:
+    r = client.post(
+        "/api/eudr",
+        data={
+            "geojson_text": _fc([_POLY_CLEAR]),
+            "commodity": "palm",
+            "role": role,
+            "name": "Test",
+            "email": "test@example.com",
+        },
+    )
+    assert r.status_code == 200
+    return r.json()
+
+
+def test_who_files_field_present():
+    body = _post_role("non_eu_supplier")
+    assert "who_files" in body
+    wf = body["who_files"]
+    assert "who" in wf
+    assert "detail" in wf
+    assert "action" in wf
+
+
+def test_who_files_non_eu_supplier_says_buyer_files():
+    wf = _post_role("non_eu_supplier")["who_files"]
+    combined = (wf["who"] + " " + wf["detail"]).lower()
+    assert "buyer" in combined or "importer" in combined
+
+
+def test_who_files_eu_first_placer_says_you_file():
+    wf = _post_role("eu_first_placer")["who_files"]
+    combined = (wf["who"] + " " + wf["detail"]).lower()
+    assert "you" in combined
+
+
+def test_who_files_downstream_operator_no_own_dds():
+    wf = _post_role("downstream_operator")["who_files"]
+    combined = (wf["who"] + " " + wf["detail"]).lower()
+    # Downstream no longer files their own DDS
+    assert "no longer" in combined or "verify" in combined
+
+
+def test_who_files_no_banned_strings():
+    for role in ("non_eu_supplier", "eu_first_placer", "downstream_operator"):
+        body = _post_role(role)
+        wf_json = json.dumps(body["who_files"])
+        for banned in EUDR_BANNED_SUBSTRINGS:
+            assert banned not in wf_json, (
+                f"Banned substring {banned!r} in who_files for role={role}"
+            )
+
+
+# ══ E5: Indonesia context ═════════════════════════════════════════════════════
+
+
+def test_indonesia_context_field_present():
+    body = _post(_fc([_POLY_LOSS]))
+    assert "indonesia_context" in body
+    ic = body["indonesia_context"]
+    assert "risk_level" in ic
+    assert "due_diligence" in ic
+    assert "deadlines" in ic
+    assert isinstance(ic["deadlines"], list)
+    assert len(ic["deadlines"]) >= 2
+
+
+def test_indonesia_context_standard_risk():
+    ic = _post(_fc([_POLY_LOSS]))["indonesia_context"]
+    assert "standard" in ic["risk_level"].lower()
+    assert "full" in ic["due_diligence"].lower()
+
+
+def test_indonesia_context_deadlines_contain_2026_and_2027():
+    ic = _post(_fc([_POLY_LOSS]))["indonesia_context"]
+    all_deadlines = " ".join(d["deadline"] for d in ic["deadlines"])
+    assert "2026" in all_deadlines
+    assert "2027" in all_deadlines
+
+
+def test_indonesia_context_no_simplified_route():
+    """Simplified route does NOT apply to Indonesia — context must say so."""
+    ic = _post(_fc([_POLY_LOSS]))["indonesia_context"]
+    note = ic.get("simplified_route_note", "").lower()
+    assert "simplified" in note
+    assert "indonesia" in note
+
+
+def test_indonesia_context_no_banned_strings():
+    body = _post(_fc([_POLY_CLEAR]))
+    ic_json = json.dumps(body["indonesia_context"])
+    for banned in EUDR_BANNED_SUBSTRINGS:
+        assert banned not in ic_json, (
+            f"Banned substring {banned!r} in indonesia_context"
+        )

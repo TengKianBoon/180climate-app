@@ -478,6 +478,157 @@ _EUDR_JRC_ATTRIBUTION = (
 
 _EUDR_HOW_CHECKED = "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/FOREST/GFC2020/LATEST/"
 
+# ── Commodity-specific evidence (what to gather for your DDS) ────────────────
+_EUDR_COMMODITY_EVIDENCE: dict[str, list[str]] = {
+    "timber": [
+        "SVLK certificate (V-Legal) — Indonesia's timber legality assurance scheme",
+        "Logging permit: IPK (land conversion) or IPPKH (borrow-use permit), as applicable",
+        "Land title or HGU (Hak Guna Usaha) for the concession area",
+        "Environmental permit (AMDAL or UKL-UPL)",
+        "SKSHH timber transport certificate for each shipment leg",
+    ],
+    "palm": [
+        "ISPO certificate (or RSPO if your EU buyer requires it)",
+        "HGU (Hak Guna Usaha) — land-use right covering the plantation area",
+        "Plantation establishment permit (IUP-B or equivalent)",
+        "Land title or concession agreement",
+        "No-burn clearance record (Permentan 5/2018 compliance)",
+    ],
+    "rubber": [
+        "Land title documents (SHM, SHGB, or community land certificate)",
+        "Cooperative or farmer-group membership records",
+        "Plantation registration with local agriculture office",
+        "Land-use / spatial conformity letter from local government, if requested by buyer",
+    ],
+    "cocoa": [
+        "Land title documents (SHM, SHGB, or community land certificate)",
+        "Cooperative or farmer-group membership records",
+        "Farm registration with local agriculture office (where required)",
+        "Land-use / spatial conformity letter from local government, if requested by buyer",
+    ],
+    "coffee": [
+        "Land title documents (SHM, SHGB, or community land certificate)",
+        "Cooperative or farmer-group membership records",
+        "Farm registration with local agriculture office (where required)",
+        "Land-use / spatial conformity letter from local government, if requested by buyer",
+    ],
+    "manual_review": [
+        "Land title or concession documents (SHM, SHGB, HGU, or community land certificate)",
+        "Commodity-specific legality permits or certifications",
+        "Cooperative or company registration documents, as applicable",
+        "Contact 180Climate for commodity-specific DDS evidence requirements",
+    ],
+}
+
+# ── Who files the DDS — role-keyed explainer ─────────────────────────────────
+_EUDR_WHO_FILES: dict[str, dict[str, str]] = {
+    "non_eu_supplier": {
+        "who": "Your EU buyer / importer files the DDS — not you.",
+        "detail": (
+            "As an Indonesian supplier or exporter, your role is to prepare a geolocation pack "
+            "(plot coordinates at ≥6 decimal places, commodity, production country) and hand it to "
+            "your EU buyer or importer. The first EU company that places your product on the EU market "
+            "is the one that files the Due Diligence Statement. "
+            "Confirm with your buyer what format they need and when they need it."
+        ),
+        "action": (
+            "Prepare your geolocation pack and legality documents. "
+            "Confirm who your EU buyer is and share this screening result with them."
+        ),
+    },
+    "eu_first_placer": {
+        "who": "You file the DDS — before the product is released on the EU market.",
+        "detail": (
+            "As the first EU operator placing this product on the EU market, you are responsible for "
+            "filing the Due Diligence Statement via EU TRACES before the commodity is released for "
+            "free circulation. Collect a geolocation pack from every Indonesian supplier and conduct "
+            "due diligence (deforestation check + legality check). "
+            "Deadline: 30 Dec 2026 (large/medium) · 30 Jun 2027 (micro/small)."
+        ),
+        "action": (
+            "Collect geolocation packs from all Indonesian suppliers. "
+            "File the DDS via EU TRACES before your deadline."
+        ),
+    },
+    "downstream_operator": {
+        "who": "You verify the DDS filed above you — you no longer file your own.",
+        "detail": (
+            "Downstream EU operators (traders, manufacturers, retailers) are no longer required to file "
+            "their own Due Diligence Statement under the 2024 EUDR amendment. "
+            "Your responsibility is to verify that the operator above you in the supply chain has filed "
+            "a valid DDS, and to keep records for at least 5 years. "
+            "Ask your supplier for their EU TRACES DDS reference number."
+        ),
+        "action": (
+            "Ask your supplier for their EU TRACES DDS reference number. "
+            "Keep records for at least 5 years."
+        ),
+    },
+}
+
+# ── Indonesia standard-risk context ──────────────────────────────────────────
+_EUDR_INDONESIA_CONTEXT: dict = {
+    "risk_level": "Standard risk",
+    "due_diligence": "Full due diligence required",
+    "simplified_route_note": (
+        "The simplified due diligence route (no geolocation required) applies only to low-risk countries. "
+        "Indonesia is standard-risk — full due diligence applies, and your geolocation pack is required."
+    ),
+    "deadlines": [
+        {"group": "Large and medium operators", "deadline": "30 December 2026"},
+        {"group": "Micro and small operators", "deadline": "30 June 2027"},
+    ],
+    "action": (
+        "Start preparing your geolocation pack now — delays in collecting plot coordinates "
+        "are the main bottleneck before the Dec 2026 deadline."
+    ),
+}
+
+
+def _build_readiness(inval_count: int, loss_count: int, incon_count: int) -> list[dict]:
+    """Categorical readiness checklist (ADR-0018: no numeric score, ✓/incomplete per component)."""
+    geo_ok = inval_count == 0
+    screen_ok = (loss_count == 0 and incon_count == 0)
+    return [
+        {
+            "component": "Plots have valid geolocation (EUDR Art. 9)",
+            "status": "complete" if geo_ok else "incomplete",
+            "note": (
+                f"{inval_count} plot(s) have invalid geometry — fix coordinates to ≥6 decimal places and resubmit."
+                if not geo_ok
+                else "All plots have valid geometry at ≥6 decimal places."
+            ),
+        },
+        {
+            "component": "Plots screened against the EU's forest maps",
+            "status": "complete",
+            "note": "All submitted plots have been screened (JRC GFC2020 + Hansen + RADD).",
+        },
+        {
+            "component": "No deforestation flagged in screening",
+            "status": "complete" if screen_ok else "incomplete",
+            "note": (
+                "All plots screened clear — no loss detected."
+                if screen_ok
+                else "One or more plots flagged or inconclusive — resolve before DDS preparation."
+            ),
+        },
+        {
+            "component": "Commodity legality evidence gathered",
+            "status": "incomplete",
+            "note": (
+                "Gather the commodity-specific permits and legality documents listed in the evidence section below. "
+                "This is a manual step — satellite screening does not verify legality."
+            ),
+        },
+        {
+            "component": "Who files the DDS — role identified",
+            "status": "complete",
+            "note": "Role recorded. See the who-files explainer below.",
+        },
+    ]
+
+
 _EUDR_VERBATIM: dict[str, dict[str, str]] = {
     "clear_in_screen": {
         "label": "Screened — no loss detected",
@@ -642,6 +793,11 @@ async def eudr_screen(
         "jrc_attribution":    _EUDR_JRC_ATTRIBUTION,
         "footer":             _EUDR_FOOTER,
         "how_checked_url":    _EUDR_HOW_CHECKED,
+        # E5: get-ready kit
+        "readiness":          _build_readiness(inval_count, loss_count, incon_count),
+        "commodity_evidence": _EUDR_COMMODITY_EVIDENCE.get(commodity, _EUDR_COMMODITY_EVIDENCE["manual_review"]),
+        "who_files":          _EUDR_WHO_FILES.get(role, _EUDR_WHO_FILES["non_eu_supplier"]),
+        "indonesia_context":  _EUDR_INDONESIA_CONTEXT,
     }
 
     # Banned-string guard (belt-and-suspenders — the contract tests cover this too)
