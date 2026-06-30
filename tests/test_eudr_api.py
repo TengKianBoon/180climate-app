@@ -391,22 +391,24 @@ def test_readiness_legality_always_incomplete():
     assert leg_item["status"] == "incomplete"
 
 
-def test_readiness_no_deforestation_complete_for_clear():
+def test_readiness_screening_result_complete_for_clear():
+    """'Screening result resolved' is complete when no loss or inconclusive plots."""
     body = _post(_fc([_POLY_CLEAR]))
-    def_item = next(
-        (r for r in body["readiness"] if "deforestation" in r["component"].lower()), None
+    item = next(
+        (r for r in body["readiness"] if "Screening result resolved" in r["component"]), None
     )
-    assert def_item is not None
-    assert def_item["status"] == "complete"
+    assert item is not None, "Expected 'Screening result resolved' component"
+    assert item["status"] == "complete"
 
 
-def test_readiness_no_deforestation_incomplete_for_loss():
+def test_readiness_screening_result_incomplete_for_loss():
+    """'Screening result resolved' is incomplete when loss detected."""
     body = _post(_fc([_POLY_LOSS]))
-    def_item = next(
-        (r for r in body["readiness"] if "deforestation" in r["component"].lower()), None
+    item = next(
+        (r for r in body["readiness"] if "Screening result resolved" in r["component"]), None
     )
-    assert def_item is not None
-    assert def_item["status"] == "incomplete"
+    assert item is not None, "Expected 'Screening result resolved' component"
+    assert item["status"] == "incomplete"
 
 
 def test_readiness_no_banned_strings():
@@ -823,3 +825,81 @@ def test_eudr_lead_email_has_pdf_bytes(monkeypatch):
     assert pdf is not None and len(pdf) > 100, (
         f"Expected non-empty PDF bytes, got: {repr(pdf)[:40]}"
     )
+
+
+# ── WO-EUDR-GATEFIX-011: hero colour map + grammar + checklist label ──────────
+
+
+def test_eudr_hero_colour_map_constants():
+    """EUDR_HERO_COLOUR has the required three states with correct hex values."""
+    from reports.generator import EUDR_HERO_COLOUR
+    assert EUDR_HERO_COLOUR["loss_detected"]   == "#C0392B", "loss_detected must be red"
+    assert EUDR_HERO_COLOUR["review_needed"]   == "#8A5A00", "review_needed must be amber"
+    assert EUDR_HERO_COLOUR["clear_in_screen"] == "#0E7A30", "clear_in_screen must be green"
+
+
+def test_eudr_hero_colour_map_pdf_loss_differs_from_clear():
+    """loss_detected and clear_in_screen produce different PDF bytes (different bg colour)."""
+    from reports.generator import generate_eudr_pdf
+    base = _post(_fc([_POLY_LOSS]))
+    loss_pdf  = generate_eudr_pdf({**base, "overall": "loss_detected",
+                                   "contact_name": "T", "commodity": "palm"})
+    clear_pdf = generate_eudr_pdf({**base, "overall": "clear_in_screen",
+                                   "contact_name": "T", "commodity": "palm"})
+    assert loss_pdf != clear_pdf, "loss_detected PDF must differ from clear_in_screen PDF"
+
+
+def test_eudr_hero_colour_map_pdf_review_differs_from_loss_and_clear():
+    """review_needed produces different PDF bytes from both loss and clear."""
+    from reports.generator import generate_eudr_pdf
+    base = _post(_fc([_POLY_INCON]))
+    review_pdf = generate_eudr_pdf({**base, "overall": "review_needed",
+                                    "contact_name": "T", "commodity": "palm"})
+    loss_pdf   = generate_eudr_pdf({**base, "overall": "loss_detected",
+                                    "contact_name": "T", "commodity": "palm"})
+    clear_pdf  = generate_eudr_pdf({**base, "overall": "clear_in_screen",
+                                    "contact_name": "T", "commodity": "palm"})
+    assert review_pdf != loss_pdf,  "review_needed PDF must differ from loss_detected PDF"
+    assert review_pdf != clear_pdf, "review_needed PDF must differ from clear_in_screen PDF"
+
+
+def test_eudr_headline_grammar_singular():
+    """'1 plot needs review' — singular subject-verb agreement."""
+    body = _post(_fc([_POLY_INCON]))
+    if body["overall"] == "review_needed":
+        assert "need" in body["overall_headline"], f"Headline: {body['overall_headline']!r}"
+        # Singular: "needs", not "need" (only for 1 plot)
+        if body.get("inconclusive_count") == 1:
+            assert "needs" in body["overall_headline"], (
+                f"Expected 'needs' for 1 plot: {body['overall_headline']!r}"
+            )
+
+
+def test_eudr_headline_grammar_no_plot_s():
+    """No 'plot(s)' literal in any headline — must be 'plot' or 'plots'."""
+    for fc in [_fc([_POLY_LOSS]), _fc([_POLY_CLEAR]), _fc([_POLY_INCON])]:
+        body = _post(fc)
+        assert "plot(s)" not in body["overall_headline"], (
+            f"Literal 'plot(s)' in headline: {body['overall_headline']!r}"
+        )
+
+
+def test_eudr_checklist_label_renamed():
+    """Checklist component is 'Screening result resolved', not 'No deforestation...'."""
+    body = _post(_fc([_POLY_CLEAR]))
+    components = [item["component"] for item in body.get("readiness", [])]
+    assert any("Screening result resolved" in c for c in components), (
+        f"Expected 'Screening result resolved' in checklist components: {components}"
+    )
+    assert not any("No deforestation flagged" in c for c in components), (
+        f"Old label still present: {components}"
+    )
+
+
+def test_eudr_geometry_note_no_plot_s():
+    """Geometry readiness note uses 'plot'/'plots', not 'plot(s)'."""
+    body = _post(_fc([_POLY_BADGEO]))
+    for item in body.get("readiness", []):
+        assert "plot(s)" not in item.get("note", ""), (
+            f"Literal 'plot(s)' in readiness note: {item['note']!r}"
+        )

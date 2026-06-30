@@ -753,6 +753,14 @@ def generate_docx(data: ReportData) -> bytes:
 
 # ── EUDR PDF ──────────────────────────────────────────────────────────────────
 
+# Single source-of-truth verdict→colour map (also mirrored in frontend heroClass map)
+EUDR_HERO_COLOUR: dict[str, str] = {
+    "loss_detected":   "#C0392B",  # red
+    "review_needed":   "#8A5A00",  # amber (WCAG AA contrast ~6:1 with white)
+    "clear_in_screen": "#0E7A30",  # green
+}
+
+
 def generate_eudr_pdf(body: dict) -> bytes:
     """Return PDF bytes for the value-first EUDR triage report (WO-EUDR-REPORT-009).
 
@@ -804,8 +812,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
     grey    = colors.HexColor("#475463")
     ltgrey  = colors.HexColor("#8A97A3")
     white   = colors.HexColor("#FFFFFF")
-    red_bg  = colors.HexColor("#C0392B")
-    cta_bg  = colors.HexColor("#0E7A30")
+    cta_bg   = colors.HexColor("#0E7A30")
 
     H2   = ParagraphStyle("H2E",     parent=styles["Heading2"], textColor=gdeep,
                           fontSize=11, leading=14, spaceBefore=18, spaceAfter=5,
@@ -875,15 +882,20 @@ def generate_eudr_pdf(body: dict) -> bytes:
     story.append(_hr())
 
     # ── 2. Hero ──────────────────────────────────────────────────────────────
-    hero_bg = red_bg if loss_count > 0 else cta_bg
-    dds_sub = (
-        "Plots flagged — your shipment may be affected. See per-plot detail below."
-        if loss_count > 0
-        else (
+    # Single source-of-truth: overall → colour (never collapse 3 states to 2)
+    hero_bg = colors.HexColor(EUDR_HERO_COLOUR.get(overall, EUDR_HERO_COLOUR["review_needed"]))
+    if overall == "loss_detected":
+        dds_sub = "Plots flagged — your shipment may be affected. See per-plot detail below."
+    elif overall == "clear_in_screen":
+        dds_sub = (
             "Screened against the EU's own maps — not certified, still needs a "
             "Due Diligence Statement (DDS). See readiness checklist below."
         )
-    )
+    else:
+        dds_sub = (
+            "One or more plots are inconclusive — review needed before filing a DDS. "
+            "See per-plot detail and readiness checklist below."
+        )
     hero_inner = [
         Paragraph("EU Deforestation Regulation — Triage Result", LABEL),
         Paragraph(headline, HERO_H),

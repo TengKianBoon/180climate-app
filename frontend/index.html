@@ -1215,14 +1215,13 @@ function renderEudrResult() {
   // ── Hero colour + headline ──────────────────────────────────────────────
   var heroEl = document.getElementById('eudr-hero');
   heroEl.className = 'result-hero';
-  if (r.overall === 'loss_detected') {
-    heroEl.classList.add('eudr-hero-red');
-  } else if (r.overall === 'review_needed') {
-    heroEl.classList.add('eudr-hero-amber');
-  } else {
-    // clear_in_screen — muted teal, NOT the same as carbon compliance green
-    heroEl.classList.add('eudr-hero-clear');
-  }
+  // Single source-of-truth map — must match generate_eudr_pdf() in reports/generator.py
+  var _heroClass = {
+    'loss_detected':   'eudr-hero-red',
+    'review_needed':   'eudr-hero-amber',
+    'clear_in_screen': 'eudr-hero-clear',
+  };
+  heroEl.classList.add(_heroClass[r.overall] || 'eudr-hero-amber');
 
   document.getElementById('eudr-headline').textContent = r.overall_headline || '';
   document.getElementById('eudr-subline').textContent =
@@ -1379,10 +1378,15 @@ async function downloadEudrReport() {
   status.textContent = 'Generating PDF…';
   btn.disabled = true;
   try {
+    // Prefer cached vars; fall back to form fields still in DOM
+    var contactName = _eudrContactName
+      || ((document.getElementById('eudr-name') || {}).value || '');
+    var commodity = _eudrCommodity
+      || ((document.getElementById('eudr-commodity') || {}).value || '');
     var payload = {
       result:       _eudrResult,
-      contact_name: (_eudrContactName || ''),
-      commodity:    (_eudrCommodity   || ''),
+      contact_name: contactName,
+      commodity:    commodity,
     };
     var res = await fetch('/api/eudr/report', {
       method:  'POST',

@@ -672,7 +672,7 @@ def _build_readiness(inval_count: int, loss_count: int, incon_count: int) -> lis
             "component": "Plots have valid geolocation (EUDR Art. 9)",
             "status": "complete" if geo_ok else "incomplete",
             "note": (
-                f"{inval_count} plot(s) have invalid geometry — fix coordinates to ≥6 decimal places and resubmit."
+                f"{inval_count} {'plot' if inval_count == 1 else 'plots'} {'has' if inval_count == 1 else 'have'} invalid geometry — fix coordinates to ≥6 decimal places and resubmit."
                 if not geo_ok
                 else "All plots have valid geometry at ≥6 decimal places."
             ),
@@ -683,7 +683,7 @@ def _build_readiness(inval_count: int, loss_count: int, incon_count: int) -> lis
             "note": "All submitted plots have been screened (JRC GFC2020 + Hansen + RADD).",
         },
         {
-            "component": "No deforestation flagged in screening",
+            "component": "Screening result resolved",
             "status": "complete" if screen_ok else "incomplete",
             "note": (
                 "All plots screened clear — no loss detected."
@@ -762,7 +762,8 @@ def _eudr_overall_headline(plots: list, loss_count: int, clear_count: int) -> st
         )
     inconclusive = n - clear_count
     noun = "plot" if inconclusive == 1 else "plots"
-    return f"{inconclusive} {noun} need review"
+    verb = "needs" if inconclusive == 1 else "need"
+    return f"{inconclusive} {noun} {verb} review"
 
 
 def _detect_eudr_fmt(filename: str) -> str:
@@ -907,7 +908,7 @@ async def eudr_screen(
             f"overall={overall}, loss={loss_count}"
         ),
         "area_ha":   None,
-        "geometry_summary": f"{len(plot_verdicts)} EUDR plot(s)",
+        "geometry_summary": f"{len(plot_verdicts)} EUDR {'plot' if len(plot_verdicts) == 1 else 'plots'}",
         "verdict":   overall,
         "quantity_low_tco2e":  None,
         "quantity_high_tco2e": None,
