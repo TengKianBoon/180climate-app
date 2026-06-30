@@ -1,112 +1,69 @@
-# OUTBOX — Builder → Cowork · WO-EUDR-BLOCKER-004 (E4) · 2026-06-30
+# OUTBOX — Builder → Cowork · WO-EUDR-RADD-LIVE-005B · 2026-06-30
 
-## Status: CI GREEN ✅ — API smoke PASS — STOPPED for Cowork review (384 tests pass, +25 new)
+## Status: CI GREEN ✅ — 400 tests pass (+16 new RADD live tests) — STOPPED for Cowork review
 
-EUDR API endpoint + value-first result page (the per-plot blocker table). Deterministic, no LLM.
-Carbon contracts untouched. Brevo lead delivery reused.
+Live RADD query wired in `core/overlays/radd.py`. All mocked tests green. Key never in repo or logs.
 
 ---
 
 ## What shipped
 
-### `POST /api/eudr` (new, `api/main.py`)
-Accepts `multipart/form-data`:
-- `file` — GeoJSON / KML / SHP upload (preferred); or
-- `geojson_text` — pasted GeoJSON text
-- `commodity`, `role`, contact fields
+### `core/overlays/radd.py` (rewritten)
 
-Pipeline: `parse_plots` (E2) → `triage_validated_plots` (E3) → JSON response.
-
-Response fields (flat dict, no EUDRVerdict model — E5 will extend):
-- `engine: "eudr"`, `overall`, `overall_headline`, `plot_count`, `loss_count`, `clear_count`
-- `plots[]` — each with `detection`, `label`, `detail`, `action`, `plot_satellite_risk`, `geometry_ok`,
-  `loss_after_2020_ha`, `run_date`, `datasets_version`
-- `legality_note`, `timber_note` (only when commodity=timber), `jrc_attribution`, `footer`
-- `country_benchmark_risk: "standard"` (Indonesia hardcoded for MVP)
-
-**No banned strings** (enforced + tested): "compliant", "deforestation-free", "dds-ready",
-"due diligence statement ready" never appear in any response field.
-
-### Render guards (all tested, all pass)
-
-| Guard | Behaviour |
+| Change | Detail |
 |---|---|
-| `loss_detected` headline | "X plot(s) could block your shipment" — tested `test_loss_detected_headline_contains_could_block` |
-| `clear_in_screen` headline | "All X plots screened — not certified, still needs a DDS" — tested `test_clear_in_screen_headline_never_bare` |
-| `clear_in_screen` action | "Screened against the EU's maps — not certified, still needs a DDS..." — tested `test_clear_in_screen_plot_detail_has_dds_framing` |
-| Roll-up never softens a red | Any `loss_detected` → `overall=loss_detected` + blocking headline, even in mixed batch |
-| No bare clear tick | Every `clear_in_screen` plot carries DDS framing in action; never "Clear ✓" |
-| `geometry_invalid` | Returned with Art-9 fix message; never produces false clear |
+| `_DEFAULT_RADD_URL` | `https://data-api.globalforestwatch.org/dataset/wur_radd_alerts/latest/query` — no env var required for URL |
+| Live activation | `RADD_API_KEY` alone enables live (URL has a default); `RADD_GFW_API_URL` overrides if GFW renames dataset |
+| `_query_live()` | `httpx.post` with `x-api-key` header; SQL: `SELECT MAX(alert__date) AS latest, COUNT(*) AS n FROM results WHERE alert__date > '2020-12-31'` |
+| Honesty | `True` = alert found; `False` = queried OK, none found; `None` = any failure (malformed response, HTTP error, network error) — NEVER fabricated |
+| Malformed response | Non-dict body → `None`; `data` not a list → `None`; empty list → `False` (genuine negative) |
+| Exception logging | `log.warning("RADD live query failed (%s); enrichment skipped", type(exc).__name__)` — key NEVER in log |
+| Key never committed | Key lives in Render `RADD_API_KEY` env var only; no key in repo, fixtures, or logs |
 
-### Frontend EUDR screen (new, `frontend/index.html`)
+### `tests/test_radd_live.py` (new, 16 tests)
 
-Screen-nav toggle: **Carbon Screening** | **EUDR Plot Check** at the top.
+| Test | Assertion |
+|---|---|
+| `test_default_url_points_to_wur_radd_alerts` | URL contains "wur_radd_alerts" + "data-api.globalforestwatch.org" |
+| `test_live_alert_present` | n=5 → `alert_after_cutoff=True`, `latest_alert_date="2023-08-14"`, live `datasets_version` |
+| `test_live_alert_present_high_count` | n=128 → `alert_after_cutoff=True` |
+| `test_live_no_alerts_empty_data` | empty `data=[]` → `alert_after_cutoff=False`, `latest_alert_date=None`, live `datasets_version` |
+| `test_live_no_alerts_n_zero` | `n=0` → `alert_after_cutoff=False` |
+| `test_live_connection_error_returns_none` | `ConnectError` → `alert_after_cutoff=None` (never fabricated False) |
+| `test_live_http_4xx_returns_none` | HTTP 403 → `alert_after_cutoff=None` |
+| `test_live_malformed_body_non_dict_returns_none` | list body → `alert_after_cutoff=None` |
+| `test_live_malformed_body_data_not_list_returns_none` | `data: "string"` → `alert_after_cutoff=None` |
+| `test_live_missing_data_field_returns_none` | no `data` key → `alert_after_cutoff=None` |
+| `test_no_key_returns_stub` | no `RADD_API_KEY` → `None`; `httpx.post` NOT called |
+| `test_disable_live_skips_live_call` | `RADD_DISABLE_LIVE=true` → `None`; `httpx.post` NOT called |
+| `test_disable_live_uses_stub_datasets_version` | confirms stub `datasets_version` returned |
+| `test_key_never_appears_in_log_output` | scans captured `WARNING` log records — key absent |
+| `test_key_never_appears_in_result_note` | key absent from `result.note` |
+| `test_radd_gfw_api_url_env_override` | custom URL env var reaches `httpx.post` as the call target |
 
-**Intake (`#screen-eudr #eudr-step-form`):**
-- File upload tab (GeoJSON/KML/SHP) + paste GeoJSON tab
-- Commodity select (palm/rubber/timber/cocoa/coffee/manual review)
-- Role pick (Indonesian supplier / EU first placer / downstream operator)
-- Contact (name, email, mobile, company)
-- "Check my plots against the EU maps →" button
-
-**Result (`#screen-eudr #eudr-step-result`):**
-- **Hero card** — colour-coded (red/amber/teal) with `overall_headline`; never the same green as carbon compliance
-- **Per-plot blocker table** — one row per plot, colour-coded: `loss_detected`=red, `inconclusive`=amber, `clear_in_screen`=teal (NOT the same green as verified-compliant), `geometry_invalid`=grey
-- Verbatim advisor wording per detection state (from `docs/eudr-design-v2.md`)
-- **Legality limb** plain next-action note (deforestation check ≠ legality check)
-- **Timber note** — degradation not assessed (shown only for timber commodity)
-- **JRC attribution** line
-- **ONE footer disclaimer** (not a DDS, not legal advice)
-- **"How this is checked"** link (dataset names behind the link, not in the hero)
-- 180Climate CTA: "180Climate prepares your DDS — and verifies flagged plots on the ground"
+All 16 tests use `httpx.post` mocked — zero network calls. Key `"test-key-never-logged"` verifiably absent from all log output and result notes.
 
 ---
 
-## API smoke tests (2 runs)
+## Live verification
 
-**Run 1 — mixed batch (1 loss + 1 clear):**
-```
-Plot A (lon=113, lat=-1)  → loss_detected  (Kalimantan fixture: JRC forest + Hansen 12.4 ha loss)
-Plot B (lon=114, lat=-2)  → clear_in_screen (fixture: JRC forest + Hansen 0.0 ha loss)
-overall:   loss_detected
-headline:  "1 plot could block your shipment"   ← render guard ✓
-```
+The live RADD path verifies on the **deployed app** — `RADD_API_KEY` is set in Render, not locally. No live smoke required here.
 
-**Run 2 — clear only:**
-```
-Plot B alone → clear_in_screen
-headline: "All 1 plot screened — not certified, still needs a DDS"  ← render guard ✓
-detail:   "...A screening result, not a legal determination."
-action:   "Screened against the EU's maps — not certified, still needs a DDS..."
-```
+---
 
-**Run 3 — geometry_invalid (4-decimal coords):**
+## mypy
+
 ```
-overall: review_needed
-detection: geometry_invalid
-action: "Fix the geometry and re-submit for screening."
+mypy core/contracts/__init__.py --ignore-missing-imports
+Success: no issues found in 1 source file
 ```
 
 ---
 
-## Tests — `tests/test_eudr_api.py` (24 new)
+## pytest
 
-- `test_no_banned_strings_*` — both loss and clear responses scanned for all 4 banned substrings
-- `test_engine_tag_is_eudr`
-- Loss guards: overall, headline "could block", counts, verbatim detail ("EU inspector")
-- Clear guards: overall, headline "not certified"/"needs a DDS", action framing, counts
-- Inconclusive: overall `review_needed`, plot field + "needs-review" text
-- Geometry invalid: invalid_count, `geometry_ok=False`, "Art 9" in detail
-- Mixed batch: loss dominates overall + headline; order preserved
-- Stamps: `run_date`, `datasets_version`, JRC attribution
-- `legality_note` present; `timber_note` only for timber commodity
-- `country_benchmark_risk = "standard"`
-- No-geometry → 422
-- File upload path tested
+```
+400 passed, 1 warning in 8.75s
+```
 
-**384 tests pass** (was 359; +25). Green offline with `*_DISABLE_LIVE=true`. Pre-existing KHG live smoke excluded (network `ReadTimeout`).
-
----
-
-## Commit
-`2b6658c` — pushed to `main` — `feat(eudr): EUDR API endpoint + value-first per-plot blocker table (WO-EUDR-BLOCKER-004, E4)`
+(Was 384; +16 new RADD live tests.)

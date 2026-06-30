@@ -6,17 +6,19 @@ post-cutoff RADD alert on a forest baseline confirms `loss_detected`. RADD is NO
 its absence/unavailability does NOT prevent `clear_in_screen` when Hansen+JRC are conclusive.
 
 Distribution: GFW Data API (`data-api.globalforestwatch.org`, dataset `wur_radd_alerts`).
-  ⚠ The GFW Data API query endpoint requires an `x-api-key`, so there is NO confirmed
-  clean *free* HTTP endpoint at build time. Per the WO, RADD is therefore STUBBED by default
-  (fixture-cache + unavailable) and flagged in OUTBOX. A best-effort live path is wired but
-  OFF unless both RADD_GFW_API_URL and RADD_API_KEY are set.
+  Requires an `x-api-key` header; set RADD_API_KEY in the host environment (Render).
+  Default endpoint is _DEFAULT_RADD_URL; override with RADD_GFW_API_URL.
 
-Env RADD_GFW_API_URL : GFW Data API query URL (enables the best-effort live path).
-Env RADD_API_KEY     : GFW Data API key (required for the live path; NEVER logged).
-Env RADD_DISABLE_LIVE=true : force-skip live (CI kill-switch).
+Env RADD_API_KEY          : GFW Data API key (enables live path; NEVER logged).
+Env RADD_GFW_API_URL      : override the default GFW Data API query URL.
+Env RADD_DISABLE_LIVE=true: force-skip live (CI kill-switch).
 
-Returns alert_after_cutoff=None when unavailable — NEVER a fabricated False. The triage
-engine treats None as "no enrichment signal" (it relies on Hansen+JRC), never as "clear".
+Returns alert_after_cutoff:
+  True  — at least one confirmed post-cutoff RADD alert intersects the plot geometry.
+  False — query succeeded; no post-cutoff alerts found (genuine negative).
+  None  — unavailable (API error, key missing, disabled) — NEVER fabricated.
+
+The triage engine treats None as "no enrichment signal" (relies on Hansen+JRC), never as clear.
 """
 from __future__ import annotations
 
@@ -33,9 +35,15 @@ log = logging.getLogger(__name__)
 _ADAPTER = "radd"
 _SOURCE = "RADD radar alerts (WUR / GFW Data API)"
 _DATASETS_VERSION = "RADD (WUR Sentinel-1 alerts; via GFW Data API)"
-_DATASETS_VERSION_STUB = "RADD (stubbed — enriches, not blocking; see OUTBOX flag)"
+_DATASETS_VERSION_STUB = "RADD (stubbed — enriches, not blocking; RADD_API_KEY not set)"
 
 _EUDR_CUTOFF_DATE = "2020-12-31"
+
+# Default GFW Data API spatial-query endpoint for WUR RADD alerts.
+# Override via RADD_GFW_API_URL (e.g. if GFW renames the dataset).
+_DEFAULT_RADD_URL = (
+    "https://data-api.globalforestwatch.org/dataset/wur_radd_alerts/latest/query"
+)
 
 
 @dataclass
@@ -59,9 +67,10 @@ class RADDResult:
 def query_radd(boundary: Boundary, cutoff_date: str = _EUDR_CUTOFF_DATE) -> RADDResult:
     """Return post-cutoff RADD alert signal for the plot.
 
-    Fixture cache first (CI-safe). Best-effort live only when RADD_GFW_API_URL + RADD_API_KEY
-    are set and live is not disabled. Otherwise returns alert_after_cutoff=None (stubbed,
-    flagged) — RADD enriches, it never blocks a clear read.
+    Order of precedence:
+      1. Committed fixture (CI-safe, always checked first).
+      2. Live GFW Data API query (when RADD_API_KEY is set and RADD_DISABLE_LIVE != true).
+      3. Stub: alert_after_cutoff=None — enriches, never blocks a clear read.
     """
     lat = boundary.centroid_lat
     lon = boundary.centroid_lon
@@ -76,19 +85,19 @@ def query_radd(boundary: Boundary, cutoff_date: str = _EUDR_CUTOFF_DATE) -> RADD
             note=cached.get("note", "fixture"),
         )
 
-    api_url = os.environ.get("RADD_GFW_API_URL", "").strip()
     api_key = os.environ.get("RADD_API_KEY", "").strip()
     live_disabled = os.environ.get("RADD_DISABLE_LIVE", "").lower() == "true"
 
-    if api_url and api_key and not live_disabled:
+    if api_key and not live_disabled:
+        api_url = os.environ.get("RADD_GFW_API_URL", _DEFAULT_RADD_URL).strip()
         return _query_live(boundary, api_url, api_key, cutoff_date)
 
     return RADDResult(
         alert_after_cutoff=None,
         datasets_version=_DATASETS_VERSION_STUB,
         note=(
-            "RADD stubbed (no confirmed free endpoint; set RADD_GFW_API_URL + RADD_API_KEY "
-            "to enable). Enriches, not blocking — triage relies on Hansen + JRC."
+            "RADD stubbed (RADD_API_KEY not set or RADD_DISABLE_LIVE=true). "
+            "Enriches, not blocking — triage relies on Hansen + JRC."
         ),
     )
 
@@ -96,7 +105,7 @@ def query_radd(boundary: Boundary, cutoff_date: str = _EUDR_CUTOFF_DATE) -> RADD
 def _query_live(
     boundary: Boundary, api_url: str, api_key: str, cutoff_date: str
 ) -> RADDResult:
-    """Best-effort GFW Data API query for RADD alerts after the cutoff. Key is never logged."""
+    """GFW Data API spatial query for post-cutoff RADD alerts. Key is NEVER logged."""
     import json
 
     import httpx
@@ -107,33 +116,56 @@ def _query_live(
         f"FROM results WHERE alert__date > '{cutoff_date}'"
     )
     payload = {"geometry": geom, "sql": sql}
+    # Key passed only in the header — never written to logs or error messages.
     headers = {"x-api-key": api_key, "content-type": "application/json"}
+
     try:
         resp = httpx.post(api_url, content=json.dumps(payload), headers=headers, timeout=15.0)
         resp.raise_for_status()
         data = resp.json()
     except Exception as exc:
-        log.warning("RADD live query failed: %s", exc)  # key not in message
+        # Log the exception type only — never the key or headers.
+        log.warning("RADD live query failed (%s); enrichment skipped", type(exc).__name__)
         return RADDResult(
             alert_after_cutoff=None,
-            note=f"RADD data unavailable — GFW API error: {type(exc).__name__}; enrichment skipped",
+            datasets_version=_DATASETS_VERSION_STUB,
+            note=f"RADD data unavailable — GFW API error: {type(exc).__name__}",
         )
 
-    rows = data.get("data", []) if isinstance(data, dict) else []
+    # Parse the GFW Data API response: {"status": "success", "data": [...]}
+    if not isinstance(data, dict):
+        log.warning("RADD: unexpected response type %s; treating as unavailable", type(data).__name__)
+        return RADDResult(
+            alert_after_cutoff=None,
+            datasets_version=_DATASETS_VERSION_STUB,
+            note="RADD: unexpected response format — treated as unavailable",
+        )
+
+    rows = data.get("data")
+    if not isinstance(rows, list):
+        log.warning("RADD: 'data' field missing or not a list; treating as unavailable")
+        return RADDResult(
+            alert_after_cutoff=None,
+            datasets_version=_DATASETS_VERSION_STUB,
+            note="RADD: 'data' field missing or unexpected — treated as unavailable",
+        )
+
     if not rows:
+        # Query succeeded; no alerts found after the cutoff date.
         return RADDResult(
             alert_after_cutoff=False,
             latest_alert_date=None,
             datasets_version=_DATASETS_VERSION,
-            note=f"RADD: no alerts after {cutoff_date} (GFW Data API)",
+            note=f"RADD: queried OK; no alerts after {cutoff_date} (GFW Data API)",
         )
 
     row = rows[0]
     n = row.get("n") or 0
     latest = row.get("latest")
+    has_alert = bool(n and int(n) > 0)
     return RADDResult(
-        alert_after_cutoff=bool(n and n > 0),
-        latest_alert_date=latest,
+        alert_after_cutoff=has_alert,
+        latest_alert_date=latest if has_alert else None,
         datasets_version=_DATASETS_VERSION,
         note=f"RADD: {n} alert(s) after {cutoff_date}; latest {latest} (GFW Data API)",
     )
