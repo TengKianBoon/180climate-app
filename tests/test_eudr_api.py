@@ -169,9 +169,9 @@ def test_loss_detected_plot_fields():
     assert plot["detection"] == "loss_detected"
     assert plot["plot_satellite_risk"] == "high"
     assert plot["geometry_ok"] is True
-    # Verbatim wording: observed-not-confirmed framing (WO-EUDR-USEFUL-015)
-    assert "observed, not yet confirmed on the ground" in plot["detail"]
-    assert "31 Dec 2020 cutoff" in plot["detail"]
+    # Data-driven finding: real ha + 31 December 2020 reference (WO-EUDR-FINDING-016)
+    assert "12.4 ha" in plot["detail"]
+    assert "31 December 2020" in plot["detail"]
 
 
 # ── clear_in_screen render guards ─────────────────────────────────────────────

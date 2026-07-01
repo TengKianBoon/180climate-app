@@ -996,7 +996,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
             tbl_data.append([
                 Paragraph(p.get("plot_id", "—"), SMALL),
                 Paragraph(_det_label.get(det, det.upper()), BOLD_SMALL),
-                Paragraph(p.get("label",  "—"), SMALL),
+                Paragraph(p.get("detail", "—"), SMALL),
                 Paragraph(p.get("action", "—"), SMALL),
             ])
         col_ws = [doc.width * w for w in (0.18, 0.18, 0.32, 0.32)]

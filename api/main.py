@@ -757,6 +757,56 @@ _EUDR_VERBATIM: dict[str, dict[str, str]] = {
 }
 
 
+def _eudr_finding_detail(pv, area_ha: float) -> str:
+    """Build a data-driven finding sentence from the PlotVerdict + validated area."""
+    det = pv.detection
+    area = int(round(area_ha))
+
+    if det == "clear_in_screen":
+        return (
+            f"We checked this ~{area} ha plot against the EU's 2020 forest baseline and found "
+            "no tree-cover loss after 31 December 2020 (Hansen shows zero; no RADD alerts). "
+            "A good screening result — but a screen isn't certification: you still file a DDS, "
+            "and legality is checked separately."
+        )
+
+    if det == "loss_detected":
+        ha = pv.loss_after_2020_ha
+        if ha > 0:
+            ha_str = "<0.1" if ha < 0.05 else f"{ha:.1f}"
+            pct_part = f" (~{round(ha / area_ha * 100)}%)" if area_ha > 0 else ""
+            return (
+                f"We found about {ha_str} ha of tree-cover loss on this ~{area} ha plot"
+                f"{pct_part} after the EU's 31 December 2020 cutoff, on land the EU's 2020 map "
+                "shows as forest. It shows up in the EU's satellite data (Hansen annual loss / "
+                "RADD radar). Satellite sees the loss but not the cause — it could be permitted "
+                "harvest, a road, fire, or replanting — so document what happened and clear it "
+                "before this plot enters a DDS."
+            )
+        return (
+            f"Recent radar alerts (RADD) flagged possible tree-cover loss on this ~{area} ha "
+            "plot after the EU's 31 December 2020 cutoff, on land the EU's 2020 map shows as "
+            "forest — the exact area isn't quantified yet. Satellite sees the signal but not "
+            "the cause (permitted harvest, road, fire, or replanting). Have it checked and "
+            "documented before this plot enters a DDS."
+        )
+
+    if det == "inconclusive":
+        return (
+            f"We couldn't get a reliable read for this ~{area} ha plot — usually cloud cover, "
+            "a parcel small relative to the satellite's resolution, or an unclear 2020 forest "
+            "baseline. That's a data gap, not evidence of a problem, so we can't call it clear. "
+            "A recent high-resolution image or a field check would resolve it."
+        )
+
+    # geometry_invalid — area couldn't be computed; don't reference it
+    return (
+        "We couldn't read this plot's boundary — the coordinates weren't precise enough "
+        "(need ≥6 decimal places, WGS-84) or the shape was invalid, so we couldn't place "
+        "it on the EU's maps. Fix the coordinates and re-submit."
+    )
+
+
 def _eudr_overall_headline(plots: list, loss_count: int, clear_count: int) -> str:
     n = len(plots)
     if loss_count > 0:
@@ -850,17 +900,18 @@ async def eudr_screen(
           "geometry_ok": pv.geometry_ok} for pv in plot_verdicts],
     )
 
-    # 5. Per-plot response dicts (with verbatim wording)
+    # 5. Per-plot response dicts (with data-driven finding detail)
     plots_out = []
-    for pv in plot_verdicts:
+    for pv, val in zip(plot_verdicts, validations):
         det = pv.detection
         wording = _EUDR_VERBATIM[det]
         plots_out.append({
             "plot_id":           pv.plot_id,
             "detection":         det,
             "label":             wording["label"],
-            "detail":            wording["detail"],
+            "detail":            _eudr_finding_detail(pv, val.area_ha),
             "action":            wording["action"],
+            "area_ha":           round(val.area_ha, 1),
             "plot_satellite_risk": pv.plot_satellite_risk,
             "geometry_ok":       pv.geometry_ok,
             "loss_after_2020_ha": pv.loss_after_2020_ha,
