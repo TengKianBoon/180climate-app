@@ -1248,6 +1248,8 @@ async function submitEudr() {
     _eudrCommodity   = commodity;
     renderEudrResult();
     eudrShowStep('eudr-step-result');
+    // invalidateSize after the panel is visible so Leaflet measures the container correctly
+    setTimeout(function() { if (_eudrMap) _eudrMap.invalidateSize(); }, 0);
   } catch(e) {
     errEl.textContent = e.message; errEl.style.display = 'block';
   } finally {
@@ -1402,7 +1404,7 @@ function initEudrMap(r) {
 
   var satellite = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    { attribution: 'Imagery © Esri', maxZoom: 19 }
+    { attribution: 'Imagery © Esri', maxNativeZoom: 18, maxZoom: 19 }
   );
   var streets = L.tileLayer(
     'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -1440,7 +1442,7 @@ function initEudrMap(r) {
     },
   }).addTo(_eudrMap);
 
-  _eudrMap.fitBounds(geoLayer.getBounds(), { padding: [30, 30] });
+  _eudrMap.fitBounds(geoLayer.getBounds(), { padding: [30, 30], maxZoom: 16 });
 }
 
 function escHtml(s) {
