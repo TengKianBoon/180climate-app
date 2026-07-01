@@ -114,7 +114,7 @@ def _parse_geojson(content: str) -> list[PlotValidation]:
             props.get("plot_id")
             or props.get("id")
             or props.get("name")
-            or f"plot_{i + 1}"
+            or f"P{i + 1}"
         )
         declared_ha = _float_or_zero(props.get("area_ha") or props.get("hectares"))
         geom = feat.get("geometry") or {}
@@ -141,7 +141,7 @@ def _parse_kml(content: str) -> list[PlotValidation]:
     for i, pm in enumerate(placemarks):
         name_el = pm.find(f".//{ns}name")
         raw_name = (name_el.text or "").strip() if name_el is not None else ""
-        plot_id = raw_name if raw_name else f"plot_{i + 1}"
+        plot_id = raw_name if raw_name else f"P{i + 1}"
 
         declared_ha = 0.0
         ext_el = pm.find(f".//{ns}ExtendedData")
@@ -225,10 +225,10 @@ def _parse_shp(content: bytes) -> list[PlotValidation]:
             field_names = [f[0].lower() for f in sf.fields[1:]]
             rec_vals = list(shape_rec.record)
             rec = dict(zip(field_names, rec_vals))
-            plot_id = str(rec.get("plot_id") or rec.get("id") or rec.get("name") or f"plot_{i + 1}")
+            plot_id = str(rec.get("plot_id") or rec.get("id") or rec.get("name") or f"P{i + 1}")
             declared_ha = _float_or_zero(rec.get("area_ha") or rec.get("hectares"))
         except Exception:
-            plot_id = f"plot_{i + 1}"
+            plot_id = f"P{i + 1}"
             declared_ha = 0.0
 
         try:

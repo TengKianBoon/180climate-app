@@ -712,41 +712,47 @@ _EUDR_VERBATIM: dict[str, dict[str, str]] = {
     "clear_in_screen": {
         "label": "Screened — no loss detected",
         "detail": (
-            "No forest loss after 31 Dec 2020 detected in the EU's own reference map "
-            "(JRC Global Forest Cover 2020) plus RADD and Hansen. "
-            "A strong starting point for your DDS. "
-            "(A screening result, not a legal determination.)"
+            "No tree-cover-loss signal showed up on the EU's satellite maps for this plot "
+            "after 2020."
         ),
         "action": (
-            "Screened against the EU's maps — not certified, still needs a DDS. "
-            "Ensure your geolocation pack is at ≥6-decimal precision before DDS preparation."
+            "Clear in this screening — but a screen is not certification. "
+            "It still needs a DDS, and confirm the plot's legality separately."
         ),
     },
     "loss_detected": {
         "label": "Flagged — review needed",
         "detail": (
-            "Possible forest loss after 31 Dec 2020 detected within or near this plot. "
-            "This is exactly what an EU inspector's check would catch — "
-            "resolve it before the plot enters a DDS."
+            "Possible tree-cover loss showed up on the EU's satellite maps inside or near "
+            "this plot's boundary, after the 31 Dec 2020 cutoff. "
+            "This is what the satellite data suggests — observed, not yet confirmed on the ground."
         ),
-        "action": "Resolve or investigate before this plot enters a Due Diligence Statement.",
+        "action": (
+            "Get this plot checked before it enters a DDS. "
+            "The signal could be older logging, a road, fire, or a mapping error "
+            "— but it has to be cleared up first."
+        ),
     },
     "inconclusive": {
         "label": "Inconclusive — review needed",
         "detail": (
-            "The free datasets couldn't give a clear read here (small plot, cloud/data gaps, "
-            "agroforestry ambiguity, radar noise, or degradation not visible in free data). "
-            "Treat as needs-review."
+            "We couldn't get a clear read for this plot — usually cloud cover, a small parcel, "
+            "or radar noise. That means we can't call it clear, not that there's a problem."
         ),
-        "action": "Investigate further before this plot enters a DDS.",
+        "action": (
+            "Needs a manual check (recent or higher-resolution imagery) "
+            "before it can go into a DDS."
+        ),
     },
     "geometry_invalid": {
         "label": "Geometry needs fixing",
         "detail": (
-            "EUDR Art 9 needs a polygon for plots >4 ha and coordinates to "
-            "≥6 decimals. Fix it and we'll re-screen."
+            "We couldn't read this plot's boundary — the coordinates weren't precise enough "
+            "(need ≥6 decimal places) or the shape was invalid."
         ),
-        "action": "Fix the geometry and re-submit for screening.",
+        "action": (
+            "Fix the coordinates to ≥6 decimal places and re-submit so we can screen this plot."
+        ),
     },
 }
 

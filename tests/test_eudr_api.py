@@ -169,9 +169,9 @@ def test_loss_detected_plot_fields():
     assert plot["detection"] == "loss_detected"
     assert plot["plot_satellite_risk"] == "high"
     assert plot["geometry_ok"] is True
-    # Verbatim wording per eudr-design-v2.md
-    assert "resolve it before the plot enters a DDS" in plot["detail"]
-    assert "EU inspector" in plot["detail"]
+    # Verbatim wording: observed-not-confirmed framing (WO-EUDR-USEFUL-015)
+    assert "observed, not yet confirmed on the ground" in plot["detail"]
+    assert "31 Dec 2020 cutoff" in plot["detail"]
 
 
 # ── clear_in_screen render guards ─────────────────────────────────────────────
@@ -221,7 +221,7 @@ def test_inconclusive_plot_fields():
     plot = body["plots"][0]
     assert plot["detection"] == "inconclusive"
     assert plot["plot_satellite_risk"] == "inconclusive"
-    assert "needs-review" in plot["detail"]
+    assert "can't call it clear" in plot["detail"]  # observed-not-confirmed framing (WO-015)
 
 
 # ── geometry_invalid ──────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ def test_geometry_invalid_returned():
     plot = body["plots"][0]
     assert plot["detection"] == "geometry_invalid"
     assert plot["geometry_ok"] is False
-    assert "Art 9" in plot["detail"]
+    assert "≥6 decimal places" in plot["detail"]  # plain-language reword (WO-015)
 
 
 def test_geometry_invalid_does_not_clear():
