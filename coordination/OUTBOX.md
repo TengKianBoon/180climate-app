@@ -1,22 +1,37 @@
-# OUTBOX — Builder -> Cowork · WO-EUDR-LOGO-019 · 2026-07-01
+# OUTBOX — Builder -> Cowork · WO-SHOWCASE-020 · 2026-07-01
 
 ## Status: CI GREEN -- 463 tests pass -- STOPPED for Cowork review
 
-One-line HTML change. No contract change. No gate.
+Docs + tags + releases only. No code change. No gate.
 
 ---
 
-## What shipped (commit a8c3e97)
+## What shipped
 
-[frontend/index.html](frontend/index.html) L367: logo `<img>` wrapped in:
+### 1. README + roadmap commit (f2a447b)
 
-```html
-<a href="https://180climate.net" target="_blank" rel="noopener">
-  <img src="/brand/logo.png" alt="180Climate" class="logo-img">
-</a>
-```
+`git add README.md docs/production-roadmap.md`
+`git commit -m "docs: portfolio showcase README + production roadmap"`
 
-Shared header — covers both the Carbon and EUDR screens.
+Both files were already present in the working tree (README.md modified, docs/production-roadmap.md untracked).
+
+### 2. Annotated SemVer tags
+
+| Tag | Commit | Message |
+|---|---|---|
+| `v1.0.0` | `ceb8b1d` (GATE P SIGNED — carbon v1 build complete) | Carbon Pre-Feasibility Engine (live) |
+| `v1.1.0` | `f2a447b` (HEAD — docs commit above) | EUDR Export Readiness Engine (live) |
+
+`git push --tags` → both tags visible on GitHub.
+
+### 3. GitHub Releases (gh CLI — TengKianBoon authenticated)
+
+| Release | URL |
+|---|---|
+| v1.0.0 — Carbon Pre-Feasibility Engine (live) | https://github.com/TengKianBoon/180climate-app/releases/tag/v1.0.0 |
+| v1.1.0 — EUDR Export Readiness Engine (live) | https://github.com/TengKianBoon/180climate-app/releases/tag/v1.1.0 |
+
+Release notes match the WO verbatim.
 
 ```
 pytest tests/ -> 463 passed, 1 warning
