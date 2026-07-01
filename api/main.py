@@ -760,11 +760,11 @@ _EUDR_VERBATIM: dict[str, dict[str, str]] = {
 def _eudr_finding_detail(pv, area_ha: float) -> str:
     """Build a data-driven finding sentence from the PlotVerdict + validated area."""
     det = pv.detection
-    area = int(round(area_ha))
+    area_fmt = f"{int(round(area_ha)):,}"
 
     if det == "clear_in_screen":
         return (
-            f"We checked this ~{area} ha plot against the EU's 2020 forest baseline and found "
+            f"We checked this ~{area_fmt} ha plot against the EU's 2020 forest baseline and found "
             "no tree-cover loss after 31 December 2020 (Hansen shows zero; no RADD alerts). "
             "A good screening result — but a screen isn't certification: you still file a DDS, "
             "and legality is checked separately."
@@ -773,10 +773,15 @@ def _eudr_finding_detail(pv, area_ha: float) -> str:
     if det == "loss_detected":
         ha = pv.loss_after_2020_ha
         if ha > 0:
-            ha_str = "<0.1" if ha < 0.05 else f"{ha:.1f}"
+            if ha < 0.05:
+                ha_str = "<0.1"
+            elif ha < 10:
+                ha_str = f"{ha:.1f}"
+            else:
+                ha_str = f"{ha:,.0f}"
             pct_part = f" (~{round(ha / area_ha * 100)}%)" if area_ha > 0 else ""
             return (
-                f"We found about {ha_str} ha of tree-cover loss on this ~{area} ha plot"
+                f"We found about {ha_str} ha of tree-cover loss on this ~{area_fmt} ha plot"
                 f"{pct_part} after the EU's 31 December 2020 cutoff, on land the EU's 2020 map "
                 "shows as forest. It shows up in the EU's satellite data (Hansen annual loss / "
                 "RADD radar). Satellite sees the loss but not the cause — it could be permitted "
@@ -784,7 +789,7 @@ def _eudr_finding_detail(pv, area_ha: float) -> str:
                 "before this plot enters a DDS."
             )
         return (
-            f"Recent radar alerts (RADD) flagged possible tree-cover loss on this ~{area} ha "
+            f"Recent radar alerts (RADD) flagged possible tree-cover loss on this ~{area_fmt} ha "
             "plot after the EU's 31 December 2020 cutoff, on land the EU's 2020 map shows as "
             "forest — the exact area isn't quantified yet. Satellite sees the signal but not "
             "the cause (permitted harvest, road, fire, or replanting). Have it checked and "
@@ -793,7 +798,7 @@ def _eudr_finding_detail(pv, area_ha: float) -> str:
 
     if det == "inconclusive":
         return (
-            f"We couldn't get a reliable read for this ~{area} ha plot — usually cloud cover, "
+            f"We couldn't get a reliable read for this ~{area_fmt} ha plot — usually cloud cover, "
             "a parcel small relative to the satellite's resolution, or an unclear 2020 forest "
             "baseline. That's a data gap, not evidence of a problem, so we can't call it clear. "
             "A recent high-resolution image or a field check would resolve it."

@@ -748,6 +748,10 @@
       <div id="eudr-plot-table" class="plot-table"></div>
     </div>
 
+    <!-- E8: Plot map -->
+    <h3 class="eudr-section-h">Your plots on the map</h3>
+    <div id="eudr-map" style="height:340px;border-radius:10px;margin-bottom:1.25rem"></div>
+
     <!-- Next actions -->
     <h2 class="eudr-next-h">What to do next</h2>
 
@@ -1180,6 +1184,7 @@ var _eudrResult      = null;
 var _eudrContactName = '';
 var _eudrCommodity   = '';
 var _eudrTab         = 'file';
+var _eudrMap         = null;
 
 function eudrSwitchTab(tab) {
   _eudrTab = tab;
@@ -1368,6 +1373,74 @@ function renderEudrResult() {
   if (r.how_checked_url) {
     document.getElementById('eudr-how-link').href = r.how_checked_url;
   }
+
+  // ── E8: Plot map ─────────────────────────────────────────────────────────
+  initEudrMap(r);
+}
+
+// ── EUDR satellite map (E8) ────────────────────────────────────────────────
+function initEudrMap(r) {
+  if (_eudrMap) { _eudrMap.remove(); _eudrMap = null; }
+
+  var pack = r && r.geolocation_pack_geojson;
+  if (!pack || !pack.features || pack.features.length === 0) return;
+
+  var _detColour = {
+    'loss_detected':   '#C0392B',
+    'inconclusive':    '#8A5A00',
+    'clear_in_screen': '#0E7A30',
+    'geometry_invalid':'#8A97A3',
+  };
+
+  // Build a lookup from plot_id → {label, detail} for popup content
+  var _plotInfo = {};
+  (r.plots || []).forEach(function(p) {
+    _plotInfo[p.plot_id] = { label: p.label || '', detail: p.detail || '' };
+  });
+
+  _eudrMap = L.map('eudr-map');
+
+  var satellite = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution: 'Imagery © Esri', maxZoom: 19 }
+  );
+  var streets = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© OpenStreetMap contributors', maxZoom: 19 }
+  );
+  satellite.addTo(_eudrMap);
+  L.control.layers({ 'Satellite': satellite, 'Street': streets }, {}).addTo(_eudrMap);
+
+  var geoLayer = L.geoJSON(pack, {
+    style: function(feature) {
+      var det = (feature.properties && feature.properties.detection) || 'inconclusive';
+      var col = _detColour[det] || '#8A97A3';
+      return { color: col, weight: 2.5, fillColor: col, fillOpacity: 0.18 };
+    },
+    pointToLayer: function(feature, latlng) {
+      var det = (feature.properties && feature.properties.detection) || 'inconclusive';
+      var col = _detColour[det] || '#8A97A3';
+      return L.circleMarker(latlng, {
+        radius: 8, color: col, weight: 2.5, fillColor: col, fillOpacity: 0.55
+      });
+    },
+    onEachFeature: function(feature, layer) {
+      var pid   = (feature.properties && feature.properties.plot_id) || '—';
+      var info  = _plotInfo[pid] || {};
+      var label = info.label || (feature.properties && feature.properties.detection) || '';
+      var detail = info.detail || '';
+      layer.bindTooltip(escHtml(pid), { permanent: true, direction: 'center',
+        className: 'eudr-plot-tooltip' });
+      layer.bindPopup(
+        '<strong>' + escHtml(pid) + '</strong>'
+        + '<br><em>' + escHtml(label) + '</em>'
+        + (detail ? '<br><span style="font-size:.82rem;color:#444">' + escHtml(detail) + '</span>' : ''),
+        { maxWidth: 280 }
+      );
+    },
+  }).addTo(_eudrMap);
+
+  _eudrMap.fitBounds(geoLayer.getBounds(), { padding: [30, 30] });
 }
 
 function escHtml(s) {

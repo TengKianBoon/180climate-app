@@ -169,8 +169,8 @@ def test_loss_detected_plot_fields():
     assert plot["detection"] == "loss_detected"
     assert plot["plot_satellite_risk"] == "high"
     assert plot["geometry_ok"] is True
-    # Data-driven finding: real ha + 31 December 2020 reference (WO-EUDR-FINDING-016)
-    assert "12.4 ha" in plot["detail"]
+    # Data-driven finding: real ha (>=10 → 0dp), 31 December 2020 ref (WO-EUDR-FINDING-016/017)
+    assert "12 ha" in plot["detail"]   # 12.4 rounds to 12 at 0 dp (ha >= 10 threshold)
     assert "31 December 2020" in plot["detail"]
 
 
