@@ -1,44 +1,46 @@
-# OUTBOX — Builder -> Cowork · WO-EUDR-FINDING-016 · 2026-07-01
+# OUTBOX — Builder -> Cowork · WO-EUDR-MAP-017 · 2026-07-01
 
 ## Status: CI GREEN -- 457 tests pass -- STOPPED for Cowork review
 
-Data-driven per-plot Finding. No contract change. No gate.
+Frontend-only presentation + api number-format nicety. No contract change. No gate.
 
 ---
 
-## What shipped (commit 479f03c)
+## What shipped (commit 754f6bd)
 
-### 1. `_eudr_finding_detail(pv, area_ha)` — data-driven finding builder
+### 1. Leaflet satellite map on the EUDR result screen
 
-New pure function in `api/main.py`. Produces a real-numbers finding for each detection type:
+`frontend/index.html` — new `<div id="eudr-map" style="height:340px;border-radius:10px">` panel
+under heading "Your plots on the map", placed between the per-plot table and "What to do next".
 
-| Detection | Finding (excerpt) |
-|---|---|
-| `loss_detected` (ha>0) | "We found about **12.4 ha** of tree-cover loss on this ~492 ha plot (~3%) after the EU's 31 December 2020 cutoff … Hansen annual loss / RADD radar … clear it before this plot enters a DDS." |
-| `loss_detected` (ha==0, radar-only) | "Recent radar alerts (RADD) flagged possible tree-cover loss on this ~{area} ha plot … exact area isn't quantified yet … before this plot enters a DDS." |
-| `inconclusive` | "We couldn't get a reliable read for this ~{area} ha plot … so we can't call it clear. A recent high-resolution image or a field check would resolve it." |
-| `clear_in_screen` | "We checked this ~{area} ha plot … found no tree-cover loss after 31 December 2020 (Hansen shows zero; no RADD alerts). A good screening result — … still file a DDS …" |
-| `geometry_invalid` | "… need ≥6 decimal places, WGS-84 … couldn't place it on the EU's maps. Fix the coordinates and re-submit." |
+`initEudrMap(r)` function:
+- Destroys prior `_eudrMap` instance on re-run (clean re-render).
+- Guards: returns silently if `geolocation_pack_geojson` is absent or has 0 features.
+- Basemap: **Esri World Imagery** satellite (`server.arcgisonline.com`), attribution "Imagery © Esri".
+- Optional toggle: OSM "Street" layer via `L.control.layers` — user can switch between satellite and street view.
+- Draws `geolocation_pack_geojson` with `L.geoJSON`:
+  - Polygon plots: filled boundary, colour by detection.
+  - Point plots (≤4 ha): `circleMarker` via `pointToLayer`, same detection colour.
+  - Detection→colour: `loss_detected`→#C0392B, `inconclusive`→#8A5A00, `clear_in_screen`→#0E7A30, `geometry_invalid`→#8A97A3.
+- **Permanent tooltip**: plot name (`bindTooltip`, `permanent: true`, `direction: 'center'`, class `eudr-plot-tooltip`).
+- **Click popup**: plot name / status label / finding detail (label+detail looked up from `_eudrResult.plots` by `plot_id` since geolocation pack only carries `detection`).
+- `fitBounds` with 30px padding — handles single-plot case.
 
-Number formatting: ha 1 dp ("<0.1" if 0<ha<0.05), area 0 dp, pct omitted if area=0.
+### 2. Ha/area thousands-separator formatting (`api/main.py`)
 
-### 2. `area_ha` threaded per plot (api layer — no engine/contract change)
+`_eudr_finding_detail` now formats numbers as:
+| ha value | Format | Example output |
+|---|---|---|
+| 0 < ha < 0.05 | `"<0.1"` | "We found about <0.1 ha …" |
+| 0.05 ≤ ha < 10 | `f"{ha:.1f}"` | "We found about 3.7 ha …" |
+| ha ≥ 10 | `f"{ha:,.0f}"` | "We found about 12 ha …" or "~1,101 ha" |
 
-`zip(plot_verdicts, validations)` pairs each verdict with its `PlotValidation`. Each `plots_out` dict now carries `"area_ha": round(val.area_ha, 1)`.
+Area: `f"{int(round(area_ha)):,}"` — always 0 dp with thousands separator.
+Example: "~98,457 ha" not "98457 ha".
 
-### 3. PDF Finding column → `p.get("detail")` (reports/generator.py)
+### 3. Test updated
 
-Per-plot table Finding cell renders the data-driven `detail` string (changed from `p.get("label")` to `p.get("detail")`). Status chip + Next action unchanged.
-
-### 4. Tests updated
-
-`test_loss_detected_plot_fields` updated to match new data-driven detail:
-- `"12.4 ha" in plot["detail"]` (fixture `loss_after_2020_ha=12.4`)
-- `"31 December 2020" in plot["detail"]`
-
-Inconclusive/geometry_invalid/clear guards pass without change — new templates still contain `"can't call it clear"`, `"≥6 decimal places"`, and DDS action framing.
-
-Banned-string guard green: "DDS" (uppercase) is not in `EUDR_BANNED_SUBSTRINGS`.
+`test_loss_detected_plot_fields`: `"12.4 ha"` → `"12 ha"` (fixture `loss_after_2020_ha=12.4`; at ha≥10 threshold, `f"{12.4:,.0f}"` = `"12"`).
 
 ```
 mypy core/contracts/__init__.py --ignore-missing-imports -> Success: no issues found
