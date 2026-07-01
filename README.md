@@ -13,6 +13,15 @@
 
 This repository is published in the open as a worked example of **forward-deployed engineering with agentic tooling**: how you take two fuzzy real-world problems to two live, defensible products — fast — without the AI ever inventing a number or a legal claim. It is written to be read, not just run.
 
+## How to read this repo (a 2-minute tour)
+
+- **The story** — you're reading it.
+- **The decisions** — [`docs/adr/`](docs/adr/): 18 Architecture Decision Records, one per real trade-off.
+- **The harness** — [`.claude/`](.claude/): the actual agent config — the sub-agent roles ([`.claude/agents/`](.claude/agents/): writer · reviewer · verifier · test-writer), the five custom skills ([`.claude/skills/`](.claude/skills/): brand · geospatial · golden-case · methodology · self-improving-code), and the safety **hooks** ([`.claude/settings.json`](.claude/settings.json): a contract-guard that blocks un-ADR'd edits to `core/contracts/`, a dangerous-bash veto, and a secret-scan on tool output).
+- **The proof it was real** — [`coordination/`](coordination/): the *actual, unedited* agent mailbox and audit trail — [`INBOX.md`](coordination/INBOX.md), [`OUTBOX.md`](coordination/OUTBOX.md), the append-only [`journal.md`](coordination/journal.md) (which feeds the memory-consolidation "dreaming" pass), and the [`board.html`](coordination/board.html) window.
+- **The engine** — [`core/contracts/`](core/contracts/) (the typed ontology) + [`engines/`](engines/) (pure-function carbon + EUDR); the single LLM call is isolated in [`narrative/`](narrative/).
+- **The receipts** — [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (green CI), [`tests/`](tests/) (463 tests incl. the banned-claim guard), and the [Releases](https://github.com/TengKianBoon/180climate-app/releases) (SemVer).
+
 ---
 
 ## 1. The two apps — what they are and why they exist
@@ -116,7 +125,7 @@ Bounded loops + durable state on disk + hard human checkpoints — the practical
 
 **Invariants (guardrails) — enforced, not hoped for:**
 - **Determinism.** Pure functions + typed models. The *only* LLM call is in `narrative/`.
-- **Contracts change only via an ADR + Gate C** — a **contract-guard hook** blocks un-ADR'd edits to `core/contracts/`.
+- **Contracts change only via an ADR + Gate C** — a **contract-guard hook** (`.claude/settings.json`) blocks un-ADR'd edits to `core/contracts/`; two more hooks back it up — a **dangerous-bash veto** and a **secret-scan** on tool output — with Bash further limited by a scoped permissions allowlist.
 - **Uncertainty is honest.** Always a **range + band + IPCC Tier**, never a single number, never a "% accuracy/confidence" string.
 - **Methodology routing is fixed** (HTI→APD, HA→IFM, peat→interim); mis-routing is a test failure.
 - **Banned-claim guard.** A CI test asserts EUDR output can never contain `"compliant"`, `"deforestation-free"`, or `"DDS-ready"` — the legal posture lives in the type system and the test suite, not just the copy. (It caught real regressions during the build.)
@@ -156,7 +165,7 @@ The pipeline runs longer than any single context window, so it remembers on disk
 
 **MCP (Model Context Protocol).** The agent harness (Cowork / Claude Code) is MCP-native — it discovers and calls tools through MCP. The *product's* external tools — the **GFW Data API** (RADD/Hansen), the **JRC GFC2020** COG, **Brevo**, **Google Sheets** — are consumed directly today and are exactly the surface MCP standardises; exposing them as MCP servers is the natural next step. *(Stated plainly: MCP powered the development harness, not yet a production server — no fabricated claims.)*
 
-**Skills.** Reusable, invokable capabilities were used where they earned their place — most visibly the **self-improving-agent** skill (Chain-of-Verification / recursive stress-testing) to harden the EUDR value-first spec before a line of it was built.
+**Skills.** Five custom skills live in [`.claude/skills/`](.claude/skills/) — `brand-180climate`, `geospatial`, `golden-case`, `methodology`, and `self-improving-code` — the reusable capabilities the agents drew on (domain rules, the golden-case discipline, and Chain-of-Verification self-review). The self-improving-code skill hardened the EUDR value-first spec before a line of it was built.
 
 **Why the Claude family throughout:** one model family across planner, builder, and advisor means **consistent instruction-following and a shared reasoning style** — which matters enormously when agents read and enforce *each other's* contracts and gate rules. Within that family, work was routed for economics: **Sonnet by default, Opus for the number-path Work Orders and their reviews**, with parallel git worktrees capped at ~3 to stay in budget. Homogeneity is a feature: fewer translation seams, more predictable guardrails.
 
