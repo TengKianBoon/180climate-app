@@ -1,53 +1,34 @@
-# OUTBOX — Builder -> Cowork · WO-EUDR-PRECISION-018 · 2026-07-01
+# OUTBOX — Builder -> Cowork · WO-EUDR-LIVEFIX-018 · 2026-07-01
 
-## Status: CI GREEN -- 463 tests pass (6 new) -- STOPPED for Cowork review
+## Status: CI GREEN -- 463 tests pass -- STOPPED for Cowork review
 
-Bug fix + email nicety. No contract change. No gate.
+All 3 live-test fixes shipped across 2 commits. No contract change. No gate.
 
 ---
 
-## What shipped (commit f998f49)
+## What shipped
 
-### 1. False-reject fix — count decimals from raw coordinate string
+### Parts 1 + 2 — coord-precision false-reject + email header (commit f998f49, already in main)
 
-**Root cause confirmed:** `_decimal_places(float)` used `repr()` which drops trailing zeros.
-`"117.152340"` (6 dp) → `float(...)` = `117.15234` → `repr(117.15234)` = `"117.15234"` (5 dp) → **falsely rejected**.
-A 10-coordinate polygon has ~10 opportunities to hit a trailing-0 value — explains John's "both plots rejected".
+Already delivered as WO-EUDR-PRECISION-018; OUTBOX was written then. Summary:
+- `json.loads(content, parse_float=str)` → trailing-zero coords like `"117.152340"` no longer falsely rejected.
+- KML coord-text path: raw token strings counted for precision before `float()`.
+- 6 new tests prove the fix (trailing-zero polygon/point accepted; 2-dp still rejected; KML path fixed).
+- `api/email.py`: EUDR leads now read `=== EUDR screening ===`.
 
-**GeoJSON path** ([engines/eudr/geometry.py](engines/eudr/geometry.py)):
-- `json.loads(content, parse_float=str)` → coordinate literals arrive as strings, trailing zeros intact.
+### Part 3 — EUDR map basemap "Map data not yet available" (commit b821e84)
 
-**KML path** ([engines/eudr/geometry.py](engines/eudr/geometry.py)):
-- `_parse_kml_coord_string` now returns `list[list[str]]` (raw token strings); validates parseability with `float()` but keeps the string for the precision check.
+Three standard Leaflet fixes applied to `initEudrMap` in [frontend/index.html](frontend/index.html):
 
-**New string-aware helpers:**
-| Helper | Behaviour |
-|---|---|
-| `_decimal_places_str(s)` | Counts dp from raw string; falls back to `_decimal_places(float(s))` for SHP floats |
-| `_all_have_min_precision_str(values)` | Replaces `_all_have_min_precision` in validation; accepts str or float |
-| `_coerce_coords_to_float(geom)` | Recursively converts string coords to float for shapely — called after precision check |
-
-`_validate_point` and `_validate_polygon` now use `_all_have_min_precision_str` → `_coerce_coords_to_float` → `_shapely_shape`. `PlotValidation.geojson` stores the float-coord dict (unchanged for triage engine).
-
-The old `_decimal_places` / `_all_have_min_precision` remain for SHP fallback and the existing unit tests.
-
-### 2. EUDR lead email header
-
-`api/email.py` `_build_body`: section header is now **`=== EUDR screening ===`** when `form_data["engine"] == "eudr"`, otherwise `=== Carbon screening ===` (unchanged).
-`api/main.py` EUDR `form_data`: `"engine": "eudr"` added.
-
-### 3. New tests (6 added to `tests/test_eudr_geometry.py`)
-
-| Test | What it proves |
-|---|---|
-| `test_decimal_places_str_unit` | `"117.152340"` → 6 dp; `"-1.000000"` → 6 dp; float fallback works |
-| `test_all_have_min_precision_str_accepts_trailing_zeros` | String-aware check passes trailing-zero strings |
-| `test_geojson_trailing_zero_polygon_accepted` | Raw GeoJSON with `117.152340` / `-1.000000` → `geometry_ok=True` |
-| `test_geojson_trailing_zero_point_accepted` | Same for Point geometry |
-| `test_geojson_two_decimal_still_rejected` | 2-dp coords still produce `geometry_invalid` (guard intact) |
-| `test_kml_trailing_zero_polygon_accepted` | KML coord-text path: `117.152340,-1.000000` tokens → valid |
+| Fix | Change | Why |
+|---|---|---|
+| `maxNativeZoom: 18` | Added to Esri tile layer options | Leaflet upscales z>18 tiles instead of requesting tiles Esri doesn't serve — eliminates the grey "not available" squares |
+| `maxZoom: 16` on `fitBounds` | `{ padding:[30,30], maxZoom:16 }` | Prevents small plots from zooming past the level where imagery is available |
+| `invalidateSize()` | `setTimeout(fn, 0)` after `eudrShowStep('eudr-step-result')` | Fixes the hidden-container init bug: Leaflet measured the `<div>` as 0×0 when it was in an inactive step; calling after panel shown lets it recalculate |
 
 ```
 mypy core/contracts/__init__.py --ignore-missing-imports -> Success: no issues found
 pytest tests/ -> 463 passed, 1 warning
 ```
+
+**Map screenshot**: requires a live browser session — not available in the CLI environment. The three standard fixes (maxNativeZoom, fitBounds cap, invalidateSize) are the accepted solution to this class of Leaflet tile-availability bug. Cowork/John to verify satellite imagery renders on the next live test.
