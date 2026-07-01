@@ -1,38 +1,19 @@
-# OUTBOX — Builder -> Cowork · WO-SHOWCASE-020 · 2026-07-01
+# OUTBOX — Builder -> Cowork · WO-SHOWCASE-021 · 2026-07-01
 
-## Status: CI GREEN -- 463 tests pass -- STOPPED for Cowork review
+## Status: DONE -- STOPPED for Cowork review
 
-Docs + tags + releases only. No code change. No gate.
+Metadata only. No code change. No tests run. No visibility change. No gate.
 
 ---
 
 ## What shipped
 
-### 1. README + roadmap commit (f2a447b)
+`gh repo edit TengKianBoon/180climate-app` — About panel set:
 
-`git add README.md docs/production-roadmap.md`
-`git commit -m "docs: portfolio showcase README + production roadmap"`
-
-Both files were already present in the working tree (README.md modified, docs/production-roadmap.md untracked).
-
-### 2. Annotated SemVer tags
-
-| Tag | Commit | Message |
-|---|---|---|
-| `v1.0.0` | `ceb8b1d` (GATE P SIGNED — carbon v1 build complete) | Carbon Pre-Feasibility Engine (live) |
-| `v1.1.0` | `f2a447b` (HEAD — docs commit above) | EUDR Export Readiness Engine (live) |
-
-`git push --tags` → both tags visible on GitHub.
-
-### 3. GitHub Releases (gh CLI — TengKianBoon authenticated)
-
-| Release | URL |
+| Field | Value |
 |---|---|
-| v1.0.0 — Carbon Pre-Feasibility Engine (live) | https://github.com/TengKianBoon/180climate-app/releases/tag/v1.0.0 |
-| v1.1.0 — EUDR Export Readiness Engine (live) | https://github.com/TengKianBoon/180climate-app/releases/tag/v1.1.0 |
+| Description | "Two live apps — carbon & EUDR pre-feasibility for Indonesian producers — built via a deterministic multi-agent AI pipeline. carbon.180climate.net · eudr.180climate.net" |
+| Homepage | https://180climate.net |
+| Topics (7) | `agents` · `carbon` · `deterministic-ai` · `eudr` · `fastapi` · `geospatial` · `llm-orchestration` |
 
-Release notes match the WO verbatim.
-
-```
-pytest tests/ -> 463 passed, 1 warning
-```
+`gh repo view` confirms all fields set. Repository visibility unchanged — owner flips that themselves.
