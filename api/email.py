@@ -104,7 +104,7 @@ def _build_body(form_data: dict) -> str:
         f"Area:         {c.get('area_ha', '—')} ha",
         f"Geometry:     {c.get('geometry_summary', '—')}",
         "",
-        "=== Carbon screening ===",
+        "=== EUDR screening ===" if c.get("engine") == "eudr" else "=== Carbon screening ===",
         f"Verdict:      {c.get('verdict', '—')}",
         f"Range:        {carbon_range}",
         f"Summary:      {c.get('payload_summary', '—')}",

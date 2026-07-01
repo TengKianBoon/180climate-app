@@ -7,7 +7,9 @@ from engines.eudr.geometry import (
     FIX_MESSAGE,
     PlotValidation,
     _all_have_min_precision,
+    _all_have_min_precision_str,
     _decimal_places,
+    _decimal_places_str,
     parse_plots,
 )
 
@@ -81,6 +83,104 @@ def test_all_have_min_precision():
     assert _all_have_min_precision([117.123456, -0.123456]) is True
     assert _all_have_min_precision([117.1235, -0.123456]) is False
     assert _all_have_min_precision([117.0, -0.123456]) is False
+
+
+def test_decimal_places_str_unit():
+    """_decimal_places_str counts from the raw string, preserving trailing zeros."""
+    # Trailing zeros preserved (the fix: repr() would drop these)
+    assert _decimal_places_str("117.152340") == 6    # trailing 0 — repr gives 5
+    assert _decimal_places_str("-1.000000") == 6     # all zeros after decimal
+    assert _decimal_places_str("117.1234567") == 7
+    assert _decimal_places_str("117.123456") == 6
+    assert _decimal_places_str("117.1235") == 4
+    assert _decimal_places_str("117") == 0           # no decimal
+    assert _decimal_places_str("1e-7") == 0          # scientific notation → 0
+    # Float fallback (SHP path) — still works via repr
+    assert _decimal_places_str(117.123456) == 6
+    assert _decimal_places_str(117.1235) == 4
+
+
+def test_all_have_min_precision_str_accepts_trailing_zeros():
+    """String-aware check: 6dp ending in 0 passes; 4dp fails."""
+    assert _all_have_min_precision_str(["117.152340", "-1.000000"]) is True
+    assert _all_have_min_precision_str(["117.1235", "-1.000000"]) is False   # 4dp
+    assert _all_have_min_precision_str(["117.123456", "-1.000000"]) is True
+
+
+# ── Trailing-zero coordinate acceptance (WO-EUDR-PRECISION-018) ───────────────
+
+# Raw GeoJSON strings with trailing zeros — json.dumps() would drop the trailing 0,
+# so these must be hand-written string literals to exercise the parse_float=str path.
+_GJ_TRAILING_ZERO_POLYGON = (
+    '{"type":"FeatureCollection","features":[{"type":"Feature",'
+    '"properties":{"plot_id":"T1"},"geometry":{"type":"Polygon",'
+    '"coordinates":[[[117.152340,-1.000000],[117.162340,-1.000000],'
+    '[117.162340,-1.010000],[117.152340,-1.010000],[117.152340,-1.000000]]]}}]}'
+)
+
+_GJ_TRAILING_ZERO_POINT = (
+    '{"type":"Feature","properties":{},'
+    '"geometry":{"type":"Point","coordinates":[117.152340,-1.000000]}}'
+)
+
+_GJ_TWO_DECIMAL = (
+    '{"type":"FeatureCollection","features":[{"type":"Feature",'
+    '"properties":{"plot_id":"Bad"},"geometry":{"type":"Polygon",'
+    '"coordinates":[[[117.15,-1.00],[117.16,-1.00],'
+    '[117.16,-1.01],[117.15,-1.01],[117.15,-1.00]]]}}]}'
+)
+
+_KML_TRAILING_ZERO = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Placemark>
+    <name>K1</name>
+    <Polygon>
+      <outerBoundaryIs><LinearRing>
+        <coordinates>
+          117.152340,-1.000000 117.162340,-1.000000
+          117.162340,-1.010000 117.152340,-1.010000
+          117.152340,-1.000000
+        </coordinates>
+      </LinearRing></outerBoundaryIs>
+    </Polygon>
+  </Placemark>
+</kml>"""
+
+
+def test_geojson_trailing_zero_polygon_accepted():
+    """GeoJSON polygon with 6 dp ending in 0 must validate, not be rejected (false-reject fix)."""
+    results = parse_plots(_GJ_TRAILING_ZERO_POLYGON, "geojson")
+    assert len(results) == 1
+    r = results[0]
+    assert r.geometry_ok is True, f"Trailing-zero coords falsely rejected: {r.fix_message}"
+    assert r.detection == "inconclusive"
+    assert r.area_ha > 0
+
+
+def test_geojson_trailing_zero_point_accepted():
+    """GeoJSON point with 6 dp trailing zeros must validate."""
+    results = parse_plots(_GJ_TRAILING_ZERO_POINT, "geojson")
+    assert len(results) == 1
+    r = results[0]
+    assert r.geometry_ok is True, f"Trailing-zero point coords falsely rejected: {r.fix_message}"
+    assert r.detection == "inconclusive"
+
+
+def test_geojson_two_decimal_still_rejected():
+    """2-dp coords must still be rejected (existing guard must not be broken)."""
+    results = parse_plots(_GJ_TWO_DECIMAL, "geojson")
+    assert len(results) == 1
+    assert results[0].detection == "geometry_invalid"
+
+
+def test_kml_trailing_zero_polygon_accepted():
+    """KML polygon with 6 dp ending in 0 must validate (coord-text path fix)."""
+    results = parse_plots(_KML_TRAILING_ZERO, "kml")
+    assert len(results) == 1
+    r = results[0]
+    assert r.geometry_ok is True, f"KML trailing-zero coords falsely rejected: {r.fix_message}"
+    assert r.detection == "inconclusive"
 
 
 # ── Valid polygon (>4 ha, ≥6 dec) ────────────────────────────────────────────

@@ -970,6 +970,7 @@ async def eudr_screen(
         "email":      email,
         "mobile":     mobile or "",
         "company":    company or "",
+        "engine":     "eudr",
         "iup_name":   f"EUDR screen — {name}",
         "iup_address": "Indonesia",
         "permit_type": "HA",

@@ -93,7 +93,9 @@ def parse_plots(
 
 def _parse_geojson(content: str) -> list[PlotValidation]:
     try:
-        data = json.loads(content)
+        # parse_float=str preserves literal number strings (e.g. "117.152340")
+        # so trailing zeros are not dropped before the ≥6-decimal-place check.
+        data = json.loads(content, parse_float=str)
     except (json.JSONDecodeError, ValueError) as exc:
         return [_invalid("plot_1", "unknown", f"GeoJSON parse error: {exc}")]
 
@@ -185,17 +187,22 @@ def _kml_point_to_geojson(point_el: ET.Element, ns: str) -> dict:
     return {"type": "Point", "coordinates": ring[0]}
 
 
-def _parse_kml_coord_string(text: str) -> list[list[float]]:
-    """Parse KML <coordinates> text (whitespace-separated 'lon,lat[,alt]') → [[lon, lat], ...]."""
-    pairs: list[list[float]] = []
+def _parse_kml_coord_string(text: str) -> list[list[str]]:
+    """Parse KML <coordinates> text → [[lon_str, lat_str], ...] preserving raw strings.
+
+    Strings are validated as parseable numbers but kept as-is so that trailing
+    zeros (e.g. "-1.000000") are not dropped before the ≥6-decimal-place check.
+    """
+    pairs: list[list[str]] = []
     for token in text.strip().split():
         parts = token.split(",")
         if len(parts) < 2:
             return []
         try:
-            pairs.append([float(parts[0]), float(parts[1])])
+            float(parts[0]); float(parts[1])  # validate parseability only
         except ValueError:
             return []
+        pairs.append([parts[0], parts[1]])
     return pairs
 
 
@@ -272,13 +279,14 @@ def _validate_point(plot_id: str, geom: dict, declared_ha: float) -> PlotValidat
         return _invalid(plot_id, "point", FIX_MESSAGE)
 
     lon, lat = coords[0], coords[1]
-    if not _all_have_min_precision([lon, lat]):
+    if not _all_have_min_precision_str([lon, lat]):
         return _invalid(plot_id, "point", FIX_MESSAGE)
 
     # Art-9: points are acceptable only for plots ≤4 ha
     if declared_ha > 4.0:
         return _invalid(plot_id, "point", FIX_MESSAGE)
 
+    geom_f = _coerce_coords_to_float(geom)
     return PlotValidation(
         plot_id=plot_id,
         geometry_ok=True,
@@ -286,7 +294,7 @@ def _validate_point(plot_id: str, geom: dict, declared_ha: float) -> PlotValidat
         area_ha=0.0,
         geometry_type="point",
         fix_message=None,
-        geojson=geom,
+        geojson=geom_f,
     )
 
 
@@ -297,11 +305,12 @@ def _validate_polygon(plot_id: str, geom: dict) -> PlotValidation:
 
     outer = rings[0]
     flat = [c for pt in outer for c in (pt[0], pt[1])]
-    if not _all_have_min_precision(flat):
+    if not _all_have_min_precision_str(flat):
         return _invalid(plot_id, "polygon", FIX_MESSAGE)
 
+    geom_f = _coerce_coords_to_float(geom)
     try:
-        shp = _shapely_shape(geom)
+        shp = _shapely_shape(geom_f)
         if not shp.is_valid:
             return _invalid(plot_id, "polygon", FIX_MESSAGE)
     except Exception:
@@ -315,7 +324,7 @@ def _validate_polygon(plot_id: str, geom: dict) -> PlotValidation:
         area_ha=area_ha,
         geometry_type="polygon",
         fix_message=None,
-        geojson=geom,
+        geojson=geom_f,
     )
 
 
@@ -355,6 +364,50 @@ def _decimal_places(val: float) -> int:
 def _all_have_min_precision(values: list[float], min_places: int = 6) -> bool:
     """True iff every value has ≥min_places decimal places in its repr."""
     return all(_decimal_places(v) >= min_places for v in values)
+
+
+def _decimal_places_str(s: object) -> int:
+    """Count decimal places from a raw coordinate string, preserving trailing zeros.
+
+    Accepts str (GeoJSON parse_float=str, KML raw token) or numeric (SHP float fallback).
+    repr(float) drops trailing zeros; this function does not.
+    """
+    if not isinstance(s, str):
+        return _decimal_places(float(s))
+    clean = s.strip()
+    if "e" in clean.lower():
+        return 0
+    if "." not in clean:
+        return 0
+    return len(clean.split(".")[1])
+
+
+def _all_have_min_precision_str(values: list, min_places: int = 6) -> bool:
+    """True iff every coordinate value has ≥min_places decimal places.
+
+    Works with str (GeoJSON/KML raw strings) and numeric (SHP path).
+    """
+    return all(_decimal_places_str(v) >= min_places for v in values)
+
+
+def _coerce_coords_to_float(geom: dict) -> dict:
+    """Recursively convert string coordinate values to float in a GeoJSON geometry dict.
+
+    Called after the string-based precision check so shapely receives proper floats.
+    Non-numeric strings (e.g. the 'type' field value 'Polygon') pass through unchanged.
+    """
+    def _walk(obj: object) -> object:
+        if isinstance(obj, str):
+            try:
+                return float(obj)
+            except ValueError:
+                return obj
+        if isinstance(obj, list):
+            return [_walk(x) for x in obj]
+        if isinstance(obj, dict):
+            return {k: _walk(v) for k, v in obj.items()}
+        return obj
+    return _walk(geom)  # type: ignore[return-value]
 
 
 def _area_ha(shp) -> float:  # shp: shapely geometry
