@@ -1,48 +1,53 @@
-# OUTBOX — Builder -> Cowork · WO-EUDR-MAP-017 · 2026-07-01
+# OUTBOX — Builder -> Cowork · WO-EUDR-PRECISION-018 · 2026-07-01
 
-## Status: CI GREEN -- 457 tests pass -- STOPPED for Cowork review
+## Status: CI GREEN -- 463 tests pass (6 new) -- STOPPED for Cowork review
 
-Frontend-only presentation + api number-format nicety. No contract change. No gate.
+Bug fix + email nicety. No contract change. No gate.
 
 ---
 
-## What shipped (commit 754f6bd)
+## What shipped (commit f998f49)
 
-### 1. Leaflet satellite map on the EUDR result screen
+### 1. False-reject fix — count decimals from raw coordinate string
 
-`frontend/index.html` — new `<div id="eudr-map" style="height:340px;border-radius:10px">` panel
-under heading "Your plots on the map", placed between the per-plot table and "What to do next".
+**Root cause confirmed:** `_decimal_places(float)` used `repr()` which drops trailing zeros.
+`"117.152340"` (6 dp) → `float(...)` = `117.15234` → `repr(117.15234)` = `"117.15234"` (5 dp) → **falsely rejected**.
+A 10-coordinate polygon has ~10 opportunities to hit a trailing-0 value — explains John's "both plots rejected".
 
-`initEudrMap(r)` function:
-- Destroys prior `_eudrMap` instance on re-run (clean re-render).
-- Guards: returns silently if `geolocation_pack_geojson` is absent or has 0 features.
-- Basemap: **Esri World Imagery** satellite (`server.arcgisonline.com`), attribution "Imagery © Esri".
-- Optional toggle: OSM "Street" layer via `L.control.layers` — user can switch between satellite and street view.
-- Draws `geolocation_pack_geojson` with `L.geoJSON`:
-  - Polygon plots: filled boundary, colour by detection.
-  - Point plots (≤4 ha): `circleMarker` via `pointToLayer`, same detection colour.
-  - Detection→colour: `loss_detected`→#C0392B, `inconclusive`→#8A5A00, `clear_in_screen`→#0E7A30, `geometry_invalid`→#8A97A3.
-- **Permanent tooltip**: plot name (`bindTooltip`, `permanent: true`, `direction: 'center'`, class `eudr-plot-tooltip`).
-- **Click popup**: plot name / status label / finding detail (label+detail looked up from `_eudrResult.plots` by `plot_id` since geolocation pack only carries `detection`).
-- `fitBounds` with 30px padding — handles single-plot case.
+**GeoJSON path** ([engines/eudr/geometry.py](engines/eudr/geometry.py)):
+- `json.loads(content, parse_float=str)` → coordinate literals arrive as strings, trailing zeros intact.
 
-### 2. Ha/area thousands-separator formatting (`api/main.py`)
+**KML path** ([engines/eudr/geometry.py](engines/eudr/geometry.py)):
+- `_parse_kml_coord_string` now returns `list[list[str]]` (raw token strings); validates parseability with `float()` but keeps the string for the precision check.
 
-`_eudr_finding_detail` now formats numbers as:
-| ha value | Format | Example output |
-|---|---|---|
-| 0 < ha < 0.05 | `"<0.1"` | "We found about <0.1 ha …" |
-| 0.05 ≤ ha < 10 | `f"{ha:.1f}"` | "We found about 3.7 ha …" |
-| ha ≥ 10 | `f"{ha:,.0f}"` | "We found about 12 ha …" or "~1,101 ha" |
+**New string-aware helpers:**
+| Helper | Behaviour |
+|---|---|
+| `_decimal_places_str(s)` | Counts dp from raw string; falls back to `_decimal_places(float(s))` for SHP floats |
+| `_all_have_min_precision_str(values)` | Replaces `_all_have_min_precision` in validation; accepts str or float |
+| `_coerce_coords_to_float(geom)` | Recursively converts string coords to float for shapely — called after precision check |
 
-Area: `f"{int(round(area_ha)):,}"` — always 0 dp with thousands separator.
-Example: "~98,457 ha" not "98457 ha".
+`_validate_point` and `_validate_polygon` now use `_all_have_min_precision_str` → `_coerce_coords_to_float` → `_shapely_shape`. `PlotValidation.geojson` stores the float-coord dict (unchanged for triage engine).
 
-### 3. Test updated
+The old `_decimal_places` / `_all_have_min_precision` remain for SHP fallback and the existing unit tests.
 
-`test_loss_detected_plot_fields`: `"12.4 ha"` → `"12 ha"` (fixture `loss_after_2020_ha=12.4`; at ha≥10 threshold, `f"{12.4:,.0f}"` = `"12"`).
+### 2. EUDR lead email header
+
+`api/email.py` `_build_body`: section header is now **`=== EUDR screening ===`** when `form_data["engine"] == "eudr"`, otherwise `=== Carbon screening ===` (unchanged).
+`api/main.py` EUDR `form_data`: `"engine": "eudr"` added.
+
+### 3. New tests (6 added to `tests/test_eudr_geometry.py`)
+
+| Test | What it proves |
+|---|---|
+| `test_decimal_places_str_unit` | `"117.152340"` → 6 dp; `"-1.000000"` → 6 dp; float fallback works |
+| `test_all_have_min_precision_str_accepts_trailing_zeros` | String-aware check passes trailing-zero strings |
+| `test_geojson_trailing_zero_polygon_accepted` | Raw GeoJSON with `117.152340` / `-1.000000` → `geometry_ok=True` |
+| `test_geojson_trailing_zero_point_accepted` | Same for Point geometry |
+| `test_geojson_two_decimal_still_rejected` | 2-dp coords still produce `geometry_invalid` (guard intact) |
+| `test_kml_trailing_zero_polygon_accepted` | KML coord-text path: `117.152340,-1.000000` tokens → valid |
 
 ```
 mypy core/contracts/__init__.py --ignore-missing-imports -> Success: no issues found
-pytest tests/ -> 457 passed, 1 warning
+pytest tests/ -> 463 passed, 1 warning
 ```
