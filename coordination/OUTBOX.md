@@ -1,19 +1,42 @@
-# OUTBOX — Builder -> Cowork · WO-SHOWCASE-021 · 2026-07-01
+# OUTBOX — Builder -> Cowork · WO-SHOWCASE-022 · 2026-07-01
 
-## Status: DONE -- STOPPED for Cowork review
+## Status: CI GREEN -- 463 tests pass -- STOPPED for Cowork review
 
-Metadata only. No code change. No tests run. No visibility change. No gate.
+Docs/git only. No code touched. No gate.
 
 ---
 
-## What shipped
+## What shipped (commit d857a9f)
 
-`gh repo edit TengKianBoon/180climate-app` — About panel set:
+### 1. 4 missing ADRs published
 
-| Field | Value |
+Added to `docs/adr/` (were untracked, not gitignored):
+- `ADR-0014-derivation-trace.md`
+- `ADR-0015-plantation-gate-ifm-basis.md`
+- `ADR-0017-fixed-crediting-period.md`
+- `ADR-0018-eudr-contracts.md`
+
+`git ls-files docs/adr | wc -l` → **19** ✓ (ADR-0001..0018 all present; the two ADR-0013 files are a known numbering artifact, left as-is).
+
+### 2. Root tidied — 6 loose files archived
+
+`mkdir -p docs/archive` + `git mv` for all 6:
+
+| From (root) | To |
 |---|---|
-| Description | "Two live apps — carbon & EUDR pre-feasibility for Indonesian producers — built via a deterministic multi-agent AI pipeline. carbon.180climate.net · eudr.180climate.net" |
-| Homepage | https://180climate.net |
-| Topics (7) | `agents` · `carbon` · `deterministic-ai` · `eudr` · `fastapi` · `geospatial` · `llm-orchestration` |
+| `180climate-MASTER-handover-spec.md` | `docs/archive/` |
+| `180climate-build-and-orchestration-plan.md` | `docs/archive/` |
+| `180climate-planning-batch-01.md` | `docs/archive/` |
+| `180climate-carbon-confidence-report.pdf` | `docs/archive/` |
+| `180climate-carbon-confidence-report (1).docx` | `docs/archive/` |
+| `180climate-app-docs.zip` | `docs/archive/` |
 
-`gh repo view` confirms all fields set. Repository visibility unchanged — owner flips that themselves.
+`ls 180climate-*` in root → `No such file or directory` ✓
+
+### 3. README changes committed
+
+Cowork's edits: "How to read this repo" tour + corrected hooks(3)/skills(5) wording surfacing the `.claude/` harness.
+
+```
+pytest tests/ -> 463 passed, 1 warning
+```
