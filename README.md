@@ -1,3 +1,107 @@
+# 180Climate — Carbon & EUDR Pre-Feasibility Platform
+
+Two live web apps that give Indonesian forest owners and commodity exporters a real answer in minutes.
+
+**[carbon.180climate.net](https://carbon.180climate.net)** · **[eudr.180climate.net](https://eudr.180climate.net)** · `v1.1.0` · CI green · 461 passed, 2 skipped (1 July 2026)
+
+I scoped, funded, directed and launched this build. The engineering was executed by an AI harness under my acceptance criteria and gate sign-offs. Sections 1–4 are the product and the evidence; [section 5](#5-my-contribution) states exactly which parts were mine.
+
+---
+
+## 1. See the product
+
+**Carbon Pre-Feasibility Engine** — a concession holder enters a permit type and a location, and gets an indicative carbon-credit quantity as a range with an uncertainty band and an IPCC Tier label, a forest-loss overlay, an auto-routed methodology, and a plain-language rationale. Free, in minutes. The paid equivalent runs about SGD 12,000 and several weeks.
+
+![Carbon Pre-Feasibility Engine — entry screen](docs/assets/2609092130_carbon_entry_4ofX.png)
+
+**EUDR Export Readiness Engine** — an exporter uploads plots and gets a per-plot red / amber / green triage against the EU's own satellite forest maps, each finding stated in hectares and share of plot, with an Art-9 geolocation pack and an Indonesia-specific legality checklist. The regulation starts biting on 30 December 2026.
+
+![EUDR Export Readiness Engine — entry screen](docs/assets/2609092130_eudr_entry_4ofX.png)
+
+Both are live. Enter a location and the answer comes back from the deployed system, not a mock.
+
+---
+
+## 2. See the architecture
+
+![Architecture — deterministic engines, one isolated LLM call](docs/assets/2609092130_architecture_4ofX.svg)
+
+One rule governs the whole design: **every number and every verdict is produced by a pure function over typed models. The only LLM call in the product writes the human-readable explanation.** Numbers are therefore reproducible, testable and cheap, and no model output can invent a quantity or a legal claim.
+
+```
+core/contracts/   the typed ontology — detection states, methodology enums,
+                  uncertainty band + IPCC tier, EUDR role and commodity types
+engines/          pure-function carbon + EUDR                narrative/  the ONLY LLM call
+api/  FastAPI     frontend/  HTML/JS + Leaflet               reports/  PDF + DOCX
+tests/            461 passed, 2 skipped                      docs/adr/  18 decision records
+```
+
+Stack: Python 3.13 · FastAPI · Pydantic v2 · rasterio / shapely (COG pixel reads over vsicurl) · Leaflet · Render · Brevo.
+
+`core/contracts/` is the constitution. A change to it requires an ADR and a Gate-C sign-off, enforced by a hook that blocks un-ADR'd edits. Because the domain vocabulary is typed and central, no downstream code can emit a claim the domain forbids.
+
+---
+
+## 3. See the code
+
+One decision, end to end — the EUDR per-plot triage:
+
+**[`engines/eudr/triage.py` L45–L79](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/engines/eudr/triage.py#L45-L79)**
+
+It takes measured forest-loss area against a plot geometry and returns one of four detection states — `clear_in_screen`, `loss_detected`, `inconclusive`, `geometry_invalid` — never a compliance verdict. The distinction is the whole legal posture of the product, and it lives in the type system rather than in the copy: the app can say *we found 3.4 ha of loss after the 31 December 2020 cutoff*, and it cannot say *you are compliant*.
+
+That posture was decided before the code was written, stress-tested by an independent review agent, and recorded as **ADR-0018**.
+
+---
+
+## 4. See the tests
+
+**[`tests/test_eudr_triage.py` L50–L90](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/tests/test_eudr_triage.py#L50-L90)** — the cases that pin the function above, including the boundary between amber and green.
+
+**[Recorded CI run](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682/job/84655746161)** — 461 passed, 2 skipped, 1 July 2026. mypy on the contract layer plus pytest, on every push.
+
+The test that matters most is the **banned-claim guard**: a CI assertion that EUDR output can never contain the strings `compliant`, `deforestation-free` or `DDS-ready`. It caught real regressions during the build. A marketing instinct to write "deforestation-free" on a results page fails the build rather than reaching a user.
+
+---
+
+## 5. My contribution
+
+I am a C-level operator, not the engineer of record. This section states the split plainly, because the commit history is public and shows an AI co-author on most commits.
+
+**What I owned:**
+
+- **The problem and the business case.** Which two questions were worth answering for Indonesian producers, why a free screen beats a SGD 12,000 study as an entry point, and how the tool feeds 180Climate's paid advisory. Nobody briefed me on this; it came from the client conversations.
+- **Scope, timeline and budget.** I set the delivery window and held the build inside it on subscription tooling, routing work by cost — a cheaper model by default, the stronger one reserved for the number-path work orders and their reviews, parallel work capped at about three streams.
+- **The acceptance criteria.** Every unit of work carried a definition of done that I wrote. Agents proved conformance against it; they never certified their own gate.
+- **The four go-live gates** — contracts, carbon launch, lead pipeline, EUDR launch. Each signed by me on assembled evidence: tests, rendered reports, a live end-to-end run.
+- **The judgement calls that shaped the product.** Two examples. First, the EUDR legal posture — triage and DDS preparation, never a compliance verdict — which I set before any EUDR code existed and which became ADR-0018 and the typed detection states. Second, the calibration instruction I gave repeatedly: *don't be so conservative that no one uses it.* Watch the amber rate on real runs and tune toward green as the data allows, while never letting a genuine loss render green. Value and rigour, held in tension deliberately.
+- **The development operating model.** I ran planning in one surface and execution in another against a shared repository, customised the sub-agent roles, context and standing instructions, and kept review separate from authorship so no agent marked its own homework.
+- **Release and recovery.** Versioning, tagging and the rollback decisions were mine — see [section 6](#6-inspect-versioning-and-recovery).
+
+**What I did not do:** I did not hand-write the production code. The implementation was generated by the harness, reviewed by a separate agent, verified black-box against my criteria, and accepted or rejected by me. Where an agent could not satisfy the acceptance criteria in two attempts, it stopped and asked rather than continuing — that escalation rule is mine, and it is the reason there is no quietly broken code in this repository.
+
+I am publishing it this way because the interesting claim is not *I can code*. It is that a senior operator can take two fuzzy, regulated, real-world problems to two live and defensible products, fast, without the AI ever inventing a number or a legal claim — and can show the receipts.
+
+---
+
+## 6. Inspect versioning and recovery
+
+| Release | What went live | Date |
+|---|---|---|
+| [`v1.0.0`](https://github.com/TengKianBoon/180climate-app/releases/tag/v1.0.0) | Carbon Pre-Feasibility Engine | 1 July 2026 |
+| [`v1.1.0`](https://github.com/TengKianBoon/180climate-app/releases/tag/v1.1.0) | EUDR Export Readiness Engine | 1 July 2026 |
+
+Both tags point at the source that was actually deployed, so any state of the live product can be reproduced from this repository.
+
+Recovery scope, in practice: work advanced one work order at a time with a green CI run recorded at each accepted step, so the rollback target is always a known-good tagged commit rather than a guess. The audit trail sits in [`coordination/`](coordination/) — the unedited agent mailbox, the append-only journal, and the board — alongside [18 architecture decision records](docs/adr/) explaining why each trade-off went the way it did.
+
+---
+# Engineering deep dive
+
+The full engineering account follows: the architecture in depth, the agent
+operating model, the guardrails and hooks, memory across context resets, and
+what was deliberately left out.
+
 # 180Climate — Carbon Screening & EUDR Plot Check
 
 A shared geospatial foundation serving two user needs: screen a concession's indicative carbon potential, or check plots for satellite evidence of forest loss and identify what needs further review. Built for Indonesian landholders and exporters.
