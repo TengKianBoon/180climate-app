@@ -50,6 +50,19 @@ These are synthetic inputs to one function, not satellite observations from a re
 
 [API wiring](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/api/main.py#L267-L336) · [Contracts](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/core/contracts/__init__.py#L247-L276) · [Classifier](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/classifier/intake.py#L58-L118) · [Narration](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/narrative/narrator.py#L83-L105)
 
+### How I orchestrated development
+
+I used **Claude Cowork for planning** alongside **Claude Code in VS Code for implementation and audit work**. I customised subagent roles with the relevant context, background instructions and checks for each responsibility. The shared repository and work-order records supported handoffs between the two working environments.
+
+| Role | Instruction a reviewer can inspect |
+|---|---|
+| [Writer](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.claude/agents/writer.md) | Implement the scoped work order, respect the contracts and hand off the change for review. |
+| [Reviewer](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.claude/agents/reviewer.md) | Inspect the code and acceptance criteria; return PASS, FAIL or CLARIFY without editing files. |
+| [Verifier](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.claude/agents/verifier.md) | Run the product and checks, preserve failure evidence and report observed versus expected results. |
+| [Test writer](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.claude/agents/test-writer.md) | Turn acceptance criteria into deterministic tests and input/expected-output fixtures. |
+
+I designed this workflow around task decomposition, role-specific context, evidence-based handoffs and human decision gates. The Reviewer and Verifier instructions keep checking separate from implementation and preserve failures for the next correction cycle. The [walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) connects those controls to the code and delivery decisions.
+
 ## 3. Inspect a meaningful piece of code
 
 Start with [`_decide_detection`](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/engines/eudr/triage.py#L45-L79). It distinguishes a confirmed zero from unavailable data. That distinction prevents a missing optical-loss response from being treated as a clean result.
@@ -62,7 +75,7 @@ The [engineering walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) e
 
 The [GitHub CI run from 1 July 2026](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682/job/84655746161), for commit [`b4ac414`](https://github.com/TengKianBoon/180climate-app/commit/b4ac414789659bfbb56f19599a87cbe72a01a2d2), records **463 collected: 461 passed, 2 skipped**, with one test warning. Contract type-checking also passed. The skipped checks were two live overlay smoke tests.
 
-This is a dated CI result, not a claim that every integration was retested today. The offline example is a smaller demonstration of the decision function, not a replacement for the full suite.
+I retain the commit and run date so the test result is traceable. The offline example gives a quick way to reproduce the decision checks; the CI workflow covers the broader application suite.
 
 [CI definition](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.github/workflows/ci.yml) · [Triage tests](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/tests/test_eudr_triage.py) · [API and report tests](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/tests/test_eudr_api.py)
 
@@ -71,15 +84,15 @@ This is a dated CI result, not a claim that every integration was retested today
 I took the project from demand assessment and scope through an AI-assisted build, deployment, trial and launch.
 
 - **Chose the problem and the shared approach.** I assessed demand and the available solutions, then chose to reuse satellite data and a common geospatial foundation across carbon screening and EUDR plot checks.
-- **Set scope, timeline and budget.** I defined what the first release needed to do, what users should receive, and the development constraints.
-- **Designed the development process before coding.** I specified the skills, workflow graphs, bounded improvement loops, hooks, multi-agent roles, graders and quality controls used to organise the build.
+- **Set scope, timeline and budget.** I defined the first-release requirements and delivery constraints. I used subscription-based AI development tools to control spending and completed the build within the timeline and budget I had set.
+- **Designed the development process before coding.** I divided planning and execution between Cowork and VS Code, customised the subagents' roles, context and instructions, and specified the skills, workflow graphs, bounded improvement loops, hooks, graders and checks used throughout the build.
 - **Included versioning and recovery in delivery.** My responsibilities included GitHub version control and rollback/recovery decisions as part of the development and release process. The published releases and their exact source revisions are linked below.
 - **Owned delivery and acceptance.** I directed decisions on UI, reports, security, usage and deployment to the 180Climate website, and took the apps through trial and launch. I worked against Verra- and EUDR-related screening requirements, with report quality, usability and practical value as acceptance criteria.
 - **Connected the apps to origination and adoption.** I set the strategy for forest-data collection to support origination, and for messaging and promotion to encourage use.
 
 **One decision you can inspect:** I required the carbon report to expose the actual calculation inputs and intermediate values. [ADR-0014](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0014-derivation-trace.md) records that request; the [typed calculation trace](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/core/contracts/__init__.py#L158-L189) shows the implementation approach. [ADR-0018](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0018-eudr-contracts.md) separately records my approval of explicit EUDR detection states.
 
-AI agents wrote substantial parts of the code and tests and assisted planning and review. My contribution was product definition, the shared solution approach, development-process design and delivery ownership. Working against standards was a design requirement; it does not establish certification or an official compliance determination.
+I used AI agents for implementation, testing and review while owning product definition, solution decisions, the development process and delivery acceptance. I translated domain requirements into screening behaviour, report quality and usability criteria.
 
 ## 6. Inspect versioning and recovery
 
@@ -92,7 +105,7 @@ The project has two published releases, each connected to an annotated Git tag a
 
 These tags let a reviewer identify and retrieve the source associated with each release. The later [`b4ac414`](https://github.com/TengKianBoon/180climate-app/commit/b4ac414789659bfbb56f19599a87cbe72a01a2d2) snapshot is the basis for this walkthrough and its recorded CI result.
 
-Git recovery and service recovery have different completion checks. Reverting an unwanted source change should be followed by tests; restoring a deployed service also requires checking its configuration, dependencies and user-facing behaviour. The linked records establish versioned source and releases. They do not establish a successful production rollback drill. See the [recovery discussion](docs/2609092130_engineering_walkthrough_4ofX.md).
+I included versioning and rollback/recovery decisions in delivery so changes could be traced to specific revisions. Git recovery and service recovery have different completion checks: source changes need tests, while a restored service also needs configuration, dependency and user-facing checks. The [recovery discussion](docs/2609092130_engineering_walkthrough_4ofX.md) connects the release history to the next hardening work.
 
 ## Scope and next work
 

@@ -1,6 +1,6 @@
 # Engineering walkthrough — 180Climate
 
-A five-minute tour of the public implementation at [`b4ac414`](https://github.com/TengKianBoon/180climate-app/commit/b4ac414789659bfbb56f19599a87cbe72a01a2d2). This page explains code and recorded design decisions; it is not a fresh geospatial or regulatory validation.
+I use this five-minute walkthrough to connect the product choices, architecture and verification in the implementation at [`b4ac414`](https://github.com/TengKianBoon/180climate-app/commit/b4ac414789659bfbb56f19599a87cbe72a01a2d2).
 
 ## One distinction that changes the result
 
@@ -28,7 +28,7 @@ The reproduction script parses the checked-out source and loads only the inspect
 
 ## A second example: showing the actual calculation
 
-[ADR-0014](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0014-derivation-trace.md) records John's request for a report that exposes the engine's real inputs and intermediate values.
+I required the report to expose the engine's real inputs and intermediate values. [ADR-0014](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0014-derivation-trace.md) records that request.
 
 The engineering choice was to add a typed `CalculationTrace` populated by the engine. A report can then display those values instead of reconstructing an estimate from a partial result.
 
@@ -42,31 +42,39 @@ The [narrator](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659
 
 This distinction matters when discussing the project: AI can influence the optional category-selection route, while the numerical calculations and detection rules execute as code.
 
+## Development orchestration: Cowork and VS Code
+
+I used Claude Cowork for planning alongside Claude Code in VS Code for execution and audit work. I customised the context, background instructions and responsibilities assigned to subagents, with checks across the build. This gave planning, implementation and verification distinct working contexts within one coordinated development process.
+
+The published [Writer](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.claude/agents/writer.md), [Reviewer](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.claude/agents/reviewer.md), [Verifier](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.claude/agents/verifier.md) and [Test-writer](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.claude/agents/test-writer.md) instructions show differentiated permissions, inputs and expected outputs. In particular, the Reviewer and Verifier are instructed not to edit files: a failed check should be reported to the builder rather than silently repaired by the checker.
+
+I used the shared repository and work-order records to coordinate handoffs. The [original orchestration proposal](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/orchestration-v2.md) explains the file-based coordination design; the role instructions and [recorded work orders](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/coordination/INBOX.md) show the assigned responsibilities and acceptance criteria.
+
+My focus was on making the work controllable: clear scope for each agent, the context needed for its role, defined handoffs, preserved failure evidence and explicit acceptance gates. I combined model review with deterministic tests and human decisions at the key boundaries.
+
+I chose subscription-based AI development tools to manage spend and completed the build within the timeline and budget I had set. Reusing one geospatial foundation across two applications also kept the delivery scope focused while serving two user needs.
+
 ## Versioned releases and recovery
 
 The published [carbon release v1.0.0](https://github.com/TengKianBoon/180climate-app/releases/tag/v1.0.0) points through an annotated tag to source commit `ceb8b1df560d47499af27c20d2af819bf8b9997b`. The [EUDR release v1.1.0](https://github.com/TengKianBoon/180climate-app/releases/tag/v1.1.0) points to `f2a447b8759be80535b74c59e22b500df4ea17ae`. These are distinct source revisions; the later CI result cited in this tour belongs to `b4ac414`.
 
-John confirms that GitHub versioning and rollback/recovery decisions were part of his delivery responsibilities. Release records provide direct evidence of versioning. They do not, by themselves, prove that a service was successfully rolled back.
+I included GitHub versioning and rollback/recovery decisions in my delivery responsibilities. The release records preserve named milestones and their source revisions, making the development history inspectable.
 
 A source-recovery procedure should record the unwanted change and the recovery target, create a revert commit that preserves history, then run the relevant checks on the resulting revision. GitHub Desktop supports this through History → Revert Changes in Commit. [GitHub's documentation](https://docs.github.com/en/desktop/managing-commits/reverting-a-commit-in-github-desktop?platform=windows) explains that the original commit remains in history.
 
-For production recovery, source is one part of the system: deployment configuration, dependencies, credentials and any persistent state also matter. A useful recovery record would show the deployed revision before and after, the reason for recovery, the observed service checks, and the elapsed recovery time. The reviewed [production roadmap](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/production-roadmap.md) identifies staging, post-deployment smoke tests and a rollback path as further work. No successful production recovery drill is claimed in this showcase.
+For production recovery, source is one part of the system: deployment configuration, dependencies, credentials and any persistent state also matter. A useful recovery record captures the deployed revision before and after, the reason for recovery, the observed service checks and the elapsed recovery time. My next hardening work is guided by the [production roadmap](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/production-roadmap.md), including staging, post-deployment smoke tests and the service rollback path.
 
-## What the evidence proves
+## Verification
 
 - The linked code and design records exist in the reviewed public snapshot.
 - [The linked CI job](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682/job/84655746161) records 461 passed, 2 skipped and 1 warning on 1 July 2026.
 - The local example exercises one pure function against the repository's existing examples and invariant.
 
-It does not establish field accuracy, current email or Sheet delivery, full TRACES interoperability, enterprise scale, or independent confirmation of each historical human action. Those require their own evidence.
-
-## A two-minute interview route
+## Explore the decisions
 
 1. Open the product screenshot and describe the user problem.
 2. Show the architecture and separate the application runtime from AI-assisted development.
 3. Change the discussion from “zero” to “unavailable” in the decision table.
 4. Open the function and its tests.
-5. Explain the calculation-trace request, the advisor's uncertainty finding and John's recorded approvals.
+5. Follow my calculation-trace request, the uncertainty refinement and the recorded approvals.
 6. Discuss one remaining hardening task and the conditions that would justify it.
-
-Use the contribution wording only to the extent it matches your own recollection and supporting records.
