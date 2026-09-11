@@ -11,7 +11,7 @@
     en: {
       loading: "Checking invited-pilot availability…",
       open: "Invited-pilot intake is open. Use only your private invitation code.",
-      closed: "Preview only — real-user intake is closed until the privacy, legal, processor, retention and deployment gates are approved.",
+      closed: "This technical prototype is unavailable. Use the private Wix review form above.",
       external: "Invited-pilot applications are open through 180Climate's private Wix review form.",
       fix: "Please complete the highlighted required field before continuing.",
       unavailable: "The service could not receive this submission. Your information was not confirmed as saved.",
@@ -22,7 +22,7 @@
     id: {
       loading: "Memeriksa ketersediaan uji coba…",
       open: "Pendaftaran uji coba terbuka. Gunakan hanya kode undangan privat Anda.",
-      closed: "Hanya pratinjau — pendaftaran pengguna nyata ditutup sampai gerbang privasi, hukum, pemroses, retensi, dan penerapan disetujui.",
+      closed: "Prototipe teknis ini tidak tersedia. Gunakan formulir tinjauan privat Wix di atas.",
       external: "Pendaftaran uji coba undangan dibuka melalui formulir tinjauan privat Wix 180Climate.",
       fix: "Lengkapi bidang wajib yang ditandai sebelum melanjutkan.",
       unavailable: "Layanan tidak dapat menerima kiriman ini. Informasi Anda belum dikonfirmasi tersimpan.",
