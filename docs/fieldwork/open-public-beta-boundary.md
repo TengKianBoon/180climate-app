@@ -1,7 +1,7 @@
 # Fieldwork open public-beta boundary
 
-**Decision date:** 11 September 2026  
-**Status:** implemented locally; publication checkpoint pending  
+**Decision date:** 11 September 2026
+**Status:** implemented locally; publication checkpoint pending
 **Service:** `fieldwork.match_intro.v1`
 
 ## Approved operating model
