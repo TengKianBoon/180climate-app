@@ -4,7 +4,7 @@ A shared geospatial foundation serving two user needs: screen a concession's ind
 
 **Python · FastAPI · Pydantic · geospatial data · deterministic engines · AI-assisted development**
 
-[Open Carbon Screening](https://carbon.180climate.net) · [Open EUDR Plot Check](https://eudr.180climate.net) · [Read the code walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) · [Inspect the recorded CI run](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682)
+[Open Carbon Screening](https://carbon.180climate.net) · [Open EUDR Plot Check](https://eudr.180climate.net) · [Open Fieldwork Pilot](https://one80climate-fieldwork-preview.onrender.com/fieldwork) · [Read the code walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) · [Enterprise AI delivery case study](docs/260911_enterprise_ai_delivery_case_study.md) · [Inspect the recorded CI run](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682)
 
 ## 1. See the product
 
@@ -17,11 +17,11 @@ A shared geospatial foundation serving two user needs: screen a concession's ind
 | Carbon Screening | Concession location, permit and project information | Indicative quantity range, calculation trace and report |
 | EUDR Plot Check | Plot geometry, commodity and supplier role | Per-plot detection state, findings, preparation checklist and report |
 
-### Phase 1A Fieldwork pilot (local, closed)
+### Fieldwork invited pilot (live, work in progress)
 
-The checkout also contains a local implementation of the invitation-only **180Climate Fieldwork Network** at `/fieldwork`. It supports authorised low-risk property-condition requests, provider profiles, private operator review, non-enumerable status access and two-party consent before named contact disclosure. It does not dispatch workers, form contracts, process payments, or send messages.
+The public **180Climate Fieldwork Network** explains the invitation-only service and routes requesters and providers to a private 180Climate Wix review form. 180Climate reviews authority, safety, scope and possible fit before any introduction. The pilot does not dispatch workers, form contracts, approve site access or process payments.
 
-This slice is deliberately marked `closed_pending_launch_gate` in `frontend/services.json`. Real-user intake remains fail-closed until the privacy, legal, data-processing, retention, deployment and publication controls in [`docs/fieldwork/phase-1a-foundation.md`](docs/fieldwork/phase-1a-foundation.md) are approved and configured. Local tests use synthetic records only.
+The repository also contains a more structured native workflow for requester/provider records, private operator review, non-enumerable status access and two-party consent. That native submission path remains fail-closed while the live pilot uses Wix. Tests use generated synthetic records only; no pilot submission or runtime database belongs in this public repository. See the [`Phase 1A boundary`](docs/fieldwork/phase-1a-foundation.md) and the [`stage receipts`](docs/fieldwork/stage-receipts.md).
 
 The public service may take a short time to wake. For a quick technical review without entering contact details, use the offline example.
 
@@ -99,6 +99,18 @@ I took the project from demand assessment and scope through an AI-assisted build
 **One decision you can inspect:** I required the carbon report to expose the actual calculation inputs and intermediate values. [ADR-0014](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0014-derivation-trace.md) records that request; the [typed calculation trace](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/core/contracts/__init__.py#L158-L189) shows the implementation approach. [ADR-0018](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0018-eudr-contracts.md) separately records my approval of explicit EUDR detection states.
 
 I used AI agents for implementation, testing and review while owning product definition, solution decisions, the development process and delivery acceptance. I translated domain requirements into screening behaviour, report quality and usability criteria.
+
+### Capability evidence
+
+| Capability | Inspectable evidence |
+|---|---|
+| Solution architecture | Shared geospatial contracts and adapters support two deterministic screening products; Fieldwork adds a separately bounded human-service workflow without replacing the existing stack. |
+| Forward-deployed and full-stack engineering | Business requirements are translated into a live Wix/Render/GitHub journey, while responsive interfaces, FastAPI routes, typed contracts, deterministic logic, tests and recovery utilities form the end-to-end technical chain. |
+| Business-process and AI operating design | Requirements are mapped into intake, validation, review, consent and human-accountability controls; AI assistance is separated from deterministic calculations and consequential approvals. |
+| Business-case improvement | Common components reduce duplicate build cost, low-cost pilots test demand before automation, and calculation traces make decisions easier to review and improve. |
+| Enterprise AI adoption leadership | Role-specific agent instructions, independent checking, bilingual user guidance, manual fallbacks and measurable pilot targets support controlled adoption rather than tool-first deployment. |
+
+The [enterprise AI delivery case study](docs/260911_enterprise_ai_delivery_case_study.md) connects each claim to implementation evidence and records the remaining gaps. It treats AIRI Level 4 as a direction for evidence-building—not an achieved assessment or certification.
 
 ## 6. Inspect versioning and recovery
 

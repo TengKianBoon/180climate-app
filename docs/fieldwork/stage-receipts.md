@@ -36,3 +36,19 @@ Production deployment, real message delivery, persistent-volume durability, back
 - Critical-path tests: 16 passed. Repository offline regression: 477 passed; two live-network overlay checks intentionally deselected; one dependency deprecation warning.
 - Browser smoke: complete synthetic launch facts rendered correctly, WhatsApp link scheme was preserved, no horizontal overflow appeared, and no browser warning/error was recorded.
 - Account inspection: Wix showed the current user as site owner and GitHub showed repository ownership. Render access was not authenticated, so service region, linked branch, persistent storage, backups and deployment settings remain unverified.
+
+## Public invited-pilot entry and Wix routing — PASS
+
+- Public entry: `https://one80climate-fieldwork-preview.onrender.com/fieldwork`.
+- Private application form: `https://www.180climate.net/fieldwork-pilot-draft`.
+- Wix navigation presents one **Fieldwork Pilot** route. The live explainer presents requester/provider paths and both lead to the same private review form.
+- Render service `180climate-fieldwork-preview` was verified in Singapore on public branch `feat/fieldwork-phase-1a`; deployment `dep-dahplgqfngtc73dhkgag` completed successfully and its health check returned HTTP 200.
+- Public-routing commits: `af8b160` (Wix intake), `7820bb1` (remove obsolete warning), `79ef46e` (refresh cached status asset), and `d25d2c4` (remove the unusable native-status link from the Wix journey and align `services.json`).
+- Live browser inspection confirmed the Fieldwork explainer, English/Bahasa switch, allowed/excluded scope, all three Wix calls to action, the current application banner, and the Wix form fields and consent declaration. No real record was submitted during QA.
+- Deterministic repository regression: 477 passed, two live-network map-overlay tests deselected, one dependency deprecation warning.
+- Focused Fieldwork regression: 16 passed, one dependency deprecation warning.
+- A separate all-tests run produced 477 passes and two failures when external BIG KHG/PIPPIB endpoints timed out; both adapters returned `data unavailable`/manual-review outcomes rather than false clean results.
+
+## Remaining pilot evidence
+
+The current free/Wix arrangement can receive invited applications for manual review, but it does not prove automated contact verification, native reference/status delivery, persistent datastore durability, email notification delivery, deletion propagation, production database recovery, counsel approval, or adoption outcomes. Those controls must not be claimed from the synthetic native-workflow tests.

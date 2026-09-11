@@ -1,6 +1,6 @@
 # Fieldwork Phase 1A foundation and publication boundary
 
-**Status:** local implementation baseline; not approved for publication or real-user intake  
+**Status:** public invited-pilot entry; real-user applications routed to private Wix review; native submission workflow remains fail-closed
 **Recorded:** 2026-09-11
 
 ## Confirmed implementation relationship
@@ -32,7 +32,14 @@ Never commit or publish:
 
 Runtime Fieldwork data is stored outside the repository at `FIELDWORK_DB_PATH`. Public tests use generated synthetic records only. Status and operator secrets are submitted in request bodies or headers and are never placed in analytics events.
 
-## Fail-closed launch controls
+## Current public delivery boundary
+
+- The public explainer is deployed on Render at `https://one80climate-fieldwork-preview.onrender.com/fieldwork` and linked from the 180Climate Wix navigation.
+- Requesters and providers use `https://www.180climate.net/fieldwork-pilot-draft`; Wix is the current real-user intake and operator-review destination.
+- The Render page does not collect live submissions, issue native references/status keys, dispatch providers, approve access, form contracts or process payments.
+- The native FastAPI/SQLite workflow remains available for synthetic testing and later controlled activation. It is not represented as the system currently receiving Wix records.
+
+## Fail-closed native-workflow controls
 
 `FIELDWORK_ACCEPTING_SUBMISSIONS` defaults to `false`. Production must refuse submissions unless all required runtime values are present. Enabling real-user intake requires a recorded consequential approval after these facts are confirmed:
 
@@ -47,6 +54,6 @@ Runtime Fieldwork data is stored outside the repository at `FIELDWORK_DB_PATH`. 
 
 Until then, local and non-user staging may use synthetic data only. A local preview, passing tests, or a local commit is not Phase 1A completion.
 
-## Deployment relationship still requiring confirmation
+## Deployment relationship and remaining evidence
 
-The repository and configuration establish the technical relationship, but they do not prove current account ownership, publication rights, persistent-datastore suitability, processor terms, or authority to deploy. Those remain evidence gates. No push, deployment, DNS/Wix change, licence change, or public claim is part of this implementation stage.
+The public repository, Render service and Wix site relationship have been exercised for this invited-pilot entry. Publication authority was confirmed by the site owner for this checkpoint. Persistent-datastore suitability, processor terms, native notification delivery, production backups and restore, final counsel-approved notices, and operational adoption outcomes are not proven by the public entry and remain gates before switching real users to the native workflow. No licence change or new repository was made.
