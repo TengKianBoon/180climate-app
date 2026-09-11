@@ -4,7 +4,7 @@
 
 ## Runtime configuration
 
-Real-user intake remains closed unless `FIELDWORK_ACCEPTING_SUBMISSIONS=true` and all required host configuration is present. That includes the HTTPS public origin; private persistent datastore; invitation and operator controls; pilot participant cap; controller; public privacy-contact label/link; hosting region; published retention and processor summaries; approved versions for the terms, privacy and prohibited-use notices; Bahasa publication pack; and recorded counsel/company approval identifiers.
+Native real-user intake remains closed unless `FIELDWORK_ACCEPTING_SUBMISSIONS=true` and all required host configuration is present. That includes the HTTPS public origin; private persistent datastore; operator control; public-beta registration cap; controller; public privacy-contact label/link; hosting region; published retention and processor summaries; approved versions for the terms, privacy and prohibited-use notices; Bahasa publication pack; and recorded counsel/company approval identifiers. Open registration does not remove any launch gate.
 
 The database, WAL files, backups and operator exports are protected runtime data. They must never be placed in this public repository or a public build artifact. The selected hosting volume must provide suitable encryption at rest, access control, residency/transfer documentation, durability and backup behaviour. The current Render configuration does not by itself prove those requirements.
 

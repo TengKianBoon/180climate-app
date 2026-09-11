@@ -1,4 +1,4 @@
-"""Invitation-only Fieldwork Phase 1A service layer.
+"""Open-registration Fieldwork public-beta service layer.
 
 The module deliberately has no outbound messaging or deployment side effects.
 Real-user intake is fail-closed until the launch configuration is complete.
@@ -25,10 +25,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 router = APIRouter(prefix="/api/fieldwork", tags=["fieldwork"])
 
 SERVICE_ID = "fieldwork.match_intro.v1"
-TERMS_DRAFT_VERSION = "fieldwork-pilot-terms-draft-2026-09-11"
-PRIVACY_DRAFT_VERSION = "fieldwork-privacy-draft-2026-09-11"
-PROHIBITED_USE_DRAFT_VERSION = "fieldwork-prohibited-use-draft-2026-09-11"
-SCHEMA_VERSION = "1"
+TERMS_DRAFT_VERSION = "fieldwork-open-beta-terms-draft-2026-09-11"
+PRIVACY_DRAFT_VERSION = "fieldwork-open-beta-privacy-draft-2026-09-11"
+PROHIBITED_USE_DRAFT_VERSION = "fieldwork-open-beta-prohibited-use-draft-2026-09-11"
+SCHEMA_VERSION = "2"
 
 _DEFAULT_DB = Path(__file__).parent.parent / ".runtime" / "fieldwork.sqlite3"
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -64,7 +64,7 @@ def _notice_version(env_name: str, draft: str) -> str:
     return os.environ.get(env_name, "").strip() or draft
 
 
-def _pilot_cap() -> int | None:
+def _registration_cap() -> int | None:
     raw = os.environ.get("FIELDWORK_PILOT_CAP", "").strip()
     if not raw.isdigit():
         return None
@@ -75,7 +75,6 @@ def _pilot_cap() -> int | None:
 def _launch_gaps() -> list[str]:
     required = {
         "private persistent datastore": "FIELDWORK_DB_PATH",
-        "pilot invitation control": "FIELDWORK_INVITE_CODE",
         "operator access control": "FIELDWORK_OPERATOR_TOKEN",
         "public origin": "FIELDWORK_PUBLIC_ORIGIN",
         "personal-data controller": "FIELDWORK_CONTROLLER_NAME",
@@ -86,7 +85,7 @@ def _launch_gaps() -> list[str]:
         "published retention summary": "FIELDWORK_RETENTION_SUMMARY",
         "processor disclosure": "FIELDWORK_PROCESSOR_LIST_VERSION",
         "published processor summary": "FIELDWORK_PROCESSOR_SUMMARY",
-        "approved pilot terms version": "FIELDWORK_TERMS_VERSION",
+        "approved public-beta terms version": "FIELDWORK_TERMS_VERSION",
         "approved privacy notice version": "FIELDWORK_PRIVACY_VERSION",
         "approved prohibited-use version": "FIELDWORK_PROHIBITED_USE_VERSION",
         "Bahasa publication pack": "FIELDWORK_BAHASA_PACK_VERSION",
@@ -100,8 +99,8 @@ def _launch_gaps() -> list[str]:
     contact_url = os.environ.get("FIELDWORK_PRIVACY_CONTACT_URL", "").strip()
     if contact_url and not (contact_url.startswith("mailto:") or contact_url.startswith("https://wa.me/")):
         gaps.append("approved privacy contact link")
-    if _pilot_cap() is None:
-        gaps.append("valid pilot participant cap")
+    if _registration_cap() is None:
+        gaps.append("valid public-beta registration cap")
     return gaps
 
 
@@ -110,7 +109,7 @@ def public_config() -> dict[str, Any]:
     gaps = _launch_gaps()
     return {
         "service_id": SERVICE_ID,
-        "pilot_status": "limited_private_pilot",
+        "service_status": "open_public_beta",
         "accepting_submissions": accepting_requested and not gaps,
         "launch_gaps": gaps,
         "terms_version": _notice_version("FIELDWORK_TERMS_VERSION", TERMS_DRAFT_VERSION),
@@ -126,30 +125,21 @@ def public_config() -> dict[str, Any]:
         "retention_summary": os.environ.get("FIELDWORK_RETENTION_SUMMARY", "").strip() or "not_confirmed",
         "processor_list_version": os.environ.get("FIELDWORK_PROCESSOR_LIST_VERSION", "").strip() or "not_confirmed",
         "processor_summary": os.environ.get("FIELDWORK_PROCESSOR_SUMMARY", "").strip() or "not_confirmed",
-        "pilot_cap": _pilot_cap(),
+        "registration_cap": _registration_cap(),
         "status_route": "/fieldwork/status",
-        "price_status": "free_private_pilot",
+        "price_status": "free_open_public_beta",
     }
 
 
-def _require_open_pilot() -> None:
+def _require_open_registration() -> None:
     cfg = public_config()
     if not cfg["accepting_submissions"]:
         raise HTTPException(
             status_code=503,
             detail={
-                "code": "pilot_closed",
-                "message": "Invited-pilot intake is not open yet. No information was saved.",
+                "code": "registration_closed",
+                "message": "Public-beta registration is not open. No information was saved.",
             },
-        )
-
-
-def _require_invite(code: str) -> None:
-    expected = os.environ.get("FIELDWORK_INVITE_CODE", "")
-    if not expected or not hmac.compare_digest(code, expected):
-        raise HTTPException(
-            status_code=403,
-            detail={"code": "invalid_invitation", "message": "This invitation code is not valid."},
         )
 
 
@@ -210,7 +200,7 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             id TEXT PRIMARY KEY,
             reference TEXT NOT NULL UNIQUE,
             principal_id TEXT NOT NULL UNIQUE REFERENCES principals(id),
-            invitation_source TEXT NOT NULL,
+            registration_source TEXT NOT NULL,
             original_text TEXT NOT NULL,
             role_title TEXT NOT NULL,
             services TEXT NOT NULL,
@@ -321,6 +311,11 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         );
         """
     )
+    provider_columns = {
+        str(row[1]) for row in conn.execute("PRAGMA table_info(provider_profiles)").fetchall()
+    }
+    if "invitation_source" in provider_columns and "registration_source" not in provider_columns:
+        conn.execute("ALTER TABLE provider_profiles RENAME COLUMN invitation_source TO registration_source")
     conn.execute(
         "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)",
         (SCHEMA_VERSION,),
@@ -377,7 +372,6 @@ class ConsentMixin(StrictModel):
 
 class RequestSubmission(ContactMixin, ConsentMixin):
     website: str = Field(default="", max_length=0, exclude=True)
-    invitation_code: str = Field(min_length=4, max_length=160)
     idempotency_key: str = Field(min_length=12, max_length=100)
     organisation: str = Field(default="", max_length=160)
     preferred_contact: Literal["email", "whatsapp"]
@@ -402,9 +396,7 @@ class RequestSubmission(ContactMixin, ConsentMixin):
 
 class ProviderSubmission(ContactMixin, ConsentMixin):
     website: str = Field(default="", max_length=0, exclude=True)
-    invitation_code: str = Field(min_length=4, max_length=160)
     idempotency_key: str = Field(min_length=12, max_length=100)
-    invitation_source: str = Field(min_length=2, max_length=200)
     original_text: str = Field(min_length=20, max_length=4000)
     role_title: str = Field(min_length=2, max_length=160)
     services: str = Field(min_length=5, max_length=1200)
@@ -478,15 +470,15 @@ def _upsert_principal(conn: sqlite3.Connection, data: ContactMixin) -> str:
     principal_id = _new_id()
     conn.execute(
         "INSERT INTO principals VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (principal_id, data.contact_kind, contact, data.name.strip(), data.locale, "invited", now, now),
+        (principal_id, data.contact_kind, contact, data.name.strip(), data.locale, "registered", now, now),
     )
     return principal_id
 
 
-def _enforce_pilot_cap(conn: sqlite3.Connection, data: ContactMixin) -> None:
-    cap = _pilot_cap()
+def _enforce_registration_cap(conn: sqlite3.Connection, data: ContactMixin) -> None:
+    cap = _registration_cap()
     if cap is None:
-        raise HTTPException(status_code=503, detail={"code": "pilot_closed"})
+        raise HTTPException(status_code=503, detail={"code": "registration_closed"})
     contact = _normalise_contact(data.contact_kind, data.contact)
     existing = conn.execute("SELECT 1 FROM principals WHERE contact_value=?", (contact,)).fetchone()
     if existing:
@@ -495,7 +487,7 @@ def _enforce_pilot_cap(conn: sqlite3.Connection, data: ContactMixin) -> None:
     if count >= cap:
         raise HTTPException(
             status_code=409,
-            detail={"code": "pilot_full", "message": "The initial invited-pilot capacity has been reached."},
+            detail={"code": "registration_full", "message": "The current public-beta registration capacity has been reached."},
         )
 
 
@@ -508,7 +500,7 @@ def _record_consent_bundle(
 ) -> None:
     now = _utc_now()
     for purpose, version in [
-        ("private_matching", _notice_version("FIELDWORK_PRIVACY_VERSION", PRIVACY_DRAFT_VERSION)),
+        ("matching_review", _notice_version("FIELDWORK_PRIVACY_VERSION", PRIVACY_DRAFT_VERSION)),
         ("contact_sharing_process", _notice_version("FIELDWORK_PRIVACY_VERSION", PRIVACY_DRAFT_VERSION)),
         ("lawful_use_attestation", _notice_version("FIELDWORK_PROHIBITED_USE_VERSION", PROHIBITED_USE_DRAFT_VERSION)),
     ]:
@@ -517,7 +509,7 @@ def _record_consent_bundle(
             (_new_id(), principal_id, purpose, object_type, object_id, version, language, now),
         )
     for name, version in [
-        ("pilot_terms", _notice_version("FIELDWORK_TERMS_VERSION", TERMS_DRAFT_VERSION)),
+        ("public_beta_terms", _notice_version("FIELDWORK_TERMS_VERSION", TERMS_DRAFT_VERSION)),
         ("privacy_notice", _notice_version("FIELDWORK_PRIVACY_VERSION", PRIVACY_DRAFT_VERSION)),
         ("prohibited_use", _notice_version("FIELDWORK_PROHIBITED_USE_VERSION", PROHIBITED_USE_DRAFT_VERSION)),
     ]:
@@ -574,7 +566,7 @@ def _submission_response(reference: str, status: str, status_key: str) -> dict[s
     message = (
         "This request needs operator review before it can proceed."
         if status == "blocked"
-        else "Received for private operator review. This is not a booking, dispatch, endorsement or contract."
+        else "Received for operator review. This is not a booking, dispatch, endorsement or contract."
     )
     return {
         "service_id": SERVICE_ID,
@@ -607,8 +599,7 @@ def fieldwork_event(event: AnalyticsEvent) -> None:
 
 @router.post("/requests")
 def submit_request(data: RequestSubmission) -> dict[str, Any]:
-    _require_open_pilot()
-    _require_invite(data.invitation_code)
+    _require_open_registration()
     data.require_acceptances()
     if not data.no_payment_details:
         raise HTTPException(status_code=422, detail={"code": "payment_details_prohibited"})
@@ -619,7 +610,7 @@ def submit_request(data: RequestSubmission) -> dict[str, Any]:
     if data.hazard_status != "none_known":
         block_reasons.append("Known or uncertain hazards require separate review")
     if data.permit_status != "not_required":
-        block_reasons.append("Permit-dependent activity is outside the initial pilot")
+        block_reasons.append("Permit-dependent activity is outside the public beta")
     if data.restricted_status != "no":
         block_reasons.append("Restricted activity requires separate review")
     status = "blocked" if block_reasons else "submitted"
@@ -628,7 +619,7 @@ def submit_request(data: RequestSubmission) -> dict[str, Any]:
         existing = _existing_idempotent(conn, data.idempotency_key)
         if existing:
             return existing
-        _enforce_pilot_cap(conn, data)
+        _enforce_registration_cap(conn, data)
         principal_id = _upsert_principal(conn, data)
         now = _utc_now()
         requester = conn.execute(
@@ -690,8 +681,7 @@ def submit_request(data: RequestSubmission) -> dict[str, Any]:
 
 @router.post("/providers")
 def submit_provider(data: ProviderSubmission) -> dict[str, Any]:
-    _require_open_pilot()
-    _require_invite(data.invitation_code)
+    _require_open_registration()
     data.require_acceptances()
     if not data.no_payment_details:
         raise HTTPException(status_code=422, detail={"code": "payment_details_prohibited"})
@@ -702,7 +692,7 @@ def submit_provider(data: ProviderSubmission) -> dict[str, Any]:
         existing = _existing_idempotent(conn, data.idempotency_key)
         if existing:
             return existing
-        _enforce_pilot_cap(conn, data)
+        _enforce_registration_cap(conn, data)
         principal_id = _upsert_principal(conn, data)
         if conn.execute("SELECT id FROM provider_profiles WHERE principal_id=?", (principal_id,)).fetchone():
             raise HTTPException(
@@ -719,7 +709,7 @@ def submit_provider(data: ProviderSubmission) -> dict[str, Any]:
                 object_id,
                 reference,
                 principal_id,
-                data.invitation_source.strip(),
+                "open_public_registration",
                 data.original_text.strip(),
                 data.role_title.strip(),
                 data.services.strip(),

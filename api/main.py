@@ -2,7 +2,7 @@
 
 Routes:
   GET  /               → serves frontend/index.html
-  GET  /fieldwork      → invited-pilot landing and intake
+  GET  /fieldwork      → open public-beta landing and controlled intake
   GET  /fieldwork/status → private status lookup
   GET  /fieldwork/operator → private operator console shell
   GET  /services.json  → public service catalogue

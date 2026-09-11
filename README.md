@@ -1,6 +1,6 @@
 # 180Climate — Carbon Screening & EUDR Plot Check
 
-A deployed climate-technology foundation serving three connected needs: screen indicative carbon potential, check plots for satellite evidence of forest loss, and privately review invited field-support needs and capabilities. Built for Indonesian landholders, exporters and field-service participants.
+A deployed climate-technology foundation serving three connected needs: screen indicative carbon potential, check plots for satellite evidence of forest loss, and openly register field-support needs and capabilities for private, consent-based review. Built for Indonesian landholders, exporters and field-service participants.
 
 **Python · FastAPI · Pydantic · geospatial data · deterministic engines · AI-assisted development**
 
@@ -19,9 +19,11 @@ A deployed climate-technology foundation serving three connected needs: screen i
 | Carbon Screening | Concession location, permit and project information | Indicative quantity range, calculation trace and report |
 | EUDR Plot Check | Plot geometry, commodity and supplier role | Per-plot detection state, findings, preparation checklist and report |
 
-### Fieldwork invited pilot (live, work in progress)
+### Fieldwork open public beta (publication candidate)
 
-The public **180Climate Fieldwork Network** explains the invitation-only service and routes requesters and providers to a private 180Climate Wix review form. 180Climate reviews authority, safety, scope and possible fit before any introduction. The pilot does not dispatch workers, form contracts, approve site access or process payments.
+The **180Climate Fieldwork Network** is designed as an open public registration service: anyone may submit a fieldwork need or service capability, while profiles, contacts, requests and precise sites stay private. 180Climate publishes its review criteria, checks authority, safety, scope and possible fit, and requires both named parties to consent before contact is shared. The beta does not employ or dispatch workers, act as an employment agency, form the underlying service contract, approve site access or process payments.
+
+The open-beta source and tests are ready for the controlled publication checkpoint. The currently deployed public pages remain the earlier invited-pilot revision until the exact Wix, GitHub and Render publication batch is approved and verified.
 
 The repository also contains a more structured native workflow for requester/provider records, private operator review, non-enumerable status access and two-party consent. That native submission path remains fail-closed while the live pilot uses Wix. Tests use generated synthetic records only; no pilot submission or runtime database belongs in this public repository. See the [`Phase 1A boundary`](docs/fieldwork/phase-1a-foundation.md) and the [`stage receipts`](docs/fieldwork/stage-receipts.md).
 
@@ -109,7 +111,7 @@ I took the project from demand assessment and scope through an AI-assisted build
 | Hands-on AI engineering | Wrote and refined briefs, supplied domain context, assigned role-specific agent instructions, set model/cost routing and human approval boundaries, reviewed live behaviour and drove correction cycles. | Coding agents implemented bounded changes; reviewer/verifier agents inspected them independently. | [Agent instructions](.claude/agents), Git history, test failures/corrections and [stage receipts](docs/fieldwork/stage-receipts.md). |
 | Forward-deployed delivery | Connected the solution to the actual 180Climate Wix, GitHub and Render environment; resolved real navigation, intake and user-friction issues; and kept business operations involved in the loop. | AI assisted source changes, browser inspection, responsive QA and release documentation. | [Live Fieldwork journey](https://one80climate-fieldwork-preview.onrender.com/fieldwork), scoped commits and [deployment receipt](docs/fieldwork/stage-receipts.md). |
 | Verification and governance | Defined acceptance gates for uncertainty, privacy, consent, safety, publication and professional accountability; required deterministic tests before acceptance. | Agents generated and executed tests, scans and structured QA evidence. | [Test suites](tests), fail-closed behaviour, [public/private boundary](docs/fieldwork/phase-1a-foundation.md) and CI record. |
-| Adoption leadership | Set a small invited-pilot model, bilingual guidance, manual fallback, feedback loop and evidence needed before wider automation or commercialisation. | AI supported user-language refinement and repeatable operating documentation. | [Pilot evidence and explicit gaps](docs/260911_enterprise_ai_delivery_case_study.md#enterprise-ai-adoption-leadership); sustained enterprise adoption is not yet claimed. |
+| Adoption leadership | Progressed from a small invited pilot to an approval-gated open-registration beta, with bilingual guidance, manual fallback, feedback loop and evidence needed before wider automation or commercialisation. | AI supported user-language refinement and repeatable operating documentation. | [Beta evidence and explicit gaps](docs/260911_enterprise_ai_delivery_case_study.md#enterprise-ai-adoption-leadership); sustained enterprise adoption is not yet claimed. |
 
 This shows architecture, operator judgement and hands-on AI delivery without misrepresenting agent-produced code as unaided manual coding. I remain accountable for product definition, solution decisions, development controls, acceptance and publication; AI agents materially assisted implementation, testing, review and documentation.
 

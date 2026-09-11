@@ -2,33 +2,33 @@
   "use strict";
 
   const root = document.documentElement;
-  const banner = document.querySelector("#pilot-banner");
+  const banner = document.querySelector("#service-banner");
   const languageButton = document.querySelector("#lang-toggle");
   const externalIntake = banner.dataset.intake === "wix";
-  let pilotOpen = false;
+  let registrationOpen = false;
 
   const text = {
     en: {
-      loading: "Checking invited-pilot availability…",
-      open: "Invited-pilot intake is open. Use only your private invitation code.",
-      closed: "This technical prototype is unavailable. Use the private Wix review form above.",
-      external: "Invited-pilot applications are open through 180Climate's private Wix review form.",
+      loading: "Checking public-beta availability…",
+      open: "Open public-beta registration is available. Personal submissions are reviewed and kept private.",
+      closed: "The native application intake is unavailable. Use the 180Climate Fieldwork form above.",
+      external: "Open public-beta registration is available through the 180Climate Fieldwork form.",
       fix: "Please complete the highlighted required field before continuing.",
       unavailable: "The service could not receive this submission. Your information was not confirmed as saved.",
       submitting: "Submitting…",
       save: "Save these separately. The status key is shown once and is not placed in a URL.",
-      closedSubmit: "Pilot not open"
+      closedSubmit: "Registration unavailable"
     },
     id: {
-      loading: "Memeriksa ketersediaan uji coba…",
-      open: "Pendaftaran uji coba terbuka. Gunakan hanya kode undangan privat Anda.",
-      closed: "Prototipe teknis ini tidak tersedia. Gunakan formulir tinjauan privat Wix di atas.",
-      external: "Pendaftaran uji coba undangan dibuka melalui formulir tinjauan privat Wix 180Climate.",
+      loading: "Memeriksa ketersediaan beta publik…",
+      open: "Pendaftaran beta publik terbuka. Kiriman pribadi ditinjau dan dijaga kerahasiaannya.",
+      closed: "Pendaftaran aplikasi native tidak tersedia. Gunakan formulir Fieldwork 180Climate di atas.",
+      external: "Pendaftaran beta publik terbuka melalui formulir Fieldwork 180Climate.",
       fix: "Lengkapi bidang wajib yang ditandai sebelum melanjutkan.",
       unavailable: "Layanan tidak dapat menerima kiriman ini. Informasi Anda belum dikonfirmasi tersimpan.",
       submitting: "Mengirim…",
       save: "Simpan keduanya secara terpisah. Kunci status hanya ditampilkan sekali dan tidak ditempatkan di URL.",
-      closedSubmit: "Uji coba belum dibuka"
+      closedSubmit: "Pendaftaran tidak tersedia"
     }
   };
 
@@ -72,7 +72,7 @@
       const response = await fetch("/api/fieldwork/config", { headers: { "Accept": "application/json" } });
       if (!response.ok) throw new Error("config unavailable");
       const config = await response.json();
-      pilotOpen = Boolean(config.accepting_submissions);
+      registrationOpen = Boolean(config.accepting_submissions);
       const privacyContact = document.querySelector("#privacy-contact");
       const privacyContactPending = document.querySelector("#privacy-contact-pending");
       if (privacyContact && config.privacy_contact && config.privacy_contact !== "not_confirmed" && config.privacy_contact_url !== "not_confirmed") {
@@ -81,7 +81,7 @@
         privacyContact.hidden = false;
         if (privacyContactPending) privacyContactPending.hidden = true;
       }
-      if (pilotOpen) {
+      if (registrationOpen) {
         document.querySelector("#privacy-launch-pending").hidden = true;
         document.querySelector("#privacy-launch-ready").hidden = false;
         document.querySelector("#controller-name").textContent = config.controller_name;
@@ -89,15 +89,15 @@
         document.querySelector("#retention-summary").textContent = config.retention_summary;
         document.querySelector("#processor-summary").textContent = config.processor_summary;
       }
-      renderBanner(externalIntake ? "external" : pilotOpen ? "open" : "closed");
+      renderBanner(externalIntake ? "external" : registrationOpen ? "open" : "closed");
     } catch (_) {
-      pilotOpen = false;
+      registrationOpen = false;
       renderBanner(externalIntake ? "external" : "closed");
     }
     document.querySelectorAll("[data-submit]").forEach((button) => {
-      button.disabled = !pilotOpen;
-      if (!pilotOpen) button.dataset.originalLabel = button.textContent;
-      if (!pilotOpen) button.textContent = text[locale()].closedSubmit;
+      button.disabled = !registrationOpen;
+      if (!registrationOpen) button.dataset.originalLabel = button.textContent;
+      if (!registrationOpen) button.textContent = text[locale()].closedSubmit;
     });
   }
 
@@ -195,7 +195,7 @@
     form.elements.idempotency_key.value = makeIdempotencyKey();
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (!pilotOpen) {
+      if (!registrationOpen) {
         errorBox.textContent = text[locale()].closed;
         errorBox.hidden = false;
         errorBox.focus();
@@ -222,7 +222,7 @@
         errorBox.hidden = false;
         errorBox.focus();
       } finally {
-        button.disabled = !pilotOpen;
+        button.disabled = !registrationOpen;
         button.textContent = prior;
       }
     });

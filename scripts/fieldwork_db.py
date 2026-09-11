@@ -1,4 +1,4 @@
-"""Create and verify SQLite backups for the Fieldwork pilot.
+"""Create and verify SQLite backups for the Fieldwork public beta.
 
 The command never selects a production path implicitly. Restore requires an
 explicit destination and confirmation flag. Use only with an approved private

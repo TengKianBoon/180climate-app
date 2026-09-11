@@ -8,7 +8,7 @@
 
 ## Executive view
 
-180Climate uses one public engineering foundation to support Carbon Pre-Feasibility screening, EUDR plot screening and an invited Fieldwork pilot. The work demonstrates how a business problem is converted into a bounded human/AI workflow, a maintainable application architecture, deterministic controls, tests, deployment evidence and a practical adoption path.
+180Climate uses one public engineering foundation to support Carbon Pre-Feasibility screening, EUDR plot screening and an open-registration Fieldwork beta. The work demonstrates how a business problem is converted into a bounded human/AI workflow, a maintainable application architecture, deterministic controls, tests, deployment evidence and a practical adoption path.
 
 The delivery principle is simple: use AI where it improves speed or clarity, use deterministic code where the result must be reproducible, and keep human authority at privacy, safety, professional, publication, contact-disclosure and commercial boundaries.
 
@@ -43,7 +43,7 @@ This supports positioning as an **enterprise AI architect–operator with hands-
 |---|---|---|---|
 | Early carbon opportunity screening | Inputs and assumptions can be hard to compare or explain | Shared typed inputs, deterministic calculations and a visible derivation trace | [Carbon contracts](../core/contracts/__init__.py), [ADR-0014](adr/ADR-0014-derivation-trace.md), [report tests](../tests/test_report.py) |
 | EUDR plot triage | Missing evidence can be mistaken for a clear result | Explicit `clear_in_screen`, `loss_detected` and `inconclusive` states; missing required evidence fails closed | [Decision logic](../engines/eudr/triage.py), [ADR-0018](adr/ADR-0018-eudr-contracts.md), [truth-table tests](../tests/test_eudr_triage.py) |
-| Finding suitable field support | Requests, capabilities, authority and consent can arrive through loose messages | One invited-pilot explanation, one private Wix intake, operator review and consent-before-introduction policy | [Live pilot](https://one80climate-fieldwork-preview.onrender.com/fieldwork), [public service record](https://github.com/TengKianBoon/180climate-app/blob/d25d2c4/frontend/services.json), [Phase 1A boundary](fieldwork/phase-1a-foundation.md) |
+| Finding suitable field support | Requests, capabilities, authority and consent can arrive through loose messages | Open registration with published review criteria, a non-public Wix intake, operator review and consent-before-introduction policy | [Current public entry](https://one80climate-fieldwork-preview.onrender.com/fieldwork), [service record](../frontend/services.json), [Phase 1A boundary](fieldwork/phase-1a-foundation.md) |
 | Scaling delivery with AI | Tool use can obscure responsibility or bypass checks | Role-specific build/review/verification instructions, deterministic tests and explicit human approval gates | [Agent instructions](../.claude/agents), [engineering walkthrough](2609092130_engineering_walkthrough_4ofX.md), [project controls](../AGENTS.md) |
 
 ## Solution architecture evidence
@@ -73,7 +73,7 @@ For the current Fieldwork checkpoint, the deterministic offline suite recorded *
 The project treats AI and software investment as an operating decision:
 
 - reuse one geospatial foundation across related revenue and compliance use cases;
-- start Fieldwork as a free, invited, manually reviewed pilot before building marketplace automation or payments;
+- move Fieldwork from a free invited pilot to an approval-gated open-registration beta while retaining manual review before building marketplace automation or payments;
 - use rules, schemas and templates before model calls, then route only ambiguous work to higher-cost reasoning;
 - retain manual fallbacks for classification, matching and professional review;
 - measure counts and elapsed work before claiming savings, conversion or adoption outcomes;
