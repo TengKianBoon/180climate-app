@@ -2,6 +2,10 @@
 
 Routes:
   GET  /               → serves frontend/index.html
+  GET  /fieldwork      → invited-pilot landing and intake
+  GET  /fieldwork/status → private status lookup
+  GET  /fieldwork/operator → private operator console shell
+  GET  /services.json  → public service catalogue
   GET  /health         → {"status": "ok"}
   POST /api/carbon     → CarbonInput → EngineResult
   POST /api/lead       → full lead form → email (DOCX attached) + Sheet append
@@ -40,10 +44,12 @@ from core.forest import query_forest_data
 from engines.carbon.engine import run_carbon_engine, run_mixed_stratification
 from narrative.narrator import generate_narrative
 from api.email import send_lead_email
+from api.fieldwork import router as fieldwork_router
 from api.sheets import append_lead
 from reports.generator import generate_pdf, generate_docx, generate_eudr_pdf, ReportData, make_filename
 
 app = FastAPI(title="180Climate Pre-FS API", version="0.1.0-slice")
+app.include_router(fieldwork_router)
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 _DISCLAIMER_TEXT = (
@@ -211,6 +217,90 @@ def index() -> HTMLResponse:
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Frontend not found")
     return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+def _fieldwork_html(filename: str, *, private: bool = False) -> HTMLResponse:
+    html_path = _FRONTEND / filename
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Fieldwork page not found")
+    response = HTMLResponse(html_path.read_text(encoding="utf-8"))
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'none'; "
+        "form-action 'self'; frame-ancestors 'self' https://www.180climate.net"
+    )
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cache-Control"] = "no-store" if private else "public, max-age=300"
+    return response
+
+
+@app.get("/fieldwork", response_class=HTMLResponse)
+def fieldwork_page() -> HTMLResponse:
+    return _fieldwork_html("fieldwork.html")
+
+
+@app.get("/fieldwork/status", response_class=HTMLResponse)
+def fieldwork_status_page() -> HTMLResponse:
+    return _fieldwork_html("fieldwork-status.html", private=True)
+
+
+@app.get("/fieldwork/operator", response_class=HTMLResponse)
+def fieldwork_operator_page() -> HTMLResponse:
+    return _fieldwork_html("fieldwork-operator.html", private=True)
+
+
+@app.get("/services.json")
+def services_catalogue() -> Response:
+    path = _FRONTEND / "services.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Service catalogue not found")
+    return Response(
+        content=path.read_bytes(),
+        media_type="application/json",
+        headers={"Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get("/schemas/{schema_name}")
+def service_schema(schema_name: str) -> Response:
+    allowed = {
+        "fieldwork-request-v1.json",
+        "fieldwork-provider-v1.json",
+        "fieldwork-status-v1.json",
+    }
+    if schema_name not in allowed:
+        raise HTTPException(status_code=404, detail="Schema not found")
+    path = _FRONTEND / "schemas" / schema_name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Schema not found")
+    return Response(
+        content=path.read_bytes(),
+        media_type="application/schema+json",
+        headers={"Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get("/fieldwork-assets/{asset_name}")
+def fieldwork_asset(asset_name: str) -> Response:
+    allowed = {
+        "fieldwork.css": "text/css; charset=utf-8",
+        "fieldwork.js": "application/javascript; charset=utf-8",
+        "fieldwork-status.js": "application/javascript; charset=utf-8",
+        "fieldwork-operator.js": "application/javascript; charset=utf-8",
+    }
+    if asset_name not in allowed:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    path = _FRONTEND / asset_name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return Response(
+        content=path.read_bytes(),
+        media_type=allowed[asset_name],
+        headers={"Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 _BRAND = Path(__file__).parent.parent / "brand"

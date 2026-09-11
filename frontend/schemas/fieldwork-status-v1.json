@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/fieldwork-status-v1.json",
+  "title": "180Climate Fieldwork submission status",
+  "type": "object",
+  "required": ["service_id", "reference", "status"],
+  "properties": {
+    "service_id": {"const": "fieldwork.match_intro.v1"},
+    "reference": {"type": "string", "pattern": "^F[RP]-[A-F0-9]{10}$"},
+    "status": {
+      "enum": [
+        "already_received", "submitted", "needs_information", "qualified", "blocked", "matching",
+        "introduction_proposed", "introduced", "no_match", "profile_incomplete", "match_ready",
+        "temporarily_unavailable", "restricted", "archived"
+      ]
+    },
+    "duplicate": {"type": "boolean"},
+    "status_route": {"const": "/fieldwork/status"},
+    "status_key": {"type": ["string", "null"], "writeOnly": true},
+    "message": {"type": "string"}
+  }
+}

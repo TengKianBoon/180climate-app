@@ -1,0 +1,85 @@
+{
+  "catalogue_version": "1.0.0",
+  "updated_at": "2026-09-11",
+  "services": [
+    {
+      "service_id": "fieldwork.match_intro.v1",
+      "version": "1",
+      "name": "180Climate Fieldwork Network",
+      "description": "Private matching and consent-controlled introductions for authorised, low-risk fieldwork support in Indonesia.",
+      "status": "closed_pending_launch_gate",
+      "regions": ["Indonesia"],
+      "eligibility": [
+        "Invited requester or provider",
+        "Authorised, non-invasive and non-hazardous work",
+        "No regulated conclusion without an accountable qualified provider"
+      ],
+      "required_inputs": [
+        "Private contact",
+        "Broad location",
+        "Desired result or services",
+        "Authority, safety and exclusion declarations",
+        "Separate matching and contact-process choices"
+      ],
+      "input_schema_url": "/schemas/fieldwork-request-v1.json",
+      "output_schema_url": "/schemas/fieldwork-status-v1.json",
+      "limitations": [
+        "A match is not a booking, dispatch, site-access approval, endorsement or professional certification",
+        "The pilot does not process payments or collect bank or card details",
+        "Contact is not revealed until both named parties consent and an operator confirms the introduction"
+      ],
+      "approval_points": [
+        "Responsible-person submission",
+        "Named contact disclosure",
+        "Introduction",
+        "Site access and any direct agreement"
+      ],
+      "price_status": "free_private_pilot",
+      "terms_url": "/fieldwork#pilot-terms",
+      "privacy_url": "/fieldwork#privacy-notice",
+      "updated_at": "2026-09-11"
+    },
+    {
+      "service_id": "eudr.plot_screen.v1",
+      "version": "1",
+      "name": "EUDR Plot Screening",
+      "description": "Early plot screening and preparation support for EUDR due-diligence workflows.",
+      "status": "available",
+      "regions": ["Indonesia"],
+      "eligibility": ["EUDR-relevant commodity and role", "Plot location or geometry"],
+      "required_inputs": ["Commodity", "Role", "Plot geometry", "Contact for a detailed request"],
+      "input_schema_url": "/docs",
+      "output_schema_url": "/docs",
+      "limitations": [
+        "Screening can be unknown or inconclusive",
+        "The result is not an official due-diligence statement or legal clearance"
+      ],
+      "approval_points": ["Detailed request submission", "Professional or legal reliance"],
+      "price_status": "free_early_screen",
+      "terms_url": "https://www.180climate.net/",
+      "privacy_url": "https://www.180climate.net/",
+      "updated_at": "2026-09-11"
+    },
+    {
+      "service_id": "carbon.pre_fs.v1",
+      "version": "1",
+      "name": "Carbon Pre-Feasibility",
+      "description": "Indicative screening to decide whether a forest or land opportunity merits deeper assessment.",
+      "status": "available",
+      "regions": ["Indonesia"],
+      "eligibility": ["Authorised land or concession assessment", "Required location and permit information"],
+      "required_inputs": ["Contact", "Location or geometry", "Permit and project information"],
+      "input_schema_url": "/docs",
+      "output_schema_url": "/docs",
+      "limitations": [
+        "Preliminary screening, not a bankable study, valuation or investment recommendation",
+        "Assumptions, missing evidence and expert-review needs remain material"
+      ],
+      "approval_points": ["Detailed report request", "Professional, financial or investment reliance"],
+      "price_status": "free_early_screen",
+      "terms_url": "https://www.180climate.net/",
+      "privacy_url": "https://www.180climate.net/",
+      "updated_at": "2026-09-11"
+    }
+  ]
+}

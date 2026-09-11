@@ -17,6 +17,12 @@ A shared geospatial foundation serving two user needs: screen a concession's ind
 | Carbon Screening | Concession location, permit and project information | Indicative quantity range, calculation trace and report |
 | EUDR Plot Check | Plot geometry, commodity and supplier role | Per-plot detection state, findings, preparation checklist and report |
 
+### Phase 1A Fieldwork pilot (local, closed)
+
+The checkout also contains a local implementation of the invitation-only **180Climate Fieldwork Network** at `/fieldwork`. It supports authorised low-risk property-condition requests, provider profiles, private operator review, non-enumerable status access and two-party consent before named contact disclosure. It does not dispatch workers, form contracts, process payments, or send messages.
+
+This slice is deliberately marked `closed_pending_launch_gate` in `frontend/services.json`. Real-user intake remains fail-closed until the privacy, legal, data-processing, retention, deployment and publication controls in [`docs/fieldwork/phase-1a-foundation.md`](docs/fieldwork/phase-1a-foundation.md) are approved and configured. Local tests use synthetic records only.
+
 The public service may take a short time to wake. For a quick technical review without entering contact details, use the offline example.
 
 ### Run one decision in under a minute

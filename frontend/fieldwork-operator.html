@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>Operator queue | 180Climate Fieldwork Network</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/fieldwork-assets/fieldwork.css?v=2">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a><div class="top-rule"></div>
+  <header class="site-header"><a class="brand" href="/fieldwork"><img src="/brand/logo.png" alt="180Climate"><span>Fieldwork operator</span></a><nav class="header-links"><a href="/fieldwork">Pilot home</a></nav></header>
+  <main id="main" class="app-shell"><div class="shell">
+    <div class="app-head"><div><p class="eyebrow" style="color:var(--leaf)">Private operator destination</p><h1>Review queue</h1><p>Records are private. Contact reveal, state changes and introductions are separately logged.</p></div></div>
+    <section class="panel" aria-labelledby="access-title">
+      <h2 id="access-title">Operator access</h2><div class="error-summary" id="operator-error" role="alert" tabindex="-1" hidden></div>
+      <form id="operator-access" class="operator-controls">
+        <div class="field"><label for="operator-token">Operator token</label><input id="operator-token" type="password" required autocomplete="off"><p class="hint">The token stays in this tab only and is sent in the Authorization header.</p></div>
+        <button class="button" type="submit">Load private queue</button>
+      </form>
+      <div class="check"><input id="include-contacts" type="checkbox"><label for="include-contacts">Reveal names and private contacts in this operator view.<small>This is a need-to-know disclosure and creates an audit event.</small></label></div>
+    </section>
+
+    <section class="operator-section" aria-labelledby="requests-title"><h2 id="requests-title">Requests</h2><div id="requests" class="table-wrap"><p class="empty">Authenticate to load requests.</p></div></section>
+    <section class="operator-section" aria-labelledby="providers-title"><h2 id="providers-title">Providers</h2><div id="providers" class="table-wrap"><p class="empty">Authenticate to load providers.</p></div></section>
+
+    <section class="operator-section panel" aria-labelledby="proposal-title"><h2 id="proposal-title">Propose a consent-controlled introduction</h2><p>Only qualified/matching requests and match-ready providers can be paired. This creates a disclosure preview; it does not reveal contacts or send a message.</p>
+      <form id="proposal-form">
+        <div class="field-grid"><div class="field"><label for="request-reference">Request reference</label><input id="request-reference" required placeholder="FR-…"></div><div class="field"><label for="provider-reference">Provider reference</label><input id="provider-reference" required placeholder="FP-…"></div></div>
+        <div class="check"><input id="share-name" type="checkbox" checked disabled><label for="share-name">Name</label></div><div class="check"><input id="share-contact" type="checkbox" checked disabled><label for="share-contact">Private contact</label></div><div class="check"><input id="share-role" type="checkbox"><label for="share-role">Provider role title</label></div><div class="check"><input id="share-location" type="checkbox"><label for="share-location">Broad location</label></div>
+        <button class="button" type="submit">Create disclosure preview</button>
+      </form><div id="proposal-result" aria-live="polite"></div>
+    </section>
+
+    <section class="operator-section panel" aria-labelledby="finalize-title"><h2 id="finalize-title">Finalise an approved introduction</h2><p>This step reveals the two contacts only after both named parties have consented. It still does not send a message, create a booking or authorise site access.</p>
+      <form id="finalize-form" class="operator-controls"><div class="field"><label for="introduction-reference">Introduction reference</label><input id="introduction-reference" required placeholder="FI-…"></div><button class="button" type="submit">Confirm and reveal contacts</button></form><div id="finalize-result" aria-live="polite"></div>
+    </section>
+  </div></main>
+  <script src="/fieldwork-assets/fieldwork-operator.js?v=1" defer></script>
+</body>
+</html>

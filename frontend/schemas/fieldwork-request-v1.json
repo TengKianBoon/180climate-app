@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/fieldwork-request-v1.json",
+  "title": "180Climate Fieldwork request submission",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "invitation_code", "idempotency_key", "name", "contact_kind", "contact", "locale",
+    "preferred_contact", "original_text", "desired_result", "category", "broad_location",
+    "timing", "authority_status", "expected_evidence", "hazard_status", "permit_status",
+    "restricted_status", "relationship_type", "matching_consent", "contact_process_consent",
+    "terms_accepted", "privacy_acknowledged", "lawful_use_attested", "no_payment_details"
+  ],
+  "properties": {
+    "invitation_code": {"type": "string", "minLength": 4, "maxLength": 160, "writeOnly": true},
+    "idempotency_key": {"type": "string", "minLength": 12, "maxLength": 100},
+    "name": {"type": "string", "minLength": 2, "maxLength": 120},
+    "contact_kind": {"enum": ["email", "whatsapp"]},
+    "contact": {"type": "string", "minLength": 7, "maxLength": 254, "writeOnly": true},
+    "locale": {"enum": ["en", "id"]},
+    "organisation": {"type": "string", "maxLength": 160},
+    "preferred_contact": {"enum": ["email", "whatsapp"]},
+    "original_text": {"type": "string", "minLength": 20, "maxLength": 4000},
+    "desired_result": {"type": "string", "minLength": 10, "maxLength": 1000},
+    "category": {
+      "enum": [
+        "property_condition_photos", "non_invasive_land_observation",
+        "qualified_desktop_review", "mine_authorised_admin_support"
+      ]
+    },
+    "broad_location": {"type": "string", "minLength": 2, "maxLength": 160},
+    "timing": {"type": "string", "minLength": 2, "maxLength": 160},
+    "authority_status": {"enum": ["confirmed", "pending", "not_authorised"]},
+    "expected_evidence": {"type": "string", "minLength": 2, "maxLength": 1000},
+    "hazard_status": {"enum": ["none_known", "yes", "unsure"]},
+    "permit_status": {"enum": ["not_required", "required", "unsure"]},
+    "restricted_status": {"enum": ["no", "yes", "unsure"]},
+    "relationship_type": {"enum": ["direct_independent_service", "to_be_confirmed"]},
+    "matching_consent": {"type": "boolean", "const": true},
+    "contact_process_consent": {"type": "boolean", "const": true},
+    "terms_accepted": {"type": "boolean", "const": true},
+    "privacy_acknowledged": {"type": "boolean", "const": true},
+    "lawful_use_attested": {"type": "boolean", "const": true},
+    "no_payment_details": {"type": "boolean", "const": true}
+  }
+}
