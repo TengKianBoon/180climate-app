@@ -24,6 +24,7 @@ def test_well_known_catalogue_is_canonical_and_has_all_services() -> None:
     assert catalogue["$schema"] == "/schemas/agent-service-catalogue-v1.json"
     assert catalogue["discovery"]["canonical_url"] == "/.well-known/180climate-services.json"
     assert catalogue["discovery"]["openapi_url"] == "/openapi.json"
+    assert catalogue["discovery"]["commercial_catalogue_url"] == "/.well-known/180climate-commercial.json"
     assert {item["service_id"] for item in catalogue["services"]} == {
         "carbon.pre_fs.v1",
         "eudr.plot_screen.v1",

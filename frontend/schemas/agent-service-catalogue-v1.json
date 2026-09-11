@@ -18,11 +18,12 @@
     "discovery": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["canonical_url", "openapi_url", "human_docs_url"],
+      "required": ["canonical_url", "openapi_url", "human_docs_url", "commercial_catalogue_url"],
       "properties": {
         "canonical_url": {"type": "string"},
         "openapi_url": {"type": "string"},
-        "human_docs_url": {"type": "string"}
+        "human_docs_url": {"type": "string"},
+        "commercial_catalogue_url": {"type": "string"}
       }
     },
     "agent_policy": {

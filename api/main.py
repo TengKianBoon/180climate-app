@@ -2,6 +2,7 @@
 
 Routes:
   GET  /               → serves frontend/index.html
+  GET  /commercial     → fixed-scope professional services and checkout status
   GET  /fieldwork      → open public-beta landing and controlled intake
   GET  /fieldwork/status → private status lookup
   GET  /fieldwork/operator → private operator console shell
@@ -43,6 +44,7 @@ from core.geo import parse_geo
 from core.forest import query_forest_data
 from engines.carbon.engine import run_carbon_engine, run_mixed_stratification
 from narrative.narrator import generate_narrative
+from api.commercial import commercial_catalogue_payload, router as commercial_router
 from api.email import send_lead_email
 from api.fieldwork import router as fieldwork_router
 from api.sheets import append_lead
@@ -50,7 +52,7 @@ from reports.generator import generate_pdf, generate_docx, generate_eudr_pdf, Re
 
 app = FastAPI(
     title="180Climate Screening and Fieldwork API",
-    version="0.2.0",
+    version="0.3.0",
     description=(
         "Machine-readable interfaces for indicative EUDR and carbon screening plus "
         "the consent-controlled Fieldwork Network. Consult /services.json before "
@@ -60,10 +62,12 @@ app = FastAPI(
         {"name": "discovery", "description": "Public service discovery and schemas."},
         {"name": "screening", "description": "Indicative decision support; never a regulated conclusion."},
         {"name": "delivery", "description": "Creates reports or external communications and requires user authority."},
+        {"name": "commercial", "description": "Fail-closed paid-service catalogue and Stripe-hosted checkout handoff."},
         {"name": "fieldwork", "description": "Controlled registration, status and human introduction workflow."},
     ],
 )
 app.include_router(fieldwork_router)
+app.include_router(commercial_router)
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 _DISCLAIMER_TEXT = (
@@ -256,6 +260,11 @@ def fieldwork_page() -> HTMLResponse:
     return _fieldwork_html("fieldwork.html")
 
 
+@app.get("/commercial", response_class=HTMLResponse)
+def commercial_page() -> HTMLResponse:
+    return _fieldwork_html("commercial.html")
+
+
 @app.get("/fieldwork/status", response_class=HTMLResponse)
 def fieldwork_status_page() -> HTMLResponse:
     return _fieldwork_html("fieldwork-status.html", private=True)
@@ -294,6 +303,19 @@ def well_known_services_catalogue() -> Response:
 
 
 @app.get(
+    "/.well-known/180climate-commercial.json",
+    operation_id="getWellKnownCommercialCatalogue",
+    tags=["discovery"],
+    summary="Discover fixed-scope offers and guarded checkout actions",
+)
+def well_known_commercial_catalogue() -> JSONResponse:
+    return JSONResponse(
+        commercial_catalogue_payload(),
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get(
     "/schemas/{schema_name}",
     operation_id="getServiceSchema",
     tags=["discovery"],
@@ -301,6 +323,7 @@ def well_known_services_catalogue() -> Response:
 def service_schema(schema_name: str) -> Response:
     allowed = {
         "agent-service-catalogue-v1.json",
+        "commercial-catalogue-v1.json",
         "carbon-pre-fs-input-v1.json",
         "carbon-pre-fs-output-v1.json",
         "eudr-plot-screen-input-v1.json",
@@ -329,6 +352,24 @@ def fieldwork_asset(asset_name: str) -> Response:
         "fieldwork.js": "application/javascript; charset=utf-8",
         "fieldwork-status.js": "application/javascript; charset=utf-8",
         "fieldwork-operator.js": "application/javascript; charset=utf-8",
+    }
+    if asset_name not in allowed:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    path = _FRONTEND / asset_name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return Response(
+        content=path.read_bytes(),
+        media_type=allowed[asset_name],
+        headers={"Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get("/commercial-assets/{asset_name}")
+def commercial_asset(asset_name: str) -> Response:
+    allowed = {
+        "commercial.css": "text/css; charset=utf-8",
+        "commercial.js": "application/javascript; charset=utf-8",
     }
     if asset_name not in allowed:
         raise HTTPException(status_code=404, detail="Asset not found")

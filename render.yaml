@@ -30,3 +30,20 @@ services:
       # Anthropic API — free-text classifier, optional (see docs/deploy-runbook.md §4)
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Paid professional-service checkout — stays off until the separate live gate.
+      - key: COMMERCIAL_CHECKOUT_MODE
+        value: off
+      - key: STRIPE_EUDR_REVIEW_PAYMENT_LINK
+        sync: false
+      - key: STRIPE_CARBON_REVIEW_PAYMENT_LINK
+        sync: false
+      - key: STRIPE_LAND_EVIDENCE_PILOT_PAYMENT_LINK
+        sync: false
+      - key: COMMERCIAL_LIVE_APPROVAL_ID
+        sync: false
+      - key: COMMERCIAL_TERMS_VERSION
+        sync: false
+      - key: COMMERCIAL_REFUND_POLICY_VERSION
+        sync: false
+      - key: COMMERCIAL_TAX_DISPLAY
+        sync: false

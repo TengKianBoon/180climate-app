@@ -1,6 +1,6 @@
 {
   "$schema": "/schemas/agent-service-catalogue-v1.json",
-  "catalogue_version": "1.1.0",
+  "catalogue_version": "1.2.0",
   "updated_at": "2026-09-11",
   "provider": {
     "legal_name": "180Climate Pte Ltd",
@@ -9,7 +9,8 @@
   "discovery": {
     "canonical_url": "/.well-known/180climate-services.json",
     "openapi_url": "/openapi.json",
-    "human_docs_url": "/docs"
+    "human_docs_url": "/docs",
+    "commercial_catalogue_url": "/.well-known/180climate-commercial.json"
   },
   "agent_policy": {
     "authorised_agent_only": true,

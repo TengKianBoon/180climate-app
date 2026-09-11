@@ -1,12 +1,13 @@
 # Agent procurement readiness
 
-Status: guarded v1 contract, 11 September 2026.
+Status: guarded v1.1 contract, 11 September 2026.
 
 This repository makes the three 180Climate services easier for an authorised AI agent to discover and evaluate without giving the agent authority to contract, pay, disclose private information, dispatch people or make regulated conclusions.
 
 ## Discovery contract
 
 - `/.well-known/180climate-services.json` is the stable catalogue URL.
+- `/.well-known/180climate-commercial.json` is the stable fixed-scope offer catalogue; it never exposes a configured Stripe URL during discovery.
 - `/openapi.json` describes the HTTP operations.
 - `/schemas/*.json` contains versioned request and response contracts.
 - Each catalogue action declares its operation ID, transport, side effects, retry hint, open-world interaction and immediate approval requirement.
@@ -22,7 +23,7 @@ The tool annotations use the same four risk concepts exposed by MCP—read-only,
 5. **Approve at the edge.** Obtain explicit approval immediately before any call that communicates externally, stores personal data or creates a registration or delivery.
 6. **Invoke once.** Use the declared operation and schema. Retry only when `idempotentHint` is true and the same idempotency key is reused.
 7. **Verify.** Check the returned state or receipt. Do not convert a screening state into a professional or legal conclusion.
-8. **Stop at human gates.** Contact disclosure, introduction, site access, contracting, payment and regulated reliance remain human decisions.
+8. **Stop at human gates.** Contact disclosure, introduction, site access, contracting, payment and regulated reliance remain human decisions. An agent may request a Stripe checkout handoff only after showing the exact price, scope, exclusions and destination and obtaining immediate user approval; the human still confirms the transaction on Stripe.
 
 ## Current readiness by service
 
@@ -31,10 +32,11 @@ The tool annotations use the same four risk concepts exposed by MCP—read-only,
 | Carbon Pre-Feasibility | Guarded machine screening for declared REDD, IFM and peat routes | The `other` route may send a lead; all results are indicative and non-bankable |
 | EUDR Plot Screening | Guarded user-authorised call | The current call emails 180Climate, so it is not safe for speculative or unattended execution |
 | Fieldwork Network | Machine discovery and human Wix handoff; typed native intake is staged | Native intake stays fail-closed until privacy, datastore, access and deployment controls pass; matching and disclosure remain human-controlled |
+| Paid EUDR/carbon reviews | Readable fixed-scope catalogue; Stripe handoff is fail-closed until configured | 180Climate services only; no autonomous transaction, card-data handling, Fieldwork payout or escrow |
 
 ## Not claimed
 
-This v1 is not an MCP server, A2A agent, autonomous purchasing system, payment rail, identity delegation service or contracting system. Those would need authenticated delegated authority, policy enforcement, auditability, abuse controls, commercial terms and separate legal and deployment approval.
+This v1.1 is not an MCP server, A2A agent, autonomous purchasing system, payment rail, identity delegation service or contracting system. It can prepare a human-approved handoff to a licensed hosted checkout, but it cannot confirm a charge. Broader purchasing would need authenticated delegated authority, policy enforcement, auditability, abuse controls, commercial terms and separate legal and deployment approval.
 
 ## Standards alignment
 
