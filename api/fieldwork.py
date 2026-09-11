@@ -64,19 +64,45 @@ def _notice_version(env_name: str, draft: str) -> str:
     return os.environ.get(env_name, "").strip() or draft
 
 
+def _pilot_cap() -> int | None:
+    raw = os.environ.get("FIELDWORK_PILOT_CAP", "").strip()
+    if not raw.isdigit():
+        return None
+    value = int(raw)
+    return value if 1 <= value <= 1000 else None
+
+
 def _launch_gaps() -> list[str]:
     required = {
         "private persistent datastore": "FIELDWORK_DB_PATH",
         "pilot invitation control": "FIELDWORK_INVITE_CODE",
         "operator access control": "FIELDWORK_OPERATOR_TOKEN",
+        "public origin": "FIELDWORK_PUBLIC_ORIGIN",
+        "personal-data controller": "FIELDWORK_CONTROLLER_NAME",
         "privacy contact": "FIELDWORK_PRIVACY_CONTACT",
+        "privacy contact link": "FIELDWORK_PRIVACY_CONTACT_URL",
+        "hosting region": "FIELDWORK_HOSTING_REGION",
         "retention decision": "FIELDWORK_RETENTION_VERSION",
+        "published retention summary": "FIELDWORK_RETENTION_SUMMARY",
         "processor disclosure": "FIELDWORK_PROCESSOR_LIST_VERSION",
+        "published processor summary": "FIELDWORK_PROCESSOR_SUMMARY",
         "approved pilot terms version": "FIELDWORK_TERMS_VERSION",
         "approved privacy notice version": "FIELDWORK_PRIVACY_VERSION",
         "approved prohibited-use version": "FIELDWORK_PROHIBITED_USE_VERSION",
+        "Bahasa publication pack": "FIELDWORK_BAHASA_PACK_VERSION",
+        "Indonesian counsel approval": "FIELDWORK_COUNSEL_APPROVAL_ID",
+        "company launch approval": "FIELDWORK_COMPANY_APPROVAL_ID",
     }
-    return [label for label, env_name in required.items() if not os.environ.get(env_name, "").strip()]
+    gaps = [label for label, env_name in required.items() if not os.environ.get(env_name, "").strip()]
+    origin = os.environ.get("FIELDWORK_PUBLIC_ORIGIN", "").strip()
+    if origin and not origin.startswith("https://"):
+        gaps.append("HTTPS public origin")
+    contact_url = os.environ.get("FIELDWORK_PRIVACY_CONTACT_URL", "").strip()
+    if contact_url and not (contact_url.startswith("mailto:") or contact_url.startswith("https://wa.me/")):
+        gaps.append("approved privacy contact link")
+    if _pilot_cap() is None:
+        gaps.append("valid pilot participant cap")
+    return gaps
 
 
 def public_config() -> dict[str, Any]:
@@ -92,9 +118,15 @@ def public_config() -> dict[str, Any]:
         "prohibited_use_version": _notice_version(
             "FIELDWORK_PROHIBITED_USE_VERSION", PROHIBITED_USE_DRAFT_VERSION
         ),
+        "controller_name": os.environ.get("FIELDWORK_CONTROLLER_NAME", "").strip() or "not_confirmed",
         "privacy_contact": os.environ.get("FIELDWORK_PRIVACY_CONTACT", "").strip() or "not_confirmed",
+        "privacy_contact_url": os.environ.get("FIELDWORK_PRIVACY_CONTACT_URL", "").strip() or "not_confirmed",
+        "hosting_region": os.environ.get("FIELDWORK_HOSTING_REGION", "").strip() or "not_confirmed",
         "retention_version": os.environ.get("FIELDWORK_RETENTION_VERSION", "").strip() or "not_confirmed",
+        "retention_summary": os.environ.get("FIELDWORK_RETENTION_SUMMARY", "").strip() or "not_confirmed",
         "processor_list_version": os.environ.get("FIELDWORK_PROCESSOR_LIST_VERSION", "").strip() or "not_confirmed",
+        "processor_summary": os.environ.get("FIELDWORK_PROCESSOR_SUMMARY", "").strip() or "not_confirmed",
+        "pilot_cap": _pilot_cap(),
         "status_route": "/fieldwork/status",
         "price_status": "free_private_pilot",
     }
@@ -451,6 +483,22 @@ def _upsert_principal(conn: sqlite3.Connection, data: ContactMixin) -> str:
     return principal_id
 
 
+def _enforce_pilot_cap(conn: sqlite3.Connection, data: ContactMixin) -> None:
+    cap = _pilot_cap()
+    if cap is None:
+        raise HTTPException(status_code=503, detail={"code": "pilot_closed"})
+    contact = _normalise_contact(data.contact_kind, data.contact)
+    existing = conn.execute("SELECT 1 FROM principals WHERE contact_value=?", (contact,)).fetchone()
+    if existing:
+        return
+    count = conn.execute("SELECT COUNT(*) AS count FROM principals").fetchone()["count"]
+    if count >= cap:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "pilot_full", "message": "The initial invited-pilot capacity has been reached."},
+        )
+
+
 def _record_consent_bundle(
     conn: sqlite3.Connection,
     principal_id: str,
@@ -580,6 +628,7 @@ def submit_request(data: RequestSubmission) -> dict[str, Any]:
         existing = _existing_idempotent(conn, data.idempotency_key)
         if existing:
             return existing
+        _enforce_pilot_cap(conn, data)
         principal_id = _upsert_principal(conn, data)
         now = _utc_now()
         requester = conn.execute(
@@ -653,6 +702,7 @@ def submit_provider(data: ProviderSubmission) -> dict[str, Any]:
         existing = _existing_idempotent(conn, data.idempotency_key)
         if existing:
             return existing
+        _enforce_pilot_cap(conn, data)
         principal_id = _upsert_principal(conn, data)
         if conn.execute("SELECT id FROM provider_profiles WHERE principal_id=?", (principal_id,)).fetchone():
             raise HTTPException(

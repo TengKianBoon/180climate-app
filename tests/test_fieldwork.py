@@ -23,12 +23,22 @@ def pilot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
         "FIELDWORK_DB_PATH": str(db_path),
         "FIELDWORK_INVITE_CODE": "synthetic-invite-only",
         "FIELDWORK_OPERATOR_TOKEN": "synthetic-operator-only",
+        "FIELDWORK_PUBLIC_ORIGIN": "https://fieldwork.example.invalid",
+        "FIELDWORK_CONTROLLER_NAME": "Synthetic Controller Pte Ltd",
         "FIELDWORK_PRIVACY_CONTACT": "privacy@example.invalid",
+        "FIELDWORK_PRIVACY_CONTACT_URL": "mailto:privacy@example.invalid",
+        "FIELDWORK_HOSTING_REGION": "synthetic-region",
+        "FIELDWORK_PILOT_CAP": "10",
         "FIELDWORK_RETENTION_VERSION": "synthetic-retention-v1",
+        "FIELDWORK_RETENTION_SUMMARY": "Synthetic records: 30 days",
         "FIELDWORK_PROCESSOR_LIST_VERSION": "synthetic-processors-v1",
+        "FIELDWORK_PROCESSOR_SUMMARY": "Synthetic hosting processor",
         "FIELDWORK_TERMS_VERSION": "synthetic-terms-v1",
         "FIELDWORK_PRIVACY_VERSION": "synthetic-privacy-v1",
         "FIELDWORK_PROHIBITED_USE_VERSION": "synthetic-prohibited-use-v1",
+        "FIELDWORK_BAHASA_PACK_VERSION": "synthetic-bahasa-v1",
+        "FIELDWORK_COUNSEL_APPROVAL_ID": "synthetic-counsel-approval",
+        "FIELDWORK_COMPANY_APPROVAL_ID": "synthetic-company-approval",
     }
     for key, value in values.items():
         monkeypatch.setenv(key, value)
@@ -142,6 +152,20 @@ def test_intake_stays_closed_when_an_approved_notice_version_is_missing(
     response = client.post("/api/fieldwork/requests", json=request_payload())
     assert response.status_code == 503
     assert not pilot.exists()
+
+
+def test_initial_pilot_cap_applies_to_distinct_contacts(
+    pilot: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FIELDWORK_PILOT_CAP", "1")
+    first = client.post("/api/fieldwork/requests", json=request_payload())
+    assert first.status_code == 200
+    second = client.post(
+        "/api/fieldwork/providers",
+        json=provider_payload(contact="second-provider@example.invalid", idempotency_key="provider-cap-test-0001"),
+    )
+    assert second.status_code == 409
+    assert second.json()["detail"]["code"] == "pilot_full"
 
 
 def test_request_submission_is_auditable_and_status_key_is_not_stored(pilot: Path) -> None:

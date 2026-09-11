@@ -72,11 +72,19 @@
       pilotOpen = Boolean(config.accepting_submissions);
       const privacyContact = document.querySelector("#privacy-contact");
       const privacyContactPending = document.querySelector("#privacy-contact-pending");
-      if (privacyContact && config.privacy_contact && config.privacy_contact !== "not_confirmed") {
-        privacyContact.href = `mailto:${config.privacy_contact}`;
+      if (privacyContact && config.privacy_contact && config.privacy_contact !== "not_confirmed" && config.privacy_contact_url !== "not_confirmed") {
+        privacyContact.href = config.privacy_contact_url;
         privacyContact.textContent = config.privacy_contact;
         privacyContact.hidden = false;
         if (privacyContactPending) privacyContactPending.hidden = true;
+      }
+      if (pilotOpen) {
+        document.querySelector("#privacy-launch-pending").hidden = true;
+        document.querySelector("#privacy-launch-ready").hidden = false;
+        document.querySelector("#controller-name").textContent = config.controller_name;
+        document.querySelector("#hosting-region").textContent = config.hosting_region;
+        document.querySelector("#retention-summary").textContent = config.retention_summary;
+        document.querySelector("#processor-summary").textContent = config.processor_summary;
       }
       renderBanner(pilotOpen ? "open" : "closed");
     } catch (_) {
