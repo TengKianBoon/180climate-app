@@ -121,6 +121,7 @@ def test_public_pages_catalogue_and_security_headers() -> None:
     assert page.text.count('data-wix-intake href="https://www.180climate.net/fieldwork-pilot-draft"') == 3
     assert 'id="pilot-banner" data-state="loading" data-intake="wix"' in page.text
     assert "Preview only" not in page.text
+    assert '/fieldwork-assets/fieldwork.js?v=3' in page.text
     script = (Path(__file__).parents[1] / "frontend" / "fieldwork.js").read_text(encoding="utf-8")
     assert "real-user intake is closed" not in script
     assert 'id="request-form" aria-labelledby="request-title" hidden aria-hidden="true"' in page.text
