@@ -27,3 +27,12 @@
 ## Not yet evidenced or approved
 
 Production deployment, real message delivery, persistent-volume durability, backup destination/encryption, deletion propagation, processor terms, privacy-controller facts, final legal/Bahasa text, account/asset publication authority, operational staffing and live rollback remain outside this local PASS. The product catalogue therefore stays `closed_pending_launch_gate`.
+
+## Real-user gate hardening — PASS locally
+
+- Commit: `287e0b4` (`feat: harden real-user pilot launch gate`).
+- Added a hard cap of 10 distinct pilot contacts and required explicit public-origin, controller, privacy-contact link, hosting-region, retention-summary, processor-summary, Bahasa-pack, counsel-approval and company-approval configuration before intake can open.
+- Public privacy facts render only when the complete gate passes; the WhatsApp route is deployment configuration and no real telephone number is committed.
+- Critical-path tests: 16 passed. Repository offline regression: 477 passed; two live-network overlay checks intentionally deselected; one dependency deprecation warning.
+- Browser smoke: complete synthetic launch facts rendered correctly, WhatsApp link scheme was preserved, no horizontal overflow appeared, and no browser warning/error was recorded.
+- Account inspection: Wix showed the current user as site owner and GitHub showed repository ownership. Render access was not authenticated, so service region, linked branch, persistent storage, backups and deployment settings remain unverified.
