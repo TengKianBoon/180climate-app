@@ -29,6 +29,12 @@ The repository also contains a more structured native workflow for requester/pro
 
 The public service may take a short time to wake. For a quick technical review without entering contact details, use the offline example.
 
+### AI-agent procurement readiness
+
+The three services now expose a guarded machine-readable procurement contract at [`/.well-known/180climate-services.json`](frontend/services.json): stable service and operation IDs, versioned schemas, eligibility, limits, price status, side effects, retry hints and exact human-approval boundaries. This supports authorised agents in discovery and preparation without pretending that screening, a registration, a match, a contract and a payment are equivalent actions.
+
+This is **guarded readiness, not autonomous purchasing**. Carbon is suitable for user-authorised machine screening on its declared routes; the current EUDR call also emails 180Climate; and live Fieldwork registration still hands off to Wix while its typed native intake remains fail-closed. Contracts, payments, dispatch, contact disclosure and regulated conclusions remain outside agent authority. See the [agent procurement contract and safe journey](docs/agent-procurement-readiness.md).
+
 ### Run one decision in under a minute
 
 From the repository root, with Python 3.10 or later:

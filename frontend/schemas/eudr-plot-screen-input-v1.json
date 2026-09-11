@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/eudr-plot-screen-input-v1.json",
+  "title": "180Climate EUDR plot-screen multipart input",
+  "description": "Logical schema for multipart/form-data accepted by screenEudrPlotsAndNotify.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commodity", "role", "name", "email"],
+  "anyOf": [{"required": ["file"]}, {"required": ["geojson_text"]}],
+  "properties": {
+    "file": {"type": ["string", "null"], "format": "binary", "description": "GeoJSON, KML, SHP or ZIP upload."},
+    "geojson_text": {"type": ["string", "null"], "minLength": 2},
+    "commodity": {"enum": ["palm", "rubber", "timber", "cocoa", "coffee", "manual_review"]},
+    "role": {"enum": ["eu_first_placer", "downstream_operator", "non_eu_supplier"]},
+    "name": {"type": "string", "minLength": 1},
+    "email": {"type": "string", "format": "email"},
+    "mobile": {"type": ["string", "null"]},
+    "company": {"type": ["string", "null"]}
+  }
+}

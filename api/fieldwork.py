@@ -579,12 +579,37 @@ def _submission_response(reference: str, status: str, status_key: str) -> dict[s
     }
 
 
-@router.get("/config")
+@router.get(
+    "/config",
+    operation_id="getFieldworkConfiguration",
+    summary="Read Fieldwork availability and launch controls",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
+    },
+)
 def fieldwork_config() -> dict[str, Any]:
     return public_config()
 
 
-@router.post("/events", status_code=204)
+@router.post(
+    "/events",
+    status_code=204,
+    operation_id="recordFieldworkAnalyticsEvent",
+    summary="Record an aggregate Fieldwork analytics event",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        }
+    },
+)
 def fieldwork_event(event: AnalyticsEvent) -> None:
     day = datetime.now(timezone.utc).date().isoformat()
     with connection() as conn:
@@ -597,7 +622,20 @@ def fieldwork_event(event: AnalyticsEvent) -> None:
         )
 
 
-@router.post("/requests")
+@router.post(
+    "/requests",
+    operation_id="registerFieldworkRequest",
+    summary="Register a private Fieldwork request",
+    description="Additive and idempotent with the supplied idempotency_key. Production remains fail-closed until all launch controls pass.",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
+    },
+)
 def submit_request(data: RequestSubmission) -> dict[str, Any]:
     _require_open_registration()
     data.require_acceptances()
@@ -679,7 +717,20 @@ def submit_request(data: RequestSubmission) -> dict[str, Any]:
     return _submission_response(reference, status, status_key)
 
 
-@router.post("/providers")
+@router.post(
+    "/providers",
+    operation_id="registerFieldworkProvider",
+    summary="Register a private Fieldwork provider profile",
+    description="Additive and idempotent with the supplied idempotency_key. Production remains fail-closed until all launch controls pass.",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
+    },
+)
 def submit_provider(data: ProviderSubmission) -> dict[str, Any]:
     _require_open_registration()
     data.require_acceptances()
@@ -754,7 +805,19 @@ def _verify_status_access(conn: sqlite3.Connection, reference: str, supplied_key
     return row
 
 
-@router.post("/status")
+@router.post(
+    "/status",
+    operation_id="getFieldworkPrivateStatus",
+    summary="Read private Fieldwork status with a status key",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
+    },
+)
 def read_status(access: StatusAccess) -> dict[str, Any]:
     with connection() as conn:
         key_row = _verify_status_access(conn, access.reference, access.status_key)
@@ -806,7 +869,20 @@ def read_status(access: StatusAccess) -> dict[str, Any]:
         }
 
 
-@router.get("/operator/queue")
+@router.get(
+    "/operator/queue",
+    operation_id="getFieldworkOperatorQueue",
+    summary="Read the operator review queue",
+    description="Reads the private queue and records an operator-access audit event.",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        }
+    },
+)
 def operator_queue(
     include_contacts: bool = Query(default=False),
     authorization: str | None = Header(default=None),
@@ -873,7 +949,19 @@ _PROVIDER_TRANSITIONS = {
 }
 
 
-@router.post("/operator/records/{reference}/status")
+@router.post(
+    "/operator/records/{reference}/status",
+    operation_id="updateFieldworkRecordStatus",
+    summary="Apply an operator-controlled status transition",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        }
+    },
+)
 def operator_set_status(
     reference: str,
     update: OperatorStatusUpdate,
@@ -904,7 +992,19 @@ def operator_set_status(
         return {"reference": ref, "status": update.status}
 
 
-@router.post("/operator/introductions")
+@router.post(
+    "/operator/introductions",
+    operation_id="proposeFieldworkIntroduction",
+    summary="Propose a consent-controlled introduction",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        }
+    },
+)
 def propose_introduction(
     proposal: IntroductionProposal,
     authorization: str | None = Header(default=None),
@@ -951,7 +1051,19 @@ def propose_introduction(
         return {"reference": intro_ref, "status": "consent_required", "shared_fields": fields}
 
 
-@router.post("/introductions/consent")
+@router.post(
+    "/introductions/consent",
+    operation_id="recordFieldworkIntroductionConsent",
+    summary="Record one party's introduction choice",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        }
+    },
+)
 def introduction_consent(data: IntroductionConsent) -> dict[str, Any]:
     with connection() as conn:
         key_row = _verify_status_access(conn, data.reference, data.status_key)
@@ -1003,7 +1115,19 @@ def introduction_consent(data: IntroductionConsent) -> dict[str, Any]:
         return {"reference": intro["reference"], "status": result}
 
 
-@router.post("/operator/introductions/{reference}/finalize")
+@router.post(
+    "/operator/introductions/{reference}/finalize",
+    operation_id="finalizeFieldworkIntroduction",
+    summary="Reveal contact details only after both parties consent",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        }
+    },
+)
 def finalize_introduction(
     reference: str,
     action: IntroductionFinalize,

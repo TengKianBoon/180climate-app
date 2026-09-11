@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/carbon-pre-fs-input-v1.json",
+  "title": "180Climate carbon pre-feasibility input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contact", "iup_name", "iup_address", "permit_type", "permit_years_remaining", "project_type", "geo"],
+  "properties": {
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "email"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "email": {"type": "string", "format": "email"},
+        "mobile": {"type": ["string", "null"]},
+        "company": {"type": ["string", "null"]}
+      }
+    },
+    "iup_name": {"type": "string", "minLength": 1},
+    "iup_address": {"type": "string", "minLength": 1},
+    "permit_type": {"enum": ["HTI", "HA"]},
+    "permit_years_remaining": {"type": "integer"},
+    "project_type": {"enum": ["REDD", "PEAT", "IFM", "other"]},
+    "project_type_description": {"type": ["string", "null"]},
+    "geo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fmt", "payload"],
+      "properties": {
+        "fmt": {"enum": ["coords", "geojson", "shapefile"]},
+        "payload": {"type": "string", "minLength": 1},
+        "crs": {"type": "string", "default": "EPSG:4326"}
+      }
+    }
+  }
+}

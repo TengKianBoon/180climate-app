@@ -48,7 +48,21 @@ from api.fieldwork import router as fieldwork_router
 from api.sheets import append_lead
 from reports.generator import generate_pdf, generate_docx, generate_eudr_pdf, ReportData, make_filename
 
-app = FastAPI(title="180Climate Pre-FS API", version="0.1.0-slice")
+app = FastAPI(
+    title="180Climate Screening and Fieldwork API",
+    version="0.2.0",
+    description=(
+        "Machine-readable interfaces for indicative EUDR and carbon screening plus "
+        "the consent-controlled Fieldwork Network. Consult /services.json before "
+        "calling an operation: it declares authority, side effects and human gates."
+    ),
+    openapi_tags=[
+        {"name": "discovery", "description": "Public service discovery and schemas."},
+        {"name": "screening", "description": "Indicative decision support; never a regulated conclusion."},
+        {"name": "delivery", "description": "Creates reports or external communications and requires user authority."},
+        {"name": "fieldwork", "description": "Controlled registration, status and human introduction workflow."},
+    ],
+)
 app.include_router(fieldwork_router)
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
@@ -204,7 +218,7 @@ def _deliver(
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
-@app.get("/health")
+@app.get("/health", operation_id="getHealth", tags=["discovery"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
@@ -252,7 +266,12 @@ def fieldwork_operator_page() -> HTMLResponse:
     return _fieldwork_html("fieldwork-operator.html", private=True)
 
 
-@app.get("/services.json")
+@app.get(
+    "/services.json",
+    operation_id="getServiceCatalogue",
+    tags=["discovery"],
+    summary="Discover services and guarded agent actions",
+)
 def services_catalogue() -> Response:
     path = _FRONTEND / "services.json"
     if not path.exists():
@@ -264,11 +283,31 @@ def services_catalogue() -> Response:
     )
 
 
-@app.get("/schemas/{schema_name}")
+@app.get(
+    "/.well-known/180climate-services.json",
+    operation_id="getWellKnownServiceCatalogue",
+    tags=["discovery"],
+    summary="Discover the 180Climate service catalogue at a stable well-known URL",
+)
+def well_known_services_catalogue() -> Response:
+    return services_catalogue()
+
+
+@app.get(
+    "/schemas/{schema_name}",
+    operation_id="getServiceSchema",
+    tags=["discovery"],
+)
 def service_schema(schema_name: str) -> Response:
     allowed = {
+        "agent-service-catalogue-v1.json",
+        "carbon-pre-fs-input-v1.json",
+        "carbon-pre-fs-output-v1.json",
+        "eudr-plot-screen-input-v1.json",
+        "eudr-plot-screen-output-v1.json",
         "fieldwork-request-v1.json",
         "fieldwork-provider-v1.json",
+        "fieldwork-status-access-v1.json",
         "fieldwork-status-v1.json",
     }
     if schema_name not in allowed:
@@ -478,7 +517,26 @@ def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
     return JSONResponse(content=result.model_dump())
 
 
-@app.post("/api/carbon", response_model=None)
+@app.post(
+    "/api/carbon",
+    response_model=None,
+    operation_id="screenCarbonPreFeasibility",
+    tags=["screening"],
+    summary="Run an indicative carbon pre-feasibility screen",
+    description=(
+        "Computes an indicative Tier 1 screen. It does not send a message for the "
+        "standard REDD, IFM or peat routes. An unclassified 'other' project can trigger "
+        "lead capture; agents must obtain user approval before using that route."
+    ),
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        }
+    },
+)
 def carbon(inp: CarbonInput) -> JSONResponse:
     if inp.project_type == "other":
         return _handle_other_project_type(inp)
@@ -926,7 +984,25 @@ def _detect_eudr_fmt(filename: str) -> str:
     return "geojson"
 
 
-@app.post("/api/eudr", response_model=None)
+@app.post(
+    "/api/eudr",
+    response_model=None,
+    operation_id="screenEudrPlotsAndNotify",
+    tags=["screening", "delivery"],
+    summary="Screen EUDR plots and notify 180Climate",
+    description=(
+        "Runs indicative plot triage and sends an outbound lead email. This is not a "
+        "read-only operation and must only be called with explicit user authority."
+    ),
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        }
+    },
+)
 async def eudr_screen(
     file: Optional[UploadFile] = File(None),
     geojson_text: Optional[str] = Form(None),
@@ -1109,7 +1185,20 @@ class EudrReportRequest(BaseModel):
     commodity: str = ""
 
 
-@app.post("/api/eudr/report")
+@app.post(
+    "/api/eudr/report",
+    operation_id="createEudrReport",
+    tags=["delivery"],
+    summary="Create an EUDR screening PDF from a prior result",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
+    },
+)
 def eudr_report(req: EudrReportRequest) -> Response:
     """Return an EUDR triage PDF for download.
 
@@ -1150,7 +1239,21 @@ class LeadRequest(BaseModel):
     geo: Optional[GeoInput] = None
 
 
-@app.post("/api/lead")
+@app.post(
+    "/api/lead",
+    operation_id="submitCarbonLead",
+    tags=["delivery"],
+    summary="Send a carbon enquiry to 180Climate",
+    description="Sends an external email and may append to the configured lead sheet. Requires immediate user approval.",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        }
+    },
+)
 def lead(req: LeadRequest) -> dict[str, Any]:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
 
@@ -1222,7 +1325,21 @@ def lead(req: LeadRequest) -> dict[str, Any]:
 
 # ── Report download ───────────────────────────────────────────────────────────
 
-@app.post("/api/report")
+@app.post(
+    "/api/report",
+    operation_id="createAndDeliverCarbonReport",
+    tags=["delivery"],
+    summary="Create a carbon report and notify 180Climate",
+    description="Creates a report, sends an external email and may append to the configured lead sheet. Requires immediate user approval.",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        }
+    },
+)
 def report(
     inp: CarbonInput,
     fmt: str = Query(default="pdf", pattern="^(pdf|docx)$"),
