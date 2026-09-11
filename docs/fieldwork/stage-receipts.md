@@ -1,0 +1,29 @@
+# Fieldwork Phase 1A stage receipts
+
+**Scope:** local branch `feat/fieldwork-phase-1a`; no push, deployment, DNS/Wix change, real-user data, new repository, tag, release, or licence decision
+
+## Foundation — PASS
+
+- Commit: `468839b` (`docs: establish phase 1a architecture and governance baseline`)
+- Inspected the existing public repository, FastAPI source, Render configuration, Wix/public-site relationship, deployment runbook and licence state.
+- Recorded the public/private publication boundary and consequential launch gate.
+- Baseline regression at this stage: 21 existing slice tests passed.
+
+## Smallest working pilot — PASS locally
+
+- Commit: `3636a70` (`feat: add fail-closed invited fieldwork pilot`)
+- Added a responsive English/Bahasa landing page, invited requester/provider intake, private operator queue, status access, explicit two-party introduction consent, service catalogue/schemas, SQLite persistence, aggregate analytics and recovery helper.
+- Real-user intake is fail-closed unless every required deployment, privacy, retention, processor, access and approved-notice configuration value is present.
+- JavaScript syntax: PASS for the public, status and operator clients.
+- Python compile: PASS.
+- Mypy: PASS for `api/fieldwork.py` and `scripts/fieldwork_db.py`.
+- Critical-path tests: 15 passed.
+- Repository offline regression: 476 passed; two live-network overlay checks intentionally deselected; one dependency deprecation warning.
+- JSON parse: PASS for the service catalogue and three schemas.
+- Browser QA: PASS at 320, 390, 768, 1024 and 1440 CSS-pixel widths with no horizontal overflow; synthetic requester, provider, status and private operator flows exercised.
+- Synthetic backup/restore rehearsal: PASS through the automated test.
+- Secret/private-data scan: no credential-like tracked value found; identities in tests use the reserved `.invalid` domain.
+
+## Not yet evidenced or approved
+
+Production deployment, real message delivery, persistent-volume durability, backup destination/encryption, deletion propagation, processor terms, privacy-controller facts, final legal/Bahasa text, account/asset publication authority, operational staffing and live rollback remain outside this local PASS. The product catalogue therefore stays `closed_pending_launch_gate`.
