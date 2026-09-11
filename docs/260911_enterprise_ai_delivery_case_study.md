@@ -12,6 +12,31 @@
 
 The delivery principle is simple: use AI where it improves speed or clarity, use deterministic code where the result must be reproducible, and keep human authority at privacy, safety, professional, publication, contact-disclosure and commercial boundaries.
 
+## Current role benchmark
+
+Current official role descriptions converge on a practical set of hiring signals:
+
+- OpenAI's [Applied AI Architect role in Singapore](https://openai.com/careers/applied-ai-architect-singapore/) emphasises technical discovery, a focused use-case portfolio, architectures spanning models through governance and deployment, prototypes, production adoption and measurable customer value.
+- OpenAI's [Forward Deployed Engineer role](https://openai.com/careers/forward-deployed-engineer-%28fde%29-seattle-seattle/) emphasises end-to-end delivery, full-stack systems, direct coding, close work with customer teams, adoption, delivery trade-offs and reusable patterns.
+- Palantir's [Forward Deployed Software Engineer role](https://jobs.lever.co/palantir/c4442730-2926-41ad-8c0e-5e5a6b4d14ae) similarly combines ambiguous customer problems, data and software engineering, autonomy, executive communication and end-to-end ownership.
+- AWS's [Applied AI Solutions Architect role](https://www.amazon.jobs/en/jobs/10479997/sr-applied-ai-solutions-architect-amazon-connect) adds model selection across accuracy, latency, cost and compliance, together with customer discovery and production readiness.
+
+The combined benchmark is: **discover the real workflow → qualify value → design the full system → build and evaluate hands-on → deploy safely → drive adoption → measure impact → turn field learning into reusable practice**.
+
+### Role-alignment evidence
+
+| Hiring signal | Evidence in this project | Honest boundary |
+|---|---|---|
+| Executive and operator discovery | Business requirements connect climate origination, EUDR preparation and field-service operations to three bounded products | This is founder/operator-led product work, not yet a named portfolio of external enterprise customers |
+| Applied AI solution architecture | Models, application code, data boundaries, integrations, privacy, governance, evaluation and deployment are treated as one system | Enterprise identity, distributed-system scale and customer-specific cloud integration are not demonstrated here |
+| Hands-on FDE execution | Requirements were carried through working UI/API code, Git, tests, browser QA, Wix integration and Render deployment | AI agents wrote material implementation code; unaided coding speed is not claimed |
+| AI engineering judgement | Deterministic fallbacks, explicit unknown states, model/cost routing, agent roles, evaluations and human approval gates are documented and exercised | Custom model training, large-scale retrieval and production model observability are not demonstrated |
+| Business-value discipline | Shared components, staged investment, proof targets and stop/go boundaries connect technical choices to cost, risk and learning | Measured savings, revenue conversion and sustained adoption require pilot operating data |
+| Adoption and change leadership | Bilingual guidance, manual fallback, reviewer separation, operating ownership and user-feedback loops are built into rollout | Organisation-wide training, champion networks and multi-team adoption metrics remain future evidence |
+| Reusable field learning | ADRs, schemas, tests, agent instructions and recovery records turn decisions into reusable public artefacts | External reuse or ecosystem influence has not yet been independently verified |
+
+This supports positioning as an **enterprise AI architect–operator with hands-on forward-deployed delivery evidence**. It is stronger than presenting only strategy or only code, while remaining explicit about the experience a repository cannot prove by itself.
+
 ## From business process to working service
 
 | Business need | Previous or manual friction | Implemented operating response | Evidence |
@@ -85,7 +110,31 @@ At the evidence date, [AIRI Framework v3.2](https://airi.foundation/) describes 
 
 ## My contribution and AI assistance
 
-I owned problem selection, requirements, scope, architecture and operating choices, delivery priorities, acceptance criteria, publication decisions and the connection between the tools and 180Climate's business workflows. I used AI agents to assist research, implementation, testing, review and documentation. Deterministic test results and deployment receipts are evidence of system behaviour; they do not convert AI-assisted implementation into a claim of unaided coding, nor do they prove business outcomes that have not yet been measured.
+### What I personally owned
+
+- problem selection, business-case framing and first-release scope;
+- translation of climate, compliance and field-operation needs into product requirements;
+- shared-architecture, deployment-shape, cost-routing and build-versus-reuse decisions;
+- agent roles, task briefs, approval boundaries and acceptance criteria;
+- privacy, uncertainty, consent, safety and professional-accountability boundaries;
+- live-product review, release priorities, publication decisions and adoption approach.
+
+### What I did hands-on with AI
+
+- wrote and refined execution briefs and supplied domain context;
+- decomposed work across planning, building, testing, review and verification roles;
+- selected where to use deterministic code, templates, lower-cost AI or deeper reasoning;
+- interrogated outputs, compared them with requirements and drove bounded correction loops;
+- used browser and test evidence to find live-workflow friction rather than accepting a local build;
+- converted field lessons into reusable controls, documentation and next-stage decisions.
+
+### What AI materially assisted
+
+AI agents assisted research, implementation, test generation and execution, code/document review, browser QA and documentation. This is evidence of hands-on AI orchestration and technical product ownership; it is not represented as unaided manual authorship of every line.
+
+### What the evidence proves—and does not prove
+
+Deterministic tests, Git history and deployment receipts verify specific system behaviours and delivery checkpoints. They do not prove business outcomes, customer adoption at enterprise scale, independent coding-interview performance, or AIRI maturity that has not been measured. Those gaps are stated because credible technical leadership includes knowing the limit of the evidence.
 
 ## Review path
 

@@ -58,7 +58,7 @@ These are synthetic inputs to one function, not satellite observations from a re
 
 ### How I orchestrated development
 
-I used **Claude Cowork for planning** alongside **Claude Code in VS Code for implementation and audit work**. I customised subagent roles with the relevant context, background instructions and checks for each responsibility. The shared repository and work-order records supported handoffs between the two working environments.
+I worked hands-on with **Claude Cowork, Claude Code and Codex** to move from requirements through implementation, audit, browser QA and release correction. I customised agent roles with the relevant context, background instructions and checks for each responsibility. The shared repository and work-order records supported controlled handoffs between planning, implementation and verification.
 
 | Role | Instruction a reviewer can inspect |
 |---|---|
@@ -98,7 +98,18 @@ I took the project from demand assessment and scope through an AI-assisted build
 
 **One decision you can inspect:** I required the carbon report to expose the actual calculation inputs and intermediate values. [ADR-0014](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0014-derivation-trace.md) records that request; the [typed calculation trace](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/core/contracts/__init__.py#L158-L189) shows the implementation approach. [ADR-0018](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0018-eudr-contracts.md) separately records my approval of explicit EUDR detection states.
 
-I used AI agents for implementation, testing and review while owning product definition, solution decisions, the development process and delivery acceptance. I translated domain requirements into screening behaviour, report quality and usability criteria.
+### Personal contribution versus AI-assisted implementation
+
+| Area | My personal contribution and competency | How AI assisted | Evidence a reviewer can inspect |
+|---|---|---|---|
+| Discovery and business value | Selected the business problems, connected them to carbon origination, EUDR preparation and field operations, bounded the first useful release and set proof targets. | Agents supported research, decomposition and draft business-process mapping. | Product scope, live services and the [enterprise AI delivery case study](docs/260911_enterprise_ai_delivery_case_study.md). |
+| Solution architecture | Chose the shared geospatial foundation, deterministic decision boundaries, existing FastAPI/Wix/Render/GitHub deployment shape, public/private data boundary and staged automation path. | Agents proposed and challenged implementation options and documented decisions. | [Architecture](docs/assets/2609092130_architecture_4ofX.svg), [typed contracts](core/contracts/__init__.py), [ADRs](docs/adr) and [Fieldwork foundation](docs/fieldwork/phase-1a-foundation.md). |
+| Hands-on AI engineering | Wrote and refined briefs, supplied domain context, assigned role-specific agent instructions, set model/cost routing and human approval boundaries, reviewed live behaviour and drove correction cycles. | Coding agents implemented bounded changes; reviewer/verifier agents inspected them independently. | [Agent instructions](.claude/agents), Git history, test failures/corrections and [stage receipts](docs/fieldwork/stage-receipts.md). |
+| Forward-deployed delivery | Connected the solution to the actual 180Climate Wix, GitHub and Render environment; resolved real navigation, intake and user-friction issues; and kept business operations involved in the loop. | AI assisted source changes, browser inspection, responsive QA and release documentation. | [Live Fieldwork journey](https://one80climate-fieldwork-preview.onrender.com/fieldwork), scoped commits and [deployment receipt](docs/fieldwork/stage-receipts.md). |
+| Verification and governance | Defined acceptance gates for uncertainty, privacy, consent, safety, publication and professional accountability; required deterministic tests before acceptance. | Agents generated and executed tests, scans and structured QA evidence. | [Test suites](tests), fail-closed behaviour, [public/private boundary](docs/fieldwork/phase-1a-foundation.md) and CI record. |
+| Adoption leadership | Set a small invited-pilot model, bilingual guidance, manual fallback, feedback loop and evidence needed before wider automation or commercialisation. | AI supported user-language refinement and repeatable operating documentation. | [Pilot evidence and explicit gaps](docs/260911_enterprise_ai_delivery_case_study.md#enterprise-ai-adoption-leadership); sustained enterprise adoption is not yet claimed. |
+
+This shows architecture, operator judgement and hands-on AI delivery without misrepresenting agent-produced code as unaided manual coding. I remain accountable for product definition, solution decisions, development controls, acceptance and publication; AI agents materially assisted implementation, testing, review and documentation.
 
 ### Capability evidence
 
