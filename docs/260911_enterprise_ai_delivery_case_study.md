@@ -45,6 +45,7 @@ This supports positioning as an **enterprise AI architect–operator with hands-
 | EUDR plot triage | Missing evidence can be mistaken for a clear result | Explicit `clear_in_screen`, `loss_detected` and `inconclusive` states; missing required evidence fails closed | [Decision logic](../engines/eudr/triage.py), [ADR-0018](adr/ADR-0018-eudr-contracts.md), [truth-table tests](../tests/test_eudr_triage.py) |
 | Finding suitable field support | Requests, capabilities, authority and consent can arrive through loose messages | Open registration with published review criteria, a non-public Wix intake, operator review and consent-before-introduction policy | [Current public entry](https://one80climate-fieldwork-preview.onrender.com/fieldwork), [service record](../frontend/services.json), [Phase 1A boundary](fieldwork/phase-1a-foundation.md) |
 | Scaling delivery with AI | Tool use can obscure responsibility or bypass checks | Role-specific build/review/verification instructions, deterministic tests and explicit human approval gates | [Agent instructions](../.claude/agents), [engineering walkthrough](2609092130_engineering_walkthrough_4ofX.md), [project controls](../AGENTS.md) |
+| Commercialising early demand | Commodity software pricing can undercut an unreviewed automated output, while uncapped expert work can lose money | Free diagnostics, fixed-scope human offers, delivery-hour caps and a fail-closed Stripe-hosted handoff separated from Fieldwork-provider payments | [Commercial architecture and gates](commercial-stripe-foundation.md), [commercial API](../api/commercial.py), [control tests](../tests/test_commercial.py) |
 
 ## Solution architecture evidence
 
@@ -53,6 +54,7 @@ This supports positioning as an **enterprise AI architect–operator with hands-
 - **Fail closed at uncertain boundaries.** Missing required forest evidence yields `inconclusive`; incomplete native Fieldwork launch configuration rejects submissions.
 - **Protect different data classes differently.** Public source, schemas and synthetic fixtures stay in GitHub; contacts, requests, status keys, operator secrets, logs and sensitive locations do not.
 - **Design for recovery.** Source versioning, deployment revisions and database backup/restore are treated as different recovery layers with different completion checks.
+- **Keep payment data and authority outside the application.** Prices and scopes are machine-readable, but card credentials stay on Stripe, live checkout stays closed until control records are present, and a human must confirm the transaction.
 
 Start with the [architecture view](assets/2609092130_architecture_4ofX.svg), then inspect the [API composition](../api/main.py), [typed contracts](../core/contracts/__init__.py), [Fieldwork boundary](fieldwork/phase-1a-foundation.md) and [deployment/recovery record](fieldwork/deployment-and-recovery.md).
 
@@ -76,8 +78,10 @@ The project treats AI and software investment as an operating decision:
 - move Fieldwork from a free invited pilot to an approval-gated open-registration beta while retaining manual review before building marketplace automation or payments;
 - use rules, schemas and templates before model calls, then route only ambiguous work to higher-cost reasoning;
 - retain manual fallbacks for classification, matching and professional review;
+- compare market prices and actual platform entitlements before adding fixed software cost;
+- price capped human effort and reduce scope rather than discounting below the delivery-cost floor;
 - measure counts and elapsed work before claiming savings, conversion or adoption outcomes;
-- stop excluded work—payments, public profiles, automated dispatch and regulated conclusions—until demand and controls justify it.
+- stop excluded work—Fieldwork payments, autonomous transaction confirmation, public profiles, automated dispatch and regulated conclusions—until demand and controls justify it.
 
 This creates a clearer benefits chain: **business problem → bounded use case → reusable capability → testable decision → operating feedback → investment decision**.
 
