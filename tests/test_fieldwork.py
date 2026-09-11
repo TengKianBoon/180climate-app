@@ -121,9 +121,11 @@ def test_public_pages_catalogue_and_security_headers() -> None:
     assert page.text.count('data-wix-intake href="https://www.180climate.net/fieldwork-pilot-draft"') == 3
     assert 'id="pilot-banner" data-state="loading" data-intake="wix"' in page.text
     assert "Preview only" not in page.text
-    assert '/fieldwork-assets/fieldwork.js?v=3' in page.text
+    assert '/fieldwork-assets/fieldwork.js?v=4' in page.text
     script = (Path(__file__).parents[1] / "frontend" / "fieldwork.js").read_text(encoding="utf-8")
     assert "real-user intake is closed" not in script
+    assert "Check private status" not in page.text
+    assert "Check status" not in page.text
     assert 'id="request-form" aria-labelledby="request-title" hidden aria-hidden="true"' in page.text
     assert 'id="provider-form" aria-labelledby="provider-title" hidden aria-hidden="true"' in page.text
     assert "default-src 'self'" in page.headers["content-security-policy"]
@@ -135,7 +137,9 @@ def test_public_pages_catalogue_and_security_headers() -> None:
     assert catalogue.status_code == 200
     services = {item["service_id"]: item for item in catalogue.json()["services"]}
     assert set(services) == {"fieldwork.match_intro.v1", "eudr.plot_screen.v1", "carbon.pre_fs.v1"}
-    assert services["fieldwork.match_intro.v1"]["status"] == "closed_pending_launch_gate"
+    assert services["fieldwork.match_intro.v1"]["status"] == "live_invited_pilot"
+    assert services["fieldwork.match_intro.v1"]["intake_mode"] == "external_private_wix_review"
+    assert services["fieldwork.match_intro.v1"]["intake_url"] == "https://www.180climate.net/fieldwork-pilot-draft"
     assert client.get("/schemas/fieldwork-request-v1.json").status_code == 200
     assert client.get("/schemas/not-allowed.json").status_code == 404
 

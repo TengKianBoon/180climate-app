@@ -7,7 +7,9 @@
       "version": "1",
       "name": "180Climate Fieldwork Network",
       "description": "Private matching and consent-controlled introductions for authorised, low-risk fieldwork support in Indonesia.",
-      "status": "closed_pending_launch_gate",
+      "status": "live_invited_pilot",
+      "intake_mode": "external_private_wix_review",
+      "intake_url": "https://www.180climate.net/fieldwork-pilot-draft",
       "regions": ["Indonesia"],
       "eligibility": [
         "Invited requester or provider",
@@ -24,6 +26,7 @@
       "input_schema_url": "/schemas/fieldwork-request-v1.json",
       "output_schema_url": "/schemas/fieldwork-status-v1.json",
       "limitations": [
+        "Applications are currently received and reviewed through the private 180Climate Wix form; this service does not issue a native status key for those submissions",
         "A match is not a booking, dispatch, site-access approval, endorsement or professional certification",
         "The pilot does not process payments or collect bank or card details",
         "Contact is not revealed until both named parties consent and an operator confirms the introduction"
