@@ -4,6 +4,7 @@
   const root = document.documentElement;
   const banner = document.querySelector("#pilot-banner");
   const languageButton = document.querySelector("#lang-toggle");
+  const externalIntake = banner.dataset.intake === "wix";
   let pilotOpen = false;
 
   const text = {
@@ -11,6 +12,7 @@
       loading: "Checking invited-pilot availability…",
       open: "Invited-pilot intake is open. Use only your private invitation code.",
       closed: "Preview only — real-user intake is closed until the privacy, legal, processor, retention and deployment gates are approved.",
+      external: "Invited-pilot applications are open through 180Climate's private Wix review form.",
       fix: "Please complete the highlighted required field before continuing.",
       unavailable: "The service could not receive this submission. Your information was not confirmed as saved.",
       submitting: "Submitting…",
@@ -21,6 +23,7 @@
       loading: "Memeriksa ketersediaan uji coba…",
       open: "Pendaftaran uji coba terbuka. Gunakan hanya kode undangan privat Anda.",
       closed: "Hanya pratinjau — pendaftaran pengguna nyata ditutup sampai gerbang privasi, hukum, pemroses, retensi, dan penerapan disetujui.",
+      external: "Pendaftaran uji coba undangan dibuka melalui formulir tinjauan privat Wix 180Climate.",
       fix: "Lengkapi bidang wajib yang ditandai sebelum melanjutkan.",
       unavailable: "Layanan tidak dapat menerima kiriman ini. Informasi Anda belum dikonfirmasi tersimpan.",
       submitting: "Mengirim…",
@@ -42,7 +45,7 @@
   languageButton.addEventListener("click", () => setLanguage(locale() === "en" ? "id" : "en"));
 
   function renderBanner(state) {
-    banner.dataset.state = state;
+    banner.dataset.state = state === "external" ? "open" : state;
     banner.textContent = text[locale()][state] || text[locale()].loading;
   }
 
@@ -86,10 +89,10 @@
         document.querySelector("#retention-summary").textContent = config.retention_summary;
         document.querySelector("#processor-summary").textContent = config.processor_summary;
       }
-      renderBanner(pilotOpen ? "open" : "closed");
+      renderBanner(externalIntake ? "external" : pilotOpen ? "open" : "closed");
     } catch (_) {
       pilotOpen = false;
-      renderBanner("closed");
+      renderBanner(externalIntake ? "external" : "closed");
     }
     document.querySelectorAll("[data-submit]").forEach((button) => {
       button.disabled = !pilotOpen;

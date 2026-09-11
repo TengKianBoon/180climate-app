@@ -118,6 +118,10 @@ def test_public_pages_catalogue_and_security_headers() -> None:
     page = client.get("/fieldwork")
     assert page.status_code == 200
     assert "Fieldwork support, matched privately" in page.text
+    assert page.text.count('data-wix-intake href="https://www.180climate.net/fieldwork-pilot-draft"') == 3
+    assert 'id="pilot-banner" data-state="loading" data-intake="wix"' in page.text
+    assert 'id="request-form" aria-labelledby="request-title" hidden aria-hidden="true"' in page.text
+    assert 'id="provider-form" aria-labelledby="provider-title" hidden aria-hidden="true"' in page.text
     assert "default-src 'self'" in page.headers["content-security-policy"]
     assert page.headers["x-content-type-options"] == "nosniff"
     assert client.get("/fieldwork/status").headers["cache-control"] == "no-store"
