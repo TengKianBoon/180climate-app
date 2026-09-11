@@ -1,8 +1,10 @@
 # 180Climate — Carbon Screening & EUDR Plot Check
 
-A shared geospatial foundation serving two user needs: screen a concession's indicative carbon potential, or check plots for satellite evidence of forest loss and identify what needs further review. Built for Indonesian landholders and exporters.
+A deployed climate-technology foundation serving three connected needs: screen indicative carbon potential, check plots for satellite evidence of forest loss, and privately review invited field-support needs and capabilities. Built for Indonesian landholders, exporters and field-service participants.
 
 **Python · FastAPI · Pydantic · geospatial data · deterministic engines · AI-assisted development**
+
+**Capability showcase:** enterprise AI solution architecture · forward-deployed delivery · hands-on AI orchestration · business-process redesign · governance and adoption leadership
 
 [Open Carbon Screening](https://carbon.180climate.net) · [Open EUDR Plot Check](https://eudr.180climate.net) · [Open Fieldwork Pilot](https://one80climate-fieldwork-preview.onrender.com/fieldwork) · [Read the code walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) · [Enterprise AI delivery case study](docs/260911_enterprise_ai_delivery_case_study.md) · [Inspect the recorded CI run](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682)
 
