@@ -82,6 +82,14 @@
         if (privacyContactPending) privacyContactPending.hidden = true;
       }
       if (registrationOpen) {
+        document.querySelectorAll("[data-wix-intake]").forEach((link) => {
+          link.href = link.dataset.nativeTarget;
+        });
+        ["#request-form", "#provider-form"].forEach((selector) => {
+          const section = document.querySelector(selector);
+          section.hidden = false;
+          section.setAttribute("aria-hidden", "false");
+        });
         document.querySelector("#privacy-launch-pending").hidden = true;
         document.querySelector("#privacy-launch-ready").hidden = false;
         document.querySelector("#controller-name").textContent = config.controller_name;
@@ -89,7 +97,7 @@
         document.querySelector("#retention-summary").textContent = config.retention_summary;
         document.querySelector("#processor-summary").textContent = config.processor_summary;
       }
-      renderBanner(externalIntake ? "external" : registrationOpen ? "open" : "closed");
+      renderBanner(registrationOpen ? "open" : externalIntake ? "external" : "closed");
     } catch (_) {
       registrationOpen = false;
       renderBanner(externalIntake ? "external" : "closed");
