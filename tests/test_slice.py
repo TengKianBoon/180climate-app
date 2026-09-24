@@ -188,9 +188,14 @@ def test_eligibility_hard_no_on_bad_permit():
 
 # ── Email mock ────────────────────────────────────────────────────────────────
 
-def test_email_called_with_correct_to():
-    """Verify send_lead_email is called and payload targets info@180climate.net."""
+def test_email_called_with_explicit_recipient(monkeypatch, tmp_path):
+    """Verify the dev outbox works only with an explicit operational recipient."""
     from api.email import send_lead_email
+
+    monkeypatch.setenv("LEAD_RECIPIENT_EMAIL", "operations@example.invalid")
+    monkeypatch.setenv("OUTBOX_DIR", str(tmp_path))
+    monkeypatch.delenv("EMAIL_HOST", raising=False)
+    monkeypatch.delenv("BREVO_API_KEY", raising=False)
 
     form_data = {
         "name": "Test", "email": "test@example.com",

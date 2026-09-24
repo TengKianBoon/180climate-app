@@ -22,10 +22,44 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: LEAD_RECIPIENT_EMAIL
+        sync: false
       # Google Sheets — lead backup (see docs/deploy-runbook.md §3)
       - key: GOOGLE_SHEETS_ID
         sync: false
       - key: GOOGLE_CREDENTIALS_JSON
+        sync: false
+      # Owned intake registry — remains off until a private persistent database,
+      # retention choice, geometry choice and operator owner are approved.
+      - key: INTAKE_RECORDING_MODE
+        value: off
+      - key: INTAKE_DB_PATH
+        sync: false
+      - key: INTAKE_RETENTION_DAYS
+        sync: false
+      - key: INTAKE_STORE_GEOMETRY
+        sync: false
+      - key: INTAKE_OPERATOR_TOKEN
+        sync: false
+      - key: INTAKE_CONTROLLER_NAME
+        sync: false
+      - key: INTAKE_PRIVACY_CONTACT
+        sync: false
+      - key: INTAKE_HOSTING_REGION
+        sync: false
+      - key: INTAKE_RETENTION_VERSION
+        sync: false
+      - key: INTAKE_PROCESSOR_LIST_VERSION
+        sync: false
+      - key: INTAKE_OPERATOR_OWNER
+        sync: false
+      - key: INTAKE_AUTHORISED_DEPLOYER
+        sync: false
+      - key: INTAKE_BAHASA_PACK_VERSION
+        sync: false
+      - key: INTAKE_COUNSEL_APPROVAL_ID
+        sync: false
+      - key: INTAKE_COMPANY_APPROVAL_ID
         sync: false
       # Anthropic API — free-text classifier, optional (see docs/deploy-runbook.md §4)
       - key: ANTHROPIC_API_KEY

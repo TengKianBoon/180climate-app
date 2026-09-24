@@ -7,7 +7,7 @@ Sends via (in priority order):
 
 Env vars:
   BREVO_API_KEY          — Brevo transactional API key
-  LEAD_RECIPIENT_EMAIL   — recipient (default: leoniches@gmail.com)
+  LEAD_RECIPIENT_EMAIL   — required operational recipient
   EMAIL_HOST, EMAIL_PORT, EMAIL_USE_SSL, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM
   OUTBOX_DIR             — CI override for outbox directory
 
@@ -39,7 +39,7 @@ _COORD_EVIDENCE = Path(__file__).parent.parent / "coordination" / "evidence"
 
 
 def _recipient() -> str:
-    return os.environ.get("LEAD_RECIPIENT_EMAIL", "leoniches@gmail.com")
+    return os.environ.get("LEAD_RECIPIENT_EMAIL", "").strip()
 
 
 def _outbox_path() -> Path:
@@ -131,6 +131,10 @@ def send_lead_email(
     contact_name = form_data.get("name") or iup_name
     subject = subject_override or f"New 180Climate lead — {contact_name} · {iup_name}"
     ts = datetime.now(timezone.utc).isoformat()
+
+    if not _recipient():
+        log.error("EMAIL: LEAD_RECIPIENT_EMAIL NOT SET -> no email sent")
+        return False
 
     brevo_key = os.environ.get("BREVO_API_KEY", "")
     if brevo_key:

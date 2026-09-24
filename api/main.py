@@ -47,6 +47,11 @@ from narrative.narrator import generate_narrative
 from api.commercial import commercial_catalogue_payload, router as commercial_router
 from api.email import send_lead_email
 from api.fieldwork import router as fieldwork_router
+from api.intake import (
+    IntakeStorageError,
+    capture_submission,
+    router as intake_router,
+)
 from api.sheets import append_lead
 from reports.generator import generate_pdf, generate_docx, generate_eudr_pdf, ReportData, make_filename
 
@@ -64,10 +69,12 @@ app = FastAPI(
         {"name": "delivery", "description": "Creates reports or external communications and requires user authority."},
         {"name": "commercial", "description": "Fail-closed paid-service catalogue and Stripe-hosted checkout handoff."},
         {"name": "fieldwork", "description": "Controlled registration, status and human introduction workflow."},
+        {"name": "intake", "description": "Private, operator-controlled Carbon and EUDR submission registry."},
     ],
 )
 app.include_router(fieldwork_router)
 app.include_router(commercial_router)
+app.include_router(intake_router)
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 _DISCLAIMER_TEXT = (
@@ -218,6 +225,40 @@ def _deliver(
     ]}
     row["filename_base"] = filename_base
     append_lead(row)
+
+
+def _capture_carbon_intake(
+    inp: CarbonInput,
+    boundary,  # type: ignore[no-untyped-def]
+    result: dict[str, Any],
+) -> str | None:
+    """Record the Carbon form without duplicating geometry into other JSON fields."""
+    form = inp.model_dump(mode="json")
+    contact = form.pop("contact")
+    form.pop("geo", None)
+    stored_result = dict(result)
+    stored_map = dict(stored_result.get("map") or {})
+    stored_map.pop("boundary_geojson", None)
+    if stored_map:
+        stored_result["map"] = stored_map
+    try:
+        return capture_submission(
+            application="carbon",
+            source_route="/api/carbon",
+            contact=contact,
+            form=form,
+            geometry_geojson=boundary.geojson if boundary is not None else None,
+            result=stored_result,
+        )
+    except IntakeStorageError as exc:
+        log.error("Required Carbon intake storage failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "intake_storage_unavailable",
+                "message": "Your information was not saved. Please try again later.",
+            },
+        ) from exc
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -404,7 +445,11 @@ def favicon() -> Response:
 
 # ── Carbon screening ──────────────────────────────────────────────────────────
 
-def _capture_out_of_scope_lead(inp: CarbonInput, classifier_result: Any, boundary: Any = None) -> None:
+def _capture_out_of_scope_lead(
+    inp: CarbonInput,
+    classifier_result: Any,
+    boundary: Any = None,
+) -> str | None:
     """Capture lead for out-of-scope submissions (email + Sheet, best-effort)."""
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
     filename_base = make_filename()
@@ -431,7 +476,19 @@ def _capture_out_of_scope_lead(inp: CarbonInput, classifier_result: Any, boundar
         "quantity_low_tco2e": None,
         "quantity_high_tco2e": None,
     }
+    reference = _capture_carbon_intake(
+        inp,
+        boundary,
+        {
+            "engine": "carbon",
+            "verdict": "out_of_scope",
+            "classifier_category": classifier_result.category,
+            "classifier_confidence": classifier_result.confidence,
+            "classifier_rationale": classifier_result.rationale,
+        },
+    )
     _deliver(form_data, b"", filename_base)
+    return reference
 
 
 def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
@@ -459,8 +516,8 @@ def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
             boundary = parse_geo(inp.geo)
         except Exception:
             pass
-        _capture_out_of_scope_lead(inp, classifier_result, boundary)
-        return JSONResponse(content={
+        reference = _capture_out_of_scope_lead(inp, classifier_result, boundary)
+        response = {
             "engine": "out_of_scope",
             "verdict": "out_of_scope",
             "verdict_label": "Out of scope — project does not match current screening criteria",
@@ -469,7 +526,10 @@ def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
             "cta_email": "info@180climate.net",
             "classifier_rationale": classifier_result.rationale,
             "lead_captured": True,
-        })
+        }
+        if reference:
+            response["submission_reference"] = reference
+        return JSONResponse(content=response)
 
     # Classified to known category (REDD / IFM / PEAT)
     classified_type = classifier_result.category
@@ -555,7 +615,11 @@ def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
         carrot=_CARROT,
         data_sources=forest.data_sources,
     )
-    return JSONResponse(content=result.model_dump())
+    response = result.model_dump(mode="json")
+    reference = _capture_carbon_intake(inp, boundary, response)
+    if reference:
+        response["submission_reference"] = reference
+    return JSONResponse(content=response)
 
 
 @app.post(
@@ -637,7 +701,11 @@ def carbon(inp: CarbonInput) -> JSONResponse:
         carrot=_CARROT,
         data_sources=forest.data_sources,
     )
-    return JSONResponse(content=result.model_dump())
+    response = result.model_dump(mode="json")
+    reference = _capture_carbon_intake(inp, boundary, response)
+    if reference:
+        response["submission_reference"] = reference
+    return JSONResponse(content=response)
 
 
 # ── EUDR plot triage ─────────────────────────────────────────────────────────
@@ -1193,6 +1261,39 @@ async def eudr_screen(
         "quantity_low_tco2e":  None,
         "quantity_high_tco2e": None,
     }
+    stored_result = dict(body)
+    stored_result.pop("geolocation_pack_geojson", None)
+    try:
+        reference = capture_submission(
+            application="eudr",
+            source_route="/api/eudr",
+            contact={
+                "name": name,
+                "email": email,
+                "mobile": mobile or "",
+                "company": company or "",
+            },
+            form={
+                "commodity": commodity,
+                "role": role,
+                "input_format": fmt,
+                "upload_filename": file.filename if file is not None and file.filename else "",
+            },
+            geometry_geojson=body["geolocation_pack_geojson"],
+            result=stored_result,
+        )
+    except IntakeStorageError as exc:
+        log.error("Required EUDR intake storage failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "intake_storage_unavailable",
+                "message": "Your information was not saved. Please try again later.",
+            },
+        ) from exc
+    if reference:
+        body["submission_reference"] = reference
+        form_data["submission_reference"] = reference
     try:
         eudr_pdf_body = {
             **body,
@@ -1299,6 +1400,7 @@ def lead(req: LeadRequest) -> dict[str, Any]:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
 
     pdf_bytes: bytes | None = None
+    boundary_for_storage = None
     filename_base = make_filename()
     form_data: dict = {
         "timestamp": ts,
@@ -1337,6 +1439,7 @@ def lead(req: LeadRequest) -> dict[str, Any]:
                 geo=req.geo,
             )
             boundary = parse_geo(req.geo)
+            boundary_for_storage = boundary
             forest   = query_forest_data(boundary)
             estimate = run_carbon_engine(carbon_inp, boundary, forest)
 
@@ -1360,8 +1463,46 @@ def lead(req: LeadRequest) -> dict[str, Any]:
         except Exception:
             pass  # best-effort PDF; email still sent without attachment
 
+    stored_form = req.model_dump(mode="json")
+    stored_form.pop("geo", None)
+    for contact_key in ("name", "email", "mobile", "company"):
+        stored_form.pop(contact_key, None)
+    try:
+        reference = capture_submission(
+            application="carbon",
+            source_route="/api/lead",
+            contact={
+                "name": req.name,
+                "email": req.email,
+                "mobile": req.mobile,
+                "company": req.company,
+            },
+            form=stored_form,
+            geometry_geojson=(
+                boundary_for_storage.geojson if boundary_for_storage is not None else None
+            ),
+            result={
+                "delivery_requested": True,
+                "verdict": form_data["verdict"],
+                "area_ha": form_data["area_ha"],
+                "quantity_low_tco2e": form_data["quantity_low_tco2e"],
+                "quantity_high_tco2e": form_data["quantity_high_tco2e"],
+            },
+        )
+    except IntakeStorageError as exc:
+        log.error("Required Carbon lead storage failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "intake_storage_unavailable",
+                "message": "Your information was not saved. Please try again later.",
+            },
+        ) from exc
     _deliver(form_data, pdf_bytes or b"", filename_base)
-    return {"status": "emailed", "timestamp": ts}
+    response: dict[str, Any] = {"status": "emailed", "timestamp": ts}
+    if reference:
+        response["submission_reference"] = reference
+    return response
 
 
 # ── Report download ───────────────────────────────────────────────────────────

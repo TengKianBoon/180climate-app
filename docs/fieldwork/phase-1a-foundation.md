@@ -30,7 +30,7 @@ Never commit or publish:
 - runtime databases, backups, logs, support exports, prompt traces, or processor payloads;
 - confidential contracts, private legal advice, unresolved exploitable findings, or rights-restricted data and media.
 
-Runtime Fieldwork data is stored outside the repository at `FIELDWORK_DB_PATH`. Public tests use generated synthetic records only. Status and operator secrets are submitted in request bodies or headers and are never placed in analytics events.
+Runtime Fieldwork data is stored outside the repository at the canonical `INTAKE_DB_PATH` (`FIELDWORK_DB_PATH` remains a compatibility alias). Public tests use generated synthetic records only. Status and operator secrets are submitted in request bodies or headers and are never placed in analytics events.
 
 ## Current public delivery boundary
 

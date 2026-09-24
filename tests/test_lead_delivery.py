@@ -73,6 +73,7 @@ def ci_outbox(monkeypatch):
     monkeypatch.delenv("EMAIL_HOST", raising=False)
     monkeypatch.delenv("BREVO_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_SHEETS_ID", raising=False)
+    monkeypatch.setenv("LEAD_RECIPIENT_EMAIL", "operations@example.invalid")
     yield Path(d)
     shutil.rmtree(d, ignore_errors=True)
 
@@ -100,8 +101,7 @@ class TestLeadEndpoint:
         assert len(records) == 1
         r = records[0]
         assert "PT Hutan Lestari Test" in r["subject"]
-        # recipient is LEAD_RECIPIENT_EMAIL default
-        assert r["to"] == "leoniches@gmail.com"
+        assert r["to"] == "operations@example.invalid"
 
     def test_email_subject_format(self, ci_outbox):
         """Subject must be 'New 180Climate lead — {name} · {concession}'."""
@@ -199,10 +199,10 @@ class TestReportEndpoint:
         assert r["attachment_size"] > 1000
 
     def test_report_email_recipient(self, ci_outbox):
-        """Recipient must be LEAD_RECIPIENT_EMAIL default (leoniches@gmail.com)."""
+        """Recipient must be the explicitly configured LEAD_RECIPIENT_EMAIL."""
         client.post("/api/report?fmt=pdf", json=_GOLDEN_CARBON_INPUT)
         r = _read_jsonl(ci_outbox / "outbox_emails.jsonl")[0]
-        assert r["to"] == "leoniches@gmail.com"
+        assert r["to"] == "operations@example.invalid"
 
     def test_report_email_subject_format(self, ci_outbox):
         """Subject must be 'New 180Climate lead — {name} · {concession}'."""

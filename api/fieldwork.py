@@ -21,6 +21,8 @@ from typing import Any, Iterator, Literal
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from api.intake import database_path
+
 
 router = APIRouter(prefix="/api/fieldwork", tags=["fieldwork"])
 
@@ -30,7 +32,6 @@ PRIVACY_DRAFT_VERSION = "fieldwork-open-beta-privacy-draft-2026-09-11"
 PROHIBITED_USE_DRAFT_VERSION = "fieldwork-open-beta-prohibited-use-draft-2026-09-11"
 SCHEMA_VERSION = "2"
 
-_DEFAULT_DB = Path(__file__).parent.parent / ".runtime" / "fieldwork.sqlite3"
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _PHONE_RE = re.compile(r"^\+?[0-9][0-9\s().-]{6,30}$")
 
@@ -56,8 +57,7 @@ def _truthy(name: str) -> bool:
 
 
 def _db_path() -> Path:
-    raw = os.environ.get("FIELDWORK_DB_PATH", "").strip()
-    return Path(raw) if raw else _DEFAULT_DB
+    return database_path()
 
 
 def _notice_version(env_name: str, draft: str) -> str:
@@ -74,7 +74,6 @@ def _registration_cap() -> int | None:
 
 def _launch_gaps() -> list[str]:
     required = {
-        "private persistent datastore": "FIELDWORK_DB_PATH",
         "operator access control": "FIELDWORK_OPERATOR_TOKEN",
         "public origin": "FIELDWORK_PUBLIC_ORIGIN",
         "personal-data controller": "FIELDWORK_CONTROLLER_NAME",
@@ -93,6 +92,11 @@ def _launch_gaps() -> list[str]:
         "company launch approval": "FIELDWORK_COMPANY_APPROVAL_ID",
     }
     gaps = [label for label, env_name in required.items() if not os.environ.get(env_name, "").strip()]
+    if not (
+        os.environ.get("INTAKE_DB_PATH", "").strip()
+        or os.environ.get("FIELDWORK_DB_PATH", "").strip()
+    ):
+        gaps.insert(0, "private persistent datastore")
     origin = os.environ.get("FIELDWORK_PUBLIC_ORIGIN", "").strip()
     if origin and not origin.startswith("https://"):
         gaps.append("HTTPS public origin")
