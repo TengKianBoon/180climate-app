@@ -1,6 +1,6 @@
 # 180Climate controlled form and database map
 
-**Status:** code-ready migration draft; no production database, paid service, live-form switch or real-user intake is authorised by this file.
+**Status:** see [the 24 September production verification](controlled-beta-status-2026-09-24.md). The paid service and persistent disk are deployed; real-user native intake remains switched off. The steps below are the original migration control map and do not themselves authorise a public switch.
 
 ## One controlled record location
 
