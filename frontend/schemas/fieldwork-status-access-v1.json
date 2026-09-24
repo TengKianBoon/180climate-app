@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/fieldwork-status-access-v1.json",
+  "title": "180Climate Fieldwork private status access",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reference", "status_key"],
+  "properties": {
+    "reference": {"type": "string", "pattern": "^F[RP]-[A-F0-9]{10}$"},
+    "status_key": {"type": "string", "minLength": 20, "writeOnly": true}
+  }
+}

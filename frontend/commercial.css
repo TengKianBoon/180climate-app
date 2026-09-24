@@ -1,0 +1,37 @@
+.commercial-hero h1 { font-size: clamp(2.2rem, 6vw, 4.7rem); }
+.offers-section { padding-bottom: 3rem; }
+.eyebrow.dark { color: var(--forest-700); }
+.offer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.1rem; }
+.offer-card {
+  position: relative; display: flex; flex-direction: column; min-width: 0;
+  padding: clamp(1.35rem, 3vw, 2rem); border: 1px solid var(--line);
+  border-radius: var(--radius-md); background: var(--paper); box-shadow: 0 12px 34px rgba(9,44,26,.07);
+}
+.offer-card.featured { border: 2px solid var(--leaf); }
+.offer-card.featured::before {
+  content: "Best first paid step"; position: absolute; right: 1.25rem; top: -13px;
+  padding: .28rem .65rem; border-radius: 99px; background: var(--leaf); color: #071a0e;
+  font-size: .72rem; font-weight: 850;
+}
+.offer-label { margin: 0 0 .7rem; color: var(--forest-700); font-size: .75rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+.offer-card h3 { min-height: 2.4em; margin: 0; font-size: clamp(1.35rem, 2.5vw, 1.9rem); }
+.price { margin: 1rem 0 0; color: var(--forest-950); font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 850; letter-spacing: -.055em; line-height: 1; }
+.price span { font-size: .42em; letter-spacing: -.02em; vertical-align: top; }
+.price.from span { font-size: .45em; vertical-align: middle; }
+.price-note { margin: .35rem 0 1rem; color: var(--muted); font-size: .8rem; }
+.offer-card > p:not(.offer-label):not(.price):not(.price-note):not(.boundary) { color: var(--muted); }
+.offer-card ul { flex: 1; margin: .5rem 0 1.35rem; padding-left: 1.2rem; }
+.offer-card li { margin: .38rem 0; }
+.offer-card .button { width: 100%; border: 0; }
+.offer-card .button.quiet { border: 2px solid var(--line); }
+.boundary { margin: 1rem 0 0; padding-top: .9rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .78rem; }
+.approval-panel { margin-top: 1.2rem; padding: 1rem 1.15rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: white; }
+.approval-panel .check { margin: 0; }
+.checkout-message { min-height: 1.5em; margin: .7rem 0 0; color: var(--forest-700); font-weight: 700; }
+.checkout-message.error { color: var(--danger); }
+.process-section { padding-top: 2rem; }
+.boundary-section { margin-bottom: 2rem; padding: clamp(1.5rem, 5vw, 3rem); border-radius: var(--radius-lg); background: #e7eee8; }
+@media (max-width: 760px) {
+  .offer-grid { grid-template-columns: 1fr; }
+  .offer-card h3 { min-height: 0; }
+}

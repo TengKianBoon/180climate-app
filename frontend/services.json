@@ -1,18 +1,42 @@
 {
-  "catalogue_version": "1.0.0",
+  "$schema": "/schemas/agent-service-catalogue-v1.json",
+  "catalogue_version": "1.2.0",
   "updated_at": "2026-09-11",
+  "provider": {
+    "legal_name": "180Climate Pte Ltd",
+    "website": "https://www.180climate.net/"
+  },
+  "discovery": {
+    "canonical_url": "/.well-known/180climate-services.json",
+    "openapi_url": "/openapi.json",
+    "human_docs_url": "/docs",
+    "commercial_catalogue_url": "/.well-known/180climate-commercial.json"
+  },
+  "agent_policy": {
+    "authorised_agent_only": true,
+    "meaning": "An agent may act only for a user who has authority over the submitted data and requested action.",
+    "annotations_are_hints": true,
+    "approval_rule": "Obtain the user's explicit approval immediately before any action that sends a message, stores personal data, discloses contact details, creates a report delivery, accepts terms, contracts, pays, dispatches or makes a regulated conclusion.",
+    "never_autonomous": [
+      "Accept a contract or platform terms for a person or organisation",
+      "Make or receive a payment",
+      "Approve site access or dispatch field personnel",
+      "Disclose private contact or precise-site data",
+      "Issue a legal, EUDR, professional, financial, investment or registry-grade conclusion"
+    ]
+  },
   "services": [
     {
       "service_id": "fieldwork.match_intro.v1",
       "version": "1",
       "name": "180Climate Fieldwork Network",
-      "description": "Private matching and consent-controlled introductions for authorised, low-risk fieldwork support in Indonesia.",
-      "status": "live_invited_pilot",
-      "intake_mode": "external_private_wix_review",
+      "description": "Open public registration, transparent human review and consent-controlled introductions for authorised, low-risk fieldwork support in Indonesia.",
+      "status": "open_public_beta",
+      "intake_mode": "external_wix_registration",
       "intake_url": "https://www.180climate.net/fieldwork-pilot-draft",
       "regions": ["Indonesia"],
       "eligibility": [
-        "Invited requester or provider",
+        "Any requester or service provider may register",
         "Authorised, non-invasive and non-hazardous work",
         "No regulated conclusion without an accountable qualified provider"
       ],
@@ -24,11 +48,13 @@
         "Separate matching and contact-process choices"
       ],
       "input_schema_url": "/schemas/fieldwork-request-v1.json",
+      "provider_input_schema_url": "/schemas/fieldwork-provider-v1.json",
       "output_schema_url": "/schemas/fieldwork-status-v1.json",
       "limitations": [
-        "Applications are currently received and reviewed through the private 180Climate Wix form; this service does not issue a native status key for those submissions",
+        "Registrations are currently received and reviewed through the 180Climate Wix form; this service does not issue a native status key for those submissions",
+        "Profiles, contact details, requests and precise sites are not publicly listed or searchable",
         "A match is not a booking, dispatch, site-access approval, endorsement or professional certification",
-        "The pilot does not process payments or collect bank or card details",
+        "The public beta does not process payments or collect bank or card details",
         "Contact is not revealed until both named parties consent and an operator confirms the introduction"
       ],
       "approval_points": [
@@ -37,9 +63,83 @@
         "Introduction",
         "Site access and any direct agreement"
       ],
-      "price_status": "free_private_pilot",
-      "terms_url": "/fieldwork#pilot-terms",
+      "price_status": "free_open_public_beta",
+      "terms_url": "/fieldwork#beta-terms",
       "privacy_url": "/fieldwork#privacy-notice",
+      "agent_procurement": {
+        "readiness": "human_handoff_live_machine_intake_staged",
+        "summary": "Agents can discover and evaluate the service. Live registration currently hands off to Wix; the typed native registration and status interface remains fail-closed until its privacy, datastore, operator-access and deployment controls pass.",
+        "actions": [
+          {
+            "action_id": "open_human_registration",
+            "transport": "web",
+            "url": "https://www.180climate.net/fieldwork-pilot-draft",
+            "requires_immediate_user_approval": true,
+            "side_effects": ["stores_personal_data", "creates_registration", "notifies_180climate"],
+            "annotations": {
+              "readOnlyHint": false,
+              "destructiveHint": false,
+              "idempotentHint": false,
+              "openWorldHint": true
+            }
+          },
+          {
+            "action_id": "register_native_request_staged",
+            "transport": "openapi",
+            "operation_id": "registerFieldworkRequest",
+            "method": "POST",
+            "url": "/api/fieldwork/requests",
+            "input_schema_url": "/schemas/fieldwork-request-v1.json",
+            "output_schema_url": "/schemas/fieldwork-status-v1.json",
+            "availability": "fail_closed_until_launch_controls_pass",
+            "requires_immediate_user_approval": true,
+            "side_effects": ["stores_personal_data", "creates_registration"],
+            "annotations": {
+              "readOnlyHint": false,
+              "destructiveHint": false,
+              "idempotentHint": true,
+              "openWorldHint": false
+            }
+          },
+          {
+            "action_id": "register_native_provider_staged",
+            "transport": "openapi",
+            "operation_id": "registerFieldworkProvider",
+            "method": "POST",
+            "url": "/api/fieldwork/providers",
+            "input_schema_url": "/schemas/fieldwork-provider-v1.json",
+            "output_schema_url": "/schemas/fieldwork-status-v1.json",
+            "availability": "fail_closed_until_launch_controls_pass",
+            "requires_immediate_user_approval": true,
+            "side_effects": ["stores_personal_data", "creates_registration"],
+            "annotations": {
+              "readOnlyHint": false,
+              "destructiveHint": false,
+              "idempotentHint": true,
+              "openWorldHint": false
+            }
+          },
+          {
+            "action_id": "read_native_status",
+            "transport": "openapi",
+            "operation_id": "getFieldworkPrivateStatus",
+            "method": "POST",
+            "url": "/api/fieldwork/status",
+            "input_schema_url": "/schemas/fieldwork-status-access-v1.json",
+            "output_schema_url": "/schemas/fieldwork-status-v1.json",
+            "availability": "available_only_for_native_registration_receipts",
+            "requires_immediate_user_approval": true,
+            "side_effects": ["reads_private_status"],
+            "annotations": {
+              "readOnlyHint": true,
+              "destructiveHint": false,
+              "idempotentHint": true,
+              "openWorldHint": false
+            }
+          }
+        ],
+        "blocked_autonomous_actions": ["matching decision", "contact disclosure", "introduction", "site access", "contract", "payment", "dispatch"]
+      },
       "updated_at": "2026-09-11"
     },
     {
@@ -50,17 +150,43 @@
       "status": "available",
       "regions": ["Indonesia"],
       "eligibility": ["EUDR-relevant commodity and role", "Plot location or geometry"],
-      "required_inputs": ["Commodity", "Role", "Plot geometry", "Contact for a detailed request"],
-      "input_schema_url": "/docs",
-      "output_schema_url": "/docs",
+      "required_inputs": ["Commodity", "Role", "Plot geometry", "Authorised contact"],
+      "input_schema_url": "/schemas/eudr-plot-screen-input-v1.json",
+      "output_schema_url": "/schemas/eudr-plot-screen-output-v1.json",
       "limitations": [
         "Screening can be unknown or inconclusive",
-        "The result is not an official due-diligence statement or legal clearance"
+        "The result is not an official due-diligence statement or legal clearance",
+        "The current screening operation also sends a lead notification to 180Climate"
       ],
-      "approval_points": ["Detailed request submission", "Professional or legal reliance"],
+      "approval_points": ["Screening and lead submission", "Professional or legal reliance"],
       "price_status": "free_early_screen",
       "terms_url": "https://www.180climate.net/",
       "privacy_url": "https://www.180climate.net/",
+      "agent_procurement": {
+        "readiness": "guarded_user_authorised_action",
+        "summary": "Machine-callable, but the current call has an external communication side effect and is not safe for unattended discovery or speculative execution.",
+        "actions": [
+          {
+            "action_id": "screen_plots_and_notify",
+            "transport": "openapi",
+            "operation_id": "screenEudrPlotsAndNotify",
+            "method": "POST",
+            "url": "/api/eudr",
+            "content_type": "multipart/form-data",
+            "input_schema_url": "/schemas/eudr-plot-screen-input-v1.json",
+            "output_schema_url": "/schemas/eudr-plot-screen-output-v1.json",
+            "requires_immediate_user_approval": true,
+            "side_effects": ["processes_contact_data", "processes_plot_geometry", "emails_180climate"],
+            "annotations": {
+              "readOnlyHint": false,
+              "destructiveHint": false,
+              "idempotentHint": false,
+              "openWorldHint": true
+            }
+          }
+        ],
+        "blocked_autonomous_actions": ["due diligence statement", "legal clearance", "supplier approval", "shipment decision", "contract", "payment"]
+      },
       "updated_at": "2026-09-11"
     },
     {
@@ -71,17 +197,43 @@
       "status": "available",
       "regions": ["Indonesia"],
       "eligibility": ["Authorised land or concession assessment", "Required location and permit information"],
-      "required_inputs": ["Contact", "Location or geometry", "Permit and project information"],
-      "input_schema_url": "/docs",
-      "output_schema_url": "/docs",
+      "required_inputs": ["Authorised contact", "Location or geometry", "Permit and project information"],
+      "input_schema_url": "/schemas/carbon-pre-fs-input-v1.json",
+      "output_schema_url": "/schemas/carbon-pre-fs-output-v1.json",
       "limitations": [
         "Preliminary screening, not a bankable study, valuation or investment recommendation",
-        "Assumptions, missing evidence and expert-review needs remain material"
+        "Assumptions, missing evidence and expert-review needs remain material",
+        "The unclassified 'other' project route can send a lead notification and is not a read-only calculation"
       ],
-      "approval_points": ["Detailed report request", "Professional, financial or investment reliance"],
+      "approval_points": ["Use of authorised land and contact data", "Detailed report request", "Professional, financial or investment reliance"],
       "price_status": "free_early_screen",
       "terms_url": "https://www.180climate.net/",
       "privacy_url": "https://www.180climate.net/",
+      "agent_procurement": {
+        "readiness": "guarded_screening",
+        "summary": "Machine-callable for the declared REDD, IFM and peat screening routes. The 'other' route can create an external lead and needs immediate user approval.",
+        "actions": [
+          {
+            "action_id": "screen_pre_feasibility",
+            "transport": "openapi",
+            "operation_id": "screenCarbonPreFeasibility",
+            "method": "POST",
+            "url": "/api/carbon",
+            "content_type": "application/json",
+            "input_schema_url": "/schemas/carbon-pre-fs-input-v1.json",
+            "output_schema_url": "/schemas/carbon-pre-fs-output-v1.json",
+            "requires_immediate_user_approval": true,
+            "side_effects": ["processes_contact_data", "processes_land_geometry", "may_query_external_datasets", "other_route_may_email_180climate"],
+            "annotations": {
+              "readOnlyHint": false,
+              "destructiveHint": false,
+              "idempotentHint": false,
+              "openWorldHint": true
+            }
+          }
+        ],
+        "blocked_autonomous_actions": ["bankable study", "valuation", "investment recommendation", "registry submission", "contract", "payment"]
+      },
       "updated_at": "2026-09-11"
     }
   ]

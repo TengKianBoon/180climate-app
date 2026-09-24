@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from api.fieldwork import public_config
 from scripts.fieldwork_db import backup, restore
 
 
@@ -16,12 +17,11 @@ client = TestClient(app)
 
 
 @pytest.fixture()
-def pilot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+def public_beta(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     db_path = tmp_path / "private" / "fieldwork.sqlite3"
     values = {
         "FIELDWORK_ACCEPTING_SUBMISSIONS": "true",
         "FIELDWORK_DB_PATH": str(db_path),
-        "FIELDWORK_INVITE_CODE": "synthetic-invite-only",
         "FIELDWORK_OPERATOR_TOKEN": "synthetic-operator-only",
         "FIELDWORK_PUBLIC_ORIGIN": "https://fieldwork.example.invalid",
         "FIELDWORK_CONTROLLER_NAME": "Synthetic Controller Pte Ltd",
@@ -45,9 +45,21 @@ def pilot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     return db_path
 
 
+def test_controller_deferral_is_explicit_not_counsel_approval(public_beta, monkeypatch):
+    monkeypatch.delenv("FIELDWORK_COUNSEL_APPROVAL_ID", raising=False)
+    monkeypatch.setenv("FIELDWORK_LEGAL_REVIEW_STATUS", "deferred_by_controller")
+    config = public_config()
+    assert config["accepting_submissions"] is False
+    assert config["legal_review_status"] == "not_recorded"
+
+    monkeypatch.setenv("FIELDWORK_LEGAL_REVIEW_RECORD", "synthetic-owner-decision-2026-09-24")
+    config = public_config()
+    assert config["accepting_submissions"] is True
+    assert config["legal_review_status"] == "deferred_by_controller"
+
+
 def request_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
-        "invitation_code": "synthetic-invite-only",
         "idempotency_key": "request-idempotency-0001",
         "name": "Synthetic Requester",
         "contact_kind": "email",
@@ -79,13 +91,11 @@ def request_payload(**overrides: object) -> dict[str, object]:
 
 def provider_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
-        "invitation_code": "synthetic-invite-only",
         "idempotency_key": "provider-idempotency-0001",
         "name": "Synthetic Provider",
         "contact_kind": "email",
         "contact": "provider@example.invalid",
         "locale": "en",
-        "invitation_source": "Synthetic pilot invitation",
         "original_text": "I provide authorised property photography and structured condition checklists.",
         "role_title": "Field documentation specialist",
         "services": "Exterior property photographs and non-invasive condition checklists",
@@ -117,9 +127,12 @@ def operator_headers() -> dict[str, str]:
 def test_public_pages_catalogue_and_security_headers() -> None:
     page = client.get("/fieldwork")
     assert page.status_code == 200
-    assert "Fieldwork support, matched privately" in page.text
+    assert "Find a field professional for real-world work" in page.text
+    assert "Open public beta" in page.text
+    assert "Transparent criteria. Human review. Choice on both sides." in page.text
+    assert "without an invitation code" in page.text
     assert page.text.count('data-wix-intake href="https://www.180climate.net/fieldwork-pilot-draft"') == 3
-    assert 'id="pilot-banner" data-state="loading" data-intake="wix"' in page.text
+    assert 'id="service-banner" data-state="loading" data-intake="wix"' in page.text
     assert "Preview only" not in page.text
     assert '/fieldwork-assets/fieldwork.js?v=4' in page.text
     script = (Path(__file__).parents[1] / "frontend" / "fieldwork.js").read_text(encoding="utf-8")
@@ -137,8 +150,8 @@ def test_public_pages_catalogue_and_security_headers() -> None:
     assert catalogue.status_code == 200
     services = {item["service_id"]: item for item in catalogue.json()["services"]}
     assert set(services) == {"fieldwork.match_intro.v1", "eudr.plot_screen.v1", "carbon.pre_fs.v1"}
-    assert services["fieldwork.match_intro.v1"]["status"] == "live_invited_pilot"
-    assert services["fieldwork.match_intro.v1"]["intake_mode"] == "external_private_wix_review"
+    assert services["fieldwork.match_intro.v1"]["status"] == "open_public_beta"
+    assert services["fieldwork.match_intro.v1"]["intake_mode"] == "external_wix_registration"
     assert services["fieldwork.match_intro.v1"]["intake_url"] == "https://www.180climate.net/fieldwork-pilot-draft"
     assert client.get("/schemas/fieldwork-request-v1.json").status_code == 200
     assert client.get("/schemas/not-allowed.json").status_code == 404
@@ -147,27 +160,26 @@ def test_public_pages_catalogue_and_security_headers() -> None:
 def test_intake_fails_closed_without_launch_configuration(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("FIELDWORK_DB_PATH", str(tmp_path / "closed.sqlite3"))
     monkeypatch.setenv("FIELDWORK_ACCEPTING_SUBMISSIONS", "false")
-    monkeypatch.delenv("FIELDWORK_INVITE_CODE", raising=False)
     response = client.post("/api/fieldwork/requests", json=request_payload())
     assert response.status_code == 503
-    assert response.json()["detail"]["code"] == "pilot_closed"
+    assert response.json()["detail"]["code"] == "registration_closed"
     assert not (tmp_path / "closed.sqlite3").exists()
 
 
-def test_intake_stays_closed_when_an_approved_notice_version_is_missing(
-    pilot: Path, monkeypatch: pytest.MonkeyPatch
+def test_intake_stays_closed_when_a_published_notice_version_is_missing(
+    public_beta: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("FIELDWORK_PRIVACY_VERSION")
     config = client.get("/api/fieldwork/config").json()
     assert config["accepting_submissions"] is False
-    assert "approved privacy notice version" in config["launch_gaps"]
+    assert "published privacy notice version" in config["launch_gaps"]
     response = client.post("/api/fieldwork/requests", json=request_payload())
     assert response.status_code == 503
-    assert not pilot.exists()
+    assert not public_beta.exists()
 
 
-def test_initial_pilot_cap_applies_to_distinct_contacts(
-    pilot: Path, monkeypatch: pytest.MonkeyPatch
+def test_public_beta_cap_applies_to_distinct_contacts(
+    public_beta: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("FIELDWORK_PILOT_CAP", "1")
     first = client.post("/api/fieldwork/requests", json=request_payload())
@@ -177,19 +189,19 @@ def test_initial_pilot_cap_applies_to_distinct_contacts(
         json=provider_payload(contact="second-provider@example.invalid", idempotency_key="provider-cap-test-0001"),
     )
     assert second.status_code == 409
-    assert second.json()["detail"]["code"] == "pilot_full"
+    assert second.json()["detail"]["code"] == "registration_full"
 
 
-def test_request_submission_is_auditable_and_status_key_is_not_stored(pilot: Path) -> None:
+def test_request_submission_is_auditable_and_status_key_is_not_stored(public_beta: Path) -> None:
     response = client.post("/api/fieldwork/requests", json=request_payload())
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["reference"].startswith("FR-")
     assert body["status"] == "submitted"
     assert body["status_key"]
-    assert body["status_key"].encode() not in pilot.read_bytes()
+    assert body["status_key"].encode() not in public_beta.read_bytes()
 
-    with sqlite3.connect(pilot) as conn:
+    with sqlite3.connect(public_beta) as conn:
         assert conn.execute("SELECT COUNT(*) FROM principals").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM work_requests").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM consents").fetchone()[0] == 3
@@ -205,13 +217,13 @@ def test_request_submission_is_auditable_and_status_key_is_not_stored(pilot: Pat
     assert "contact" not in json.dumps(status.json()).lower()
 
 
-def test_duplicate_submission_does_not_create_second_record(pilot: Path) -> None:
+def test_duplicate_submission_does_not_create_second_record(public_beta: Path) -> None:
     first = client.post("/api/fieldwork/requests", json=request_payload()).json()
     second = client.post("/api/fieldwork/requests", json=request_payload()).json()
     assert second["duplicate"] is True
     assert second["reference"] == first["reference"]
     assert second["status_key"] is None
-    with sqlite3.connect(pilot) as conn:
+    with sqlite3.connect(public_beta) as conn:
         assert conn.execute("SELECT COUNT(*) FROM work_requests").fetchone()[0] == 1
 
 
@@ -224,7 +236,7 @@ def test_duplicate_submission_does_not_create_second_record(pilot: Path) -> None
         ({"restricted_status": "yes"}, "restricted"),
     ],
 )
-def test_risky_or_unconfirmed_request_is_blocked(pilot: Path, overrides: dict[str, str], reason: str) -> None:
+def test_risky_or_unconfirmed_request_is_blocked(public_beta: Path, overrides: dict[str, str], reason: str) -> None:
     payload = request_payload(**overrides, idempotency_key=f"blocked-{reason}-0001")
     body = client.post("/api/fieldwork/requests", json=payload).json()
     assert body["status"] == "blocked"
@@ -235,11 +247,7 @@ def test_risky_or_unconfirmed_request_is_blocked(pilot: Path, overrides: dict[st
     assert reason in status["block_reason"].lower()
 
 
-def test_invitation_consent_spam_and_mass_assignment_are_enforced(pilot: Path) -> None:
-    bad_invite = client.post(
-        "/api/fieldwork/requests", json=request_payload(invitation_code="wrong-code")
-    )
-    assert bad_invite.status_code == 403
+def test_consent_spam_and_mass_assignment_are_enforced(public_beta: Path) -> None:
     missing_consent = client.post(
         "/api/fieldwork/requests",
         json=request_payload(matching_consent=False, idempotency_key="missing-consent-0001"),
@@ -257,7 +265,7 @@ def test_invitation_consent_spam_and_mass_assignment_are_enforced(pilot: Path) -
     assert extra.status_code == 422
 
 
-def test_operator_queue_hides_contacts_by_default(pilot: Path) -> None:
+def test_operator_queue_hides_contacts_by_default(public_beta: Path) -> None:
     client.post("/api/fieldwork/requests", json=request_payload())
     assert client.get("/api/fieldwork/operator/queue").status_code == 401
     queue = client.get("/api/fieldwork/operator/queue", headers=operator_headers())
@@ -269,7 +277,7 @@ def test_operator_queue_hides_contacts_by_default(pilot: Path) -> None:
     assert revealed["requests"][0]["contact"] == "requester@example.invalid"
 
 
-def test_two_party_consent_is_required_before_contact_disclosure(pilot: Path) -> None:
+def test_two_party_consent_is_required_before_contact_disclosure(public_beta: Path) -> None:
     request = client.post("/api/fieldwork/requests", json=request_payload()).json()
     provider = client.post("/api/fieldwork/providers", json=provider_payload()).json()
 
@@ -336,31 +344,53 @@ def test_two_party_consent_is_required_before_contact_disclosure(pilot: Path) ->
     assert final.json()["disclosure"]["provider"]["contact_value"] == "provider@example.invalid"
 
 
-def test_same_principal_can_hold_both_roles(pilot: Path) -> None:
+def test_same_principal_can_hold_both_roles(public_beta: Path) -> None:
     client.post("/api/fieldwork/requests", json=request_payload())
     response = client.post(
         "/api/fieldwork/providers",
         json=provider_payload(contact="requester@example.invalid"),
     )
     assert response.status_code == 200, response.text
-    with sqlite3.connect(pilot) as conn:
+    with sqlite3.connect(public_beta) as conn:
         assert conn.execute("SELECT COUNT(*) FROM principals").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM requester_profiles").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM provider_profiles").fetchone()[0] == 1
 
 
-def test_backup_restore_rehearsal_uses_synthetic_database(pilot: Path, tmp_path: Path) -> None:
+def test_invited_schema_migrates_to_open_registration(public_beta: Path) -> None:
+    assert client.post("/api/fieldwork/requests", json=request_payload()).status_code == 200
+    with sqlite3.connect(public_beta) as conn:
+        conn.execute(
+            "ALTER TABLE provider_profiles RENAME COLUMN registration_source TO invitation_source"
+        )
+        conn.execute("UPDATE schema_meta SET value='1' WHERE key='schema_version'")
+
+    response = client.post("/api/fieldwork/providers", json=provider_payload())
+    assert response.status_code == 200, response.text
+    with sqlite3.connect(public_beta) as conn:
+        columns = {
+            str(row[1]) for row in conn.execute("PRAGMA table_info(provider_profiles)").fetchall()
+        }
+        assert "registration_source" in columns
+        assert "invitation_source" not in columns
+        assert conn.execute("SELECT registration_source FROM provider_profiles").fetchone()[0] == (
+            "open_public_registration"
+        )
+        assert conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0] == "2"
+
+
+def test_backup_restore_rehearsal_uses_synthetic_database(public_beta: Path, tmp_path: Path) -> None:
     client.post("/api/fieldwork/requests", json=request_payload())
     copy = tmp_path / "backup" / "fieldwork-backup.sqlite3"
     restored = tmp_path / "restore" / "fieldwork-restored.sqlite3"
-    backup(pilot, copy)
+    backup(public_beta, copy)
     restore(copy, restored, confirmed=True)
     with sqlite3.connect(restored) as conn:
-        assert conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0] == "1"
+        assert conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0] == "2"
         assert conn.execute("SELECT COUNT(*) FROM work_requests").fetchone()[0] == 1
 
 
-def test_wrong_or_expired_style_status_access_does_not_enumerate(pilot: Path) -> None:
+def test_wrong_or_expired_style_status_access_does_not_enumerate(public_beta: Path) -> None:
     body = client.post("/api/fieldwork/requests", json=request_payload()).json()
     wrong = client.post(
         "/api/fieldwork/status",

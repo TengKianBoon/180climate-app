@@ -54,3 +54,12 @@ Production deployment, real message delivery, persistent-volume durability, back
 ## Remaining pilot evidence
 
 The current free/Wix arrangement can receive invited applications for manual review, but the requester/provider choice should be made mandatory before the form is treated as enforcing that distinction. The arrangement does not prove automated contact verification, native reference/status delivery, persistent datastore durability, email notification delivery, deletion propagation, production database recovery, counsel approval, or adoption outcomes. Those controls must not be claimed from the synthetic native-workflow tests.
+
+## Open public-beta implementation — PASS locally, publication pending
+
+- Decision recorded: open public registration with transparent criteria; personal records and precise sites remain non-public; introductions require two-party consent; direct contracts and payments; no 180Climate employer, employment-agency, dispatch, payment-custody or guarantee role.
+- Removed invitation-code and referral-source requirements from the page, API models and public schemas.
+- Reframed the service as **Open Public Beta**, added a bilingual four-step process and made the fit/safety criteria visible.
+- Preserved the registration cap, human review, safety/authority blocks, non-public operator queue, status-key protection, disclosure preview and two-party consent controls.
+- Native production intake remains fail-closed behind datastore, privacy, retention, processor, Bahasa, counsel and company approval configuration.
+- Wix, GitHub and Render publication remain a separate consequential checkpoint; this local PASS does not claim they are updated.

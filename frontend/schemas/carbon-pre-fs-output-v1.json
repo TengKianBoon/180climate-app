@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/carbon-pre-fs-output-v1.json",
+  "title": "180Climate carbon pre-feasibility output",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["engine", "verdict", "summary", "map", "narrative", "disclaimer", "carrot", "data_sources"],
+      "properties": {
+        "engine": {"const": "carbon"},
+        "verdict": {"type": "string"},
+        "summary": {"type": "string"},
+        "map": {"type": "object"},
+        "narrative": {"type": "string"},
+        "disclaimer": {
+          "type": "object",
+          "required": ["text", "kind"],
+          "properties": {"text": {"type": "string"}, "kind": {"const": "carbon_non_binding"}}
+        },
+        "carrot": {"type": "string"},
+        "data_sources": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    {
+      "type": "object",
+      "required": ["engine", "verdict", "apology", "cta", "lead_captured"],
+      "properties": {
+        "engine": {"const": "out_of_scope"},
+        "verdict": {"const": "out_of_scope"},
+        "apology": {"type": "string"},
+        "cta": {"type": "string"},
+        "lead_captured": {"const": true}
+      }
+    }
+  ]
+}

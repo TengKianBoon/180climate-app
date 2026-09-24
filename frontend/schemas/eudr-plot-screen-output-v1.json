@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/eudr-plot-screen-output-v1.json",
+  "title": "180Climate EUDR plot-screen output",
+  "type": "object",
+  "required": [
+    "engine", "overall", "overall_headline", "plot_count", "loss_count", "clear_count",
+    "inconclusive_count", "invalid_count", "plots", "country_benchmark_risk", "datasets_version",
+    "run_date", "legality_note", "footer", "readiness", "commodity_evidence", "who_files",
+    "indonesia_context", "geolocation_pack_geojson"
+  ],
+  "properties": {
+    "engine": {"const": "eudr"},
+    "overall": {"enum": ["clear_in_screen", "loss_detected", "review_needed"]},
+    "overall_headline": {"type": "string"},
+    "plot_count": {"type": "integer", "minimum": 1},
+    "loss_count": {"type": "integer", "minimum": 0},
+    "clear_count": {"type": "integer", "minimum": 0},
+    "inconclusive_count": {"type": "integer", "minimum": 0},
+    "invalid_count": {"type": "integer", "minimum": 0},
+    "plots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["plot_id", "detection", "label", "detail", "action", "area_ha", "plot_satellite_risk", "geometry_ok", "loss_after_2020_ha", "run_date", "datasets_version"],
+        "properties": {
+          "plot_id": {"type": "string"},
+          "detection": {"enum": ["clear_in_screen", "loss_detected", "inconclusive", "geometry_invalid"]},
+          "label": {"type": "string"},
+          "detail": {"type": "string"},
+          "action": {"type": "string"},
+          "area_ha": {"type": "number", "minimum": 0},
+          "plot_satellite_risk": {"enum": ["low", "high", "inconclusive"]},
+          "geometry_ok": {"type": "boolean"},
+          "loss_after_2020_ha": {"type": "number", "minimum": 0},
+          "run_date": {"type": "string", "format": "date"},
+          "datasets_version": {"type": "string"}
+        }
+      }
+    },
+    "country_benchmark_risk": {"enum": ["low", "standard", "high"]},
+    "datasets_version": {"type": "string"},
+    "run_date": {"type": "string", "format": "date"},
+    "legality_note": {"type": "string"},
+    "timber_note": {"type": ["string", "null"]},
+    "jrc_attribution": {"type": "string"},
+    "footer": {"type": "string"},
+    "how_checked_url": {"type": "string"},
+    "readiness": {"type": "array"},
+    "commodity_evidence": {},
+    "who_files": {},
+    "indonesia_context": {},
+    "geolocation_pack_geojson": {"type": "object"}
+  }
+}

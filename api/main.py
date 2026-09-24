@@ -2,7 +2,8 @@
 
 Routes:
   GET  /               → serves frontend/index.html
-  GET  /fieldwork      → invited-pilot landing and intake
+  GET  /commercial     → fixed-scope professional services and checkout status
+  GET  /fieldwork      → open public-beta landing and controlled intake
   GET  /fieldwork/status → private status lookup
   GET  /fieldwork/operator → private operator console shell
   GET  /services.json  → public service catalogue
@@ -16,6 +17,7 @@ Run locally:
 """
 from __future__ import annotations
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,13 +45,37 @@ from core.geo import parse_geo
 from core.forest import query_forest_data
 from engines.carbon.engine import run_carbon_engine, run_mixed_stratification
 from narrative.narrator import generate_narrative
+from api.commercial import commercial_catalogue_payload, router as commercial_router
 from api.email import send_lead_email
 from api.fieldwork import router as fieldwork_router
+from api.intake import (
+    IntakeStorageError,
+    capture_submission,
+    router as intake_router,
+)
 from api.sheets import append_lead
 from reports.generator import generate_pdf, generate_docx, generate_eudr_pdf, ReportData, make_filename
 
-app = FastAPI(title="180Climate Pre-FS API", version="0.1.0-slice")
+app = FastAPI(
+    title="180Climate Screening and Fieldwork API",
+    version="0.3.0",
+    description=(
+        "Machine-readable interfaces for indicative EUDR and carbon screening plus "
+        "the consent-controlled Fieldwork Network. Consult /services.json before "
+        "calling an operation: it declares authority, side effects and human gates."
+    ),
+    openapi_tags=[
+        {"name": "discovery", "description": "Public service discovery and schemas."},
+        {"name": "screening", "description": "Indicative decision support; never a regulated conclusion."},
+        {"name": "delivery", "description": "Creates reports or external communications and requires user authority."},
+        {"name": "commercial", "description": "Fail-closed paid-service catalogue and Stripe-hosted checkout handoff."},
+        {"name": "fieldwork", "description": "Controlled registration, status and human introduction workflow."},
+        {"name": "intake", "description": "Private, operator-controlled Carbon and EUDR submission registry."},
+    ],
+)
 app.include_router(fieldwork_router)
+app.include_router(commercial_router)
+app.include_router(intake_router)
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 _DISCLAIMER_TEXT = (
@@ -184,14 +210,18 @@ def _deliver(
     form_data: dict,
     pdf_bytes: bytes,
     filename_base: str,
-) -> None:
-    """Fire-and-forget: email + Sheet append. Errors are logged, never raised."""
-    send_lead_email(
-        iup_name=form_data.get("iup_name", "Lead"),
-        filename_base=filename_base,
-        form_data=form_data,
-        pdf_bytes=pdf_bytes,
-    )
+) -> dict[str, bool]:
+    """Attempt notification and Sheet append without overstating delivery."""
+    try:
+        email_result = send_lead_email(
+            iup_name=form_data.get("iup_name", "Lead"),
+            filename_base=filename_base,
+            form_data=form_data,
+            pdf_bytes=pdf_bytes,
+        )
+    except Exception:
+        log.exception("Lead notification attempt failed")
+        email_result = False
     row = {k: form_data.get(k, "") for k in [
         "timestamp", "iup_name", "name", "email", "mobile", "company",
         "permit_type", "permit_years_remaining", "project_type",
@@ -199,12 +229,56 @@ def _deliver(
         "verdict", "quantity_low_tco2e", "quantity_high_tco2e",
     ]}
     row["filename_base"] = filename_base
-    append_lead(row)
+    try:
+        sheet_result = append_lead(row)
+    except Exception:
+        log.exception("Lead Sheet append attempt failed")
+        sheet_result = False
+    return {
+        "notification_accepted": bool(
+            email_result and (os.environ.get("BREVO_API_KEY") or os.environ.get("EMAIL_HOST"))
+        ),
+        "sheet_appended": bool(sheet_result and os.environ.get("GOOGLE_SHEETS_ID")),
+    }
+
+
+def _capture_carbon_intake(
+    inp: CarbonInput,
+    boundary,  # type: ignore[no-untyped-def]
+    result: dict[str, Any],
+) -> str | None:
+    """Record the Carbon form without duplicating geometry into other JSON fields."""
+    form = inp.model_dump(mode="json")
+    contact = form.pop("contact")
+    form.pop("geo", None)
+    stored_result = dict(result)
+    stored_map = dict(stored_result.get("map") or {})
+    stored_map.pop("boundary_geojson", None)
+    if stored_map:
+        stored_result["map"] = stored_map
+    try:
+        return capture_submission(
+            application="carbon",
+            source_route="/api/carbon",
+            contact=contact,
+            form=form,
+            geometry_geojson=boundary.geojson if boundary is not None else None,
+            result=stored_result,
+        )
+    except IntakeStorageError as exc:
+        log.error("Required Carbon intake storage failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "intake_storage_unavailable",
+                "message": "Your information was not saved. Please try again later.",
+            },
+        ) from exc
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
-@app.get("/health")
+@app.get("/health", operation_id="getHealth", tags=["discovery"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
@@ -242,6 +316,11 @@ def fieldwork_page() -> HTMLResponse:
     return _fieldwork_html("fieldwork.html")
 
 
+@app.get("/commercial", response_class=HTMLResponse)
+def commercial_page() -> HTMLResponse:
+    return _fieldwork_html("commercial.html")
+
+
 @app.get("/fieldwork/status", response_class=HTMLResponse)
 def fieldwork_status_page() -> HTMLResponse:
     return _fieldwork_html("fieldwork-status.html", private=True)
@@ -252,7 +331,12 @@ def fieldwork_operator_page() -> HTMLResponse:
     return _fieldwork_html("fieldwork-operator.html", private=True)
 
 
-@app.get("/services.json")
+@app.get(
+    "/services.json",
+    operation_id="getServiceCatalogue",
+    tags=["discovery"],
+    summary="Discover services and guarded agent actions",
+)
 def services_catalogue() -> Response:
     path = _FRONTEND / "services.json"
     if not path.exists():
@@ -264,11 +348,45 @@ def services_catalogue() -> Response:
     )
 
 
-@app.get("/schemas/{schema_name}")
+@app.get(
+    "/.well-known/180climate-services.json",
+    operation_id="getWellKnownServiceCatalogue",
+    tags=["discovery"],
+    summary="Discover the 180Climate service catalogue at a stable well-known URL",
+)
+def well_known_services_catalogue() -> Response:
+    return services_catalogue()
+
+
+@app.get(
+    "/.well-known/180climate-commercial.json",
+    operation_id="getWellKnownCommercialCatalogue",
+    tags=["discovery"],
+    summary="Discover fixed-scope offers and guarded checkout actions",
+)
+def well_known_commercial_catalogue() -> JSONResponse:
+    return JSONResponse(
+        commercial_catalogue_payload(),
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get(
+    "/schemas/{schema_name}",
+    operation_id="getServiceSchema",
+    tags=["discovery"],
+)
 def service_schema(schema_name: str) -> Response:
     allowed = {
+        "agent-service-catalogue-v1.json",
+        "commercial-catalogue-v1.json",
+        "carbon-pre-fs-input-v1.json",
+        "carbon-pre-fs-output-v1.json",
+        "eudr-plot-screen-input-v1.json",
+        "eudr-plot-screen-output-v1.json",
         "fieldwork-request-v1.json",
         "fieldwork-provider-v1.json",
+        "fieldwork-status-access-v1.json",
         "fieldwork-status-v1.json",
     }
     if schema_name not in allowed:
@@ -303,6 +421,24 @@ def fieldwork_asset(asset_name: str) -> Response:
     )
 
 
+@app.get("/commercial-assets/{asset_name}")
+def commercial_asset(asset_name: str) -> Response:
+    allowed = {
+        "commercial.css": "text/css; charset=utf-8",
+        "commercial.js": "application/javascript; charset=utf-8",
+    }
+    if asset_name not in allowed:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    path = _FRONTEND / asset_name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return Response(
+        content=path.read_bytes(),
+        media_type=allowed[asset_name],
+        headers={"Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff"},
+    )
+
+
 _BRAND = Path(__file__).parent.parent / "brand"
 
 
@@ -324,7 +460,11 @@ def favicon() -> Response:
 
 # ── Carbon screening ──────────────────────────────────────────────────────────
 
-def _capture_out_of_scope_lead(inp: CarbonInput, classifier_result: Any, boundary: Any = None) -> None:
+def _capture_out_of_scope_lead(
+    inp: CarbonInput,
+    classifier_result: Any,
+    boundary: Any = None,
+) -> str | None:
     """Capture lead for out-of-scope submissions (email + Sheet, best-effort)."""
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
     filename_base = make_filename()
@@ -351,7 +491,19 @@ def _capture_out_of_scope_lead(inp: CarbonInput, classifier_result: Any, boundar
         "quantity_low_tco2e": None,
         "quantity_high_tco2e": None,
     }
+    reference = _capture_carbon_intake(
+        inp,
+        boundary,
+        {
+            "engine": "carbon",
+            "verdict": "out_of_scope",
+            "classifier_category": classifier_result.category,
+            "classifier_confidence": classifier_result.confidence,
+            "classifier_rationale": classifier_result.rationale,
+        },
+    )
     _deliver(form_data, b"", filename_base)
+    return reference
 
 
 def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
@@ -379,8 +531,8 @@ def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
             boundary = parse_geo(inp.geo)
         except Exception:
             pass
-        _capture_out_of_scope_lead(inp, classifier_result, boundary)
-        return JSONResponse(content={
+        reference = _capture_out_of_scope_lead(inp, classifier_result, boundary)
+        response = {
             "engine": "out_of_scope",
             "verdict": "out_of_scope",
             "verdict_label": "Out of scope — project does not match current screening criteria",
@@ -389,7 +541,10 @@ def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
             "cta_email": "info@180climate.net",
             "classifier_rationale": classifier_result.rationale,
             "lead_captured": True,
-        })
+        }
+        if reference:
+            response["submission_reference"] = reference
+        return JSONResponse(content=response)
 
     # Classified to known category (REDD / IFM / PEAT)
     classified_type = classifier_result.category
@@ -475,10 +630,33 @@ def _handle_other_project_type(inp: CarbonInput) -> JSONResponse:
         carrot=_CARROT,
         data_sources=forest.data_sources,
     )
-    return JSONResponse(content=result.model_dump())
+    response = result.model_dump(mode="json")
+    reference = _capture_carbon_intake(inp, boundary, response)
+    if reference:
+        response["submission_reference"] = reference
+    return JSONResponse(content=response)
 
 
-@app.post("/api/carbon", response_model=None)
+@app.post(
+    "/api/carbon",
+    response_model=None,
+    operation_id="screenCarbonPreFeasibility",
+    tags=["screening"],
+    summary="Run an indicative carbon pre-feasibility screen",
+    description=(
+        "Computes an indicative Tier 1 screen. It does not send a message for the "
+        "standard REDD, IFM or peat routes. An unclassified 'other' project can trigger "
+        "lead capture; agents must obtain user approval before using that route."
+    ),
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        }
+    },
+)
 def carbon(inp: CarbonInput) -> JSONResponse:
     if inp.project_type == "other":
         return _handle_other_project_type(inp)
@@ -538,7 +716,11 @@ def carbon(inp: CarbonInput) -> JSONResponse:
         carrot=_CARROT,
         data_sources=forest.data_sources,
     )
-    return JSONResponse(content=result.model_dump())
+    response = result.model_dump(mode="json")
+    reference = _capture_carbon_intake(inp, boundary, response)
+    if reference:
+        response["submission_reference"] = reference
+    return JSONResponse(content=response)
 
 
 # ── EUDR plot triage ─────────────────────────────────────────────────────────
@@ -926,7 +1108,25 @@ def _detect_eudr_fmt(filename: str) -> str:
     return "geojson"
 
 
-@app.post("/api/eudr", response_model=None)
+@app.post(
+    "/api/eudr",
+    response_model=None,
+    operation_id="screenEudrPlotsAndNotify",
+    tags=["screening", "delivery"],
+    summary="Screen EUDR plots and notify 180Climate",
+    description=(
+        "Runs indicative plot triage and sends an outbound lead email. This is not a "
+        "read-only operation and must only be called with explicit user authority."
+    ),
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        }
+    },
+)
 async def eudr_screen(
     file: Optional[UploadFile] = File(None),
     geojson_text: Optional[str] = Form(None),
@@ -1076,6 +1276,39 @@ async def eudr_screen(
         "quantity_low_tco2e":  None,
         "quantity_high_tco2e": None,
     }
+    stored_result = dict(body)
+    stored_result.pop("geolocation_pack_geojson", None)
+    try:
+        reference = capture_submission(
+            application="eudr",
+            source_route="/api/eudr",
+            contact={
+                "name": name,
+                "email": email,
+                "mobile": mobile or "",
+                "company": company or "",
+            },
+            form={
+                "commodity": commodity,
+                "role": role,
+                "input_format": fmt,
+                "upload_filename": file.filename if file is not None and file.filename else "",
+            },
+            geometry_geojson=body["geolocation_pack_geojson"],
+            result=stored_result,
+        )
+    except IntakeStorageError as exc:
+        log.error("Required EUDR intake storage failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "intake_storage_unavailable",
+                "message": "Your information was not saved. Please try again later.",
+            },
+        ) from exc
+    if reference:
+        body["submission_reference"] = reference
+        form_data["submission_reference"] = reference
     try:
         eudr_pdf_body = {
             **body,
@@ -1109,7 +1342,20 @@ class EudrReportRequest(BaseModel):
     commodity: str = ""
 
 
-@app.post("/api/eudr/report")
+@app.post(
+    "/api/eudr/report",
+    operation_id="createEudrReport",
+    tags=["delivery"],
+    summary="Create an EUDR screening PDF from a prior result",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }
+    },
+)
 def eudr_report(req: EudrReportRequest) -> Response:
     """Return an EUDR triage PDF for download.
 
@@ -1150,11 +1396,26 @@ class LeadRequest(BaseModel):
     geo: Optional[GeoInput] = None
 
 
-@app.post("/api/lead")
+@app.post(
+    "/api/lead",
+    operation_id="submitCarbonLead",
+    tags=["delivery"],
+    summary="Send a carbon enquiry to 180Climate",
+    description="Sends an external email and may append to the configured lead sheet. Requires immediate user approval.",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        }
+    },
+)
 def lead(req: LeadRequest) -> dict[str, Any]:
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
 
     pdf_bytes: bytes | None = None
+    boundary_for_storage = None
     filename_base = make_filename()
     form_data: dict = {
         "timestamp": ts,
@@ -1193,6 +1454,7 @@ def lead(req: LeadRequest) -> dict[str, Any]:
                 geo=req.geo,
             )
             boundary = parse_geo(req.geo)
+            boundary_for_storage = boundary
             forest   = query_forest_data(boundary)
             estimate = run_carbon_engine(carbon_inp, boundary, forest)
 
@@ -1216,13 +1478,72 @@ def lead(req: LeadRequest) -> dict[str, Any]:
         except Exception:
             pass  # best-effort PDF; email still sent without attachment
 
-    _deliver(form_data, pdf_bytes or b"", filename_base)
-    return {"status": "emailed", "timestamp": ts}
+    stored_form = req.model_dump(mode="json")
+    stored_form.pop("geo", None)
+    for contact_key in ("name", "email", "mobile", "company"):
+        stored_form.pop(contact_key, None)
+    try:
+        reference = capture_submission(
+            application="carbon",
+            source_route="/api/lead",
+            contact={
+                "name": req.name,
+                "email": req.email,
+                "mobile": req.mobile,
+                "company": req.company,
+            },
+            form=stored_form,
+            geometry_geojson=(
+                boundary_for_storage.geojson if boundary_for_storage is not None else None
+            ),
+            result={
+                "delivery_requested": True,
+                "verdict": form_data["verdict"],
+                "area_ha": form_data["area_ha"],
+                "quantity_low_tco2e": form_data["quantity_low_tco2e"],
+                "quantity_high_tco2e": form_data["quantity_high_tco2e"],
+            },
+        )
+    except IntakeStorageError as exc:
+        log.error("Required Carbon lead storage failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "intake_storage_unavailable",
+                "message": "Your information was not saved. Please try again later.",
+            },
+        ) from exc
+    delivery = _deliver(form_data, pdf_bytes or b"", filename_base)
+    response: dict[str, Any] = {
+        "status": "recorded" if reference else (
+            "accepted_for_delivery" if any(delivery.values()) else "delivery_unconfirmed"
+        ),
+        "notification_accepted": delivery["notification_accepted"],
+        "sheet_appended": delivery["sheet_appended"],
+        "timestamp": ts,
+    }
+    if reference:
+        response["submission_reference"] = reference
+    return response
 
 
 # ── Report download ───────────────────────────────────────────────────────────
 
-@app.post("/api/report")
+@app.post(
+    "/api/report",
+    operation_id="createAndDeliverCarbonReport",
+    tags=["delivery"],
+    summary="Create a carbon report and notify 180Climate",
+    description="Creates a report, sends an external email and may append to the configured lead sheet. Requires immediate user approval.",
+    openapi_extra={
+        "x-agent-tool-annotations": {
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": True,
+        }
+    },
+)
 def report(
     inp: CarbonInput,
     fmt: str = Query(default="pdf", pattern="^(pdf|docx)$"),

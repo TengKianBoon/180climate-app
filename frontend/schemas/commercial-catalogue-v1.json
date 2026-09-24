@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "/schemas/commercial-catalogue-v1.json",
+  "title": "180Climate commercial service catalogue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "catalogue_version", "updated_at", "provider", "currency",
+    "checkout_mode", "payment_processor", "payment_data_boundary",
+    "fieldwork_payment_status", "agent_rule", "offers"
+  ],
+  "properties": {
+    "$schema": {"const": "/schemas/commercial-catalogue-v1.json"},
+    "catalogue_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "updated_at": {"type": "string", "format": "date"},
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["legal_name", "website"],
+      "properties": {
+        "legal_name": {"const": "180Climate Pte Ltd"},
+        "website": {"type": "string", "format": "uri"}
+      }
+    },
+    "currency": {"const": "SGD"},
+    "checkout_mode": {"enum": ["off", "test", "live"]},
+    "payment_processor": {"type": "string"},
+    "payment_data_boundary": {"type": "string"},
+    "fieldwork_payment_status": {"type": "string"},
+    "agent_rule": {"type": "string", "minLength": 80},
+    "offers": {
+      "type": "array",
+      "minItems": 4,
+      "items": {"$ref": "#/$defs/offer"}
+    }
+  },
+  "$defs": {
+    "offer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "offer_id", "service_id", "name", "price_amount", "price_currency",
+        "price_type", "delivery", "scope", "exclusions", "checkout_availability",
+        "checkout_action", "requires_immediate_user_approval"
+      ],
+      "properties": {
+        "offer_id": {"type": "string"},
+        "service_id": {"type": "string"},
+        "name": {"type": "string"},
+        "price_amount": {"type": "integer", "minimum": 0},
+        "price_currency": {"const": "SGD"},
+        "price_type": {"enum": ["fixed_launch_price", "from_price_requires_quote"]},
+        "delivery": {"type": "string"},
+        "scope": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "exclusions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "checkout_availability": {"enum": ["closed", "test_ready", "live_ready"]},
+        "checkout_action": {"type": ["string", "null"]},
+        "requires_immediate_user_approval": {"const": true}
+      }
+    }
+  }
+}

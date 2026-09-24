@@ -1,6 +1,6 @@
 # Fieldwork Phase 1A foundation and publication boundary
 
-**Status:** public invited-pilot entry; real-user applications routed to private Wix review; native submission workflow remains fail-closed
+**Status:** open public-beta publication candidate; real-user registrations remain routed to a non-public Wix review workflow; native submission workflow remains fail-closed
 **Recorded:** 2026-09-11
 
 ## Confirmed implementation relationship
@@ -30,7 +30,7 @@ Never commit or publish:
 - runtime databases, backups, logs, support exports, prompt traces, or processor payloads;
 - confidential contracts, private legal advice, unresolved exploitable findings, or rights-restricted data and media.
 
-Runtime Fieldwork data is stored outside the repository at `FIELDWORK_DB_PATH`. Public tests use generated synthetic records only. Status and operator secrets are submitted in request bodies or headers and are never placed in analytics events.
+Runtime Fieldwork data is stored outside the repository at the canonical `INTAKE_DB_PATH` (`FIELDWORK_DB_PATH` remains a compatibility alias). Public tests use generated synthetic records only. Status and operator secrets are submitted in request bodies or headers and are never placed in analytics events.
 
 ## Current public delivery boundary
 
@@ -47,7 +47,7 @@ Runtime Fieldwork data is stored outside the repository at `FIELDWORK_DB_PATH`. 
 2. final route within `180climate.net` and company authority to use the brand/logo there;
 3. encrypted persistent datastore, hosting region, operator access owner, backups, restore target, and deletion propagation;
 4. retention schedule and versions of every public notice and processor disclosure;
-5. invitation distribution, first invited users, and operational receipt/response process;
+5. open-registration capacity, published response expectations, and operational receipt/response process;
 6. Bahasa Indonesia controlling documents and qualified Indonesian counsel review of the implemented flow;
 7. security, accessibility, responsive, smoke, incident, backup/restore, and rollback evidence;
 8. explicit company publication and deployment approval.
@@ -56,4 +56,4 @@ Until then, local and non-user staging may use synthetic data only. A local prev
 
 ## Deployment relationship and remaining evidence
 
-The public repository, Render service and Wix site relationship have been exercised for this invited-pilot entry. Publication authority was confirmed by the site owner for this checkpoint. Persistent-datastore suitability, processor terms, native notification delivery, production backups and restore, final counsel-approved notices, and operational adoption outcomes are not proven by the public entry and remain gates before switching real users to the native workflow. No licence change or new repository was made.
+The public repository, Render service and Wix site relationship were exercised for the earlier invited-pilot entry. The open public-beta revision removes invitation controls and publishes the matching process while keeping personal records non-public. It is not the deployed revision until the exact Wix, GitHub and Render publication batch is approved. Persistent-datastore suitability, processor terms, native notification delivery, production backups and restore, final counsel-approved notices, regulatory applicability and operational adoption outcomes are not proven and remain gates before switching real users to the native workflow. No licence change or new repository is part of this change.
