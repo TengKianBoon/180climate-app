@@ -1,12 +1,10 @@
-# 180Climate — Evidence-Ready Climate and Field Operations
+# 180Climate — Carbon Screening & EUDR Plot Check
 
-A climate-technology foundation serving three connected operating needs: screen indicative carbon potential, check plots for satellite evidence of forest loss, and openly register field-support needs and capabilities for private, consent-based review. A separately gated commercial layer converts free diagnostics into fixed-scope human review without turning Fieldwork into a payment marketplace. Built for Indonesian landholders, exporters, field-service participants and their authorised agents.
+The platform behind 180Climate's free origination tools: carbon pre-feasibility screening, EUDR plot checks against the EU's own forest baseline and satellite loss data, and the invite-only Fieldwork Network. Built for Indonesian landholders, exporters and field practitioners.
 
 **Python · FastAPI · Pydantic · geospatial data · deterministic engines · AI-assisted development**
 
-**Capability showcase:** enterprise AI solution architecture · forward-deployed delivery · hands-on AI orchestration · business-process redesign · governance and adoption leadership
-
-[Open Carbon Screening](https://carbon.180climate.net) · [Open EUDR Plot Check](https://eudr.180climate.net) · [Open Fieldwork Pilot](https://one80climate-fieldwork-preview.onrender.com/fieldwork) · [Inspect the commercial architecture](docs/commercial-stripe-foundation.md) · [Read the code walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) · [Enterprise AI delivery case study](docs/260911_enterprise_ai_delivery_case_study.md) · [Inspect the recorded CI run](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682)
+[Open Carbon Screening](https://carbon.180climate.net) · [Open EUDR Plot Check](https://eudr.180climate.net) · [Open Fieldwork Pilot](https://one80climate-fieldwork-preview.onrender.com/fieldwork) · [Read the code walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) · [Inspect the recorded CI run](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682)
 
 ## 1. See the product
 
@@ -19,27 +17,13 @@ A climate-technology foundation serving three connected operating needs: screen 
 | Carbon Screening | Concession location, permit and project information | Indicative quantity range, calculation trace and report |
 | EUDR Plot Check | Plot geometry, commodity and supplier role | Per-plot detection state, findings, preparation checklist and report |
 
-### Fieldwork open public beta (publication candidate)
+### Fieldwork Network (invite-only, free trial)
 
-The **180Climate Fieldwork Network** is designed as an open public registration service: anyone may submit a fieldwork need or service capability, while profiles, contacts, requests and precise sites stay private. 180Climate publishes its review criteria, checks authority, safety, scope and possible fit, and requires both named parties to consent before contact is shared. The beta does not employ or dispatch workers, act as an employment agency, form the underlying service contract, approve site access or process payments.
-
-The open-beta source and tests are ready for the controlled publication checkpoint. The currently deployed public pages remain the earlier invited-pilot revision until the exact Wix, GitHub and Render publication batch is approved and verified.
+The public **180Climate Fieldwork Network** explains the invitation-only service and routes requesters and providers to a private 180Climate Wix review form. 180Climate reviews scope and fit before every introduction, and new users can start with a free trial.
 
 The repository also contains a more structured native workflow for requester/provider records, private operator review, non-enumerable status access and two-party consent. That native submission path remains fail-closed while the live pilot uses Wix. Tests use generated synthetic records only; no pilot submission or runtime database belongs in this public repository. See the [`Phase 1A boundary`](docs/fieldwork/phase-1a-foundation.md) and the [`stage receipts`](docs/fieldwork/stage-receipts.md).
 
-The public service may take a short time to wake. For a quick technical review without entering contact details, use the offline example.
-
-### AI-agent procurement readiness
-
-The three services expose a guarded machine-readable procurement contract at [`/.well-known/180climate-services.json`](frontend/services.json): stable service and operation IDs, versioned schemas, eligibility, limits, price status, side effects, retry hints and exact human-approval boundaries. Fixed-scope professional offers have a separate contract at [`/.well-known/180climate-commercial.json`](frontend/schemas/commercial-catalogue-v1.json). This supports authorised agents in discovery, comparison and preparation without pretending that screening, registration, matching, contracting and payment are equivalent actions.
-
-This is **guarded readiness, not autonomous purchasing**. Carbon is suitable for user-authorised machine screening on its declared routes; the current EUDR call also emails 180Climate; and live Fieldwork registration still hands off to Wix while its typed native intake remains fail-closed. An agent may read prices and, after immediate user approval, request a fail-closed Stripe checkout handoff. The human still confirms any payment on Stripe. Contracts, Fieldwork payments, dispatch, contact disclosure and regulated conclusions remain outside agent authority. See the [agent procurement journey](docs/agent-procurement-readiness.md) and [commercial control design](docs/commercial-stripe-foundation.md).
-
-### From free diagnostic to controlled commercial service
-
-The commercial design demonstrates more than adding a checkout button. Market comparison and delivery-cost modelling were used to keep the automated screens free, price bounded human work, cap included hours and separate 180Climate professional fees from Fieldwork-provider money. The implementation then translates that business model into a versioned catalogue, explicit scope and exclusions, a default-off test/live switch, strict Stripe-host validation and live terms/refund/tax approval gates.
-
-This is currently a **local, tested foundation—not evidence of a connected Stripe account or live charge**. That distinction is deliberate: checkout credentials, account verification, live links, public deployment and financial confirmation remain consequential actions.
+For a quick look without entering contact details, run the offline example below.
 
 ### Run one decision in under a minute
 
@@ -59,7 +43,7 @@ No API key or package installation is needed. The example reads the actual `_dec
 | Unknown | Zero loss | No | `inconclusive` |
 | Yes | Zero loss | Yes | `loss_detected` |
 
-These are synthetic inputs to one function, not satellite observations from a real property. `clear_in_screen` is a screening state, not a legal compliance determination. In this implementation, missing radar data alone does not block that state if the forest baseline and zero optical loss are confirmed.
+Synthetic inputs, run through the production function.
 
 ## 2. Understand the architecture
 
@@ -97,7 +81,7 @@ The [engineering walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) e
 
 The [GitHub CI run from 1 July 2026](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682/job/84655746161), for commit [`b4ac414`](https://github.com/TengKianBoon/180climate-app/commit/b4ac414789659bfbb56f19599a87cbe72a01a2d2), records **463 collected: 461 passed, 2 skipped**, with one test warning. Contract type-checking also passed. The skipped checks were two live overlay smoke tests.
 
-I retain the commit and run date so the test result is traceable. The offline example gives a quick way to reproduce the decision checks; the CI workflow covers the broader application suite.
+The offline example reproduces the decision checks; the CI workflow covers the broader application suite.
 
 [CI definition](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/.github/workflows/ci.yml) · [Triage tests](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/tests/test_eudr_triage.py) · [API and report tests](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/tests/test_eudr_api.py)
 
@@ -114,34 +98,13 @@ I took the project from demand assessment and scope through an AI-assisted build
 
 **One decision you can inspect:** I required the carbon report to expose the actual calculation inputs and intermediate values. [ADR-0014](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0014-derivation-trace.md) records that request; the [typed calculation trace](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/core/contracts/__init__.py#L158-L189) shows the implementation approach. [ADR-0018](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/adr/ADR-0018-eudr-contracts.md) separately records my approval of explicit EUDR detection states.
 
-### Personal contribution versus AI-assisted implementation
+### How the work was split
 
-| Area | My personal contribution and competency | How AI assisted | Evidence a reviewer can inspect |
-|---|---|---|---|
-| Discovery and business value | Selected the business problems, connected them to carbon origination, EUDR preparation and field operations, bounded the first useful release and set proof targets. | Agents supported research, decomposition and draft business-process mapping. | Product scope, live services and the [enterprise AI delivery case study](docs/260911_enterprise_ai_delivery_case_study.md). |
-| Solution architecture | Chose the shared geospatial foundation, deterministic decision boundaries, existing FastAPI/Wix/Render/GitHub deployment shape, public/private data boundary, hosted-payment boundary and staged automation path. | Agents proposed and challenged implementation options and documented decisions. | [Architecture](docs/assets/2609092130_architecture_4ofX.svg), [typed contracts](core/contracts/__init__.py), [ADRs](docs/adr), [Fieldwork foundation](docs/fieldwork/phase-1a-foundation.md) and [commercial architecture](docs/commercial-stripe-foundation.md). |
-| Hands-on AI engineering | Wrote and refined briefs, supplied domain context, assigned role-specific agent instructions, set model/cost routing and human approval boundaries, reviewed live behaviour and drove correction cycles. | Coding agents implemented bounded changes; reviewer/verifier agents inspected them independently. | [Agent instructions](.claude/agents), Git history, test failures/corrections and [stage receipts](docs/fieldwork/stage-receipts.md). |
-| Forward-deployed delivery | Connected the solution to the actual 180Climate Wix, GitHub and Render environment; resolved real navigation and intake friction; inspected the actual Wix commerce entitlement; and converted the finding into a lower-fixed-cost hosted-payment design. | AI assisted source changes, browser inspection, responsive QA and release documentation. | [Live Fieldwork journey](https://one80climate-fieldwork-preview.onrender.com/fieldwork), [commercial decision record](docs/commercial-stripe-foundation.md), scoped commits and [deployment receipt](docs/fieldwork/stage-receipts.md). |
-| Verification and governance | Defined acceptance gates for uncertainty, privacy, consent, safety, publication and professional accountability; required deterministic tests before acceptance. | Agents generated and executed tests, scans and structured QA evidence. | [Test suites](tests), fail-closed behaviour, [public/private boundary](docs/fieldwork/phase-1a-foundation.md) and CI record. |
-| Adoption leadership | Progressed from a small invited pilot to an approval-gated open-registration beta, with bilingual guidance, manual fallback, feedback loop and evidence needed before wider automation or commercialisation. | AI supported user-language refinement and repeatable operating documentation. | [Beta evidence and explicit gaps](docs/260911_enterprise_ai_delivery_case_study.md#enterprise-ai-adoption-leadership); sustained enterprise adoption is not yet claimed. |
-
-This shows architecture, operator judgement and hands-on AI delivery without misrepresenting agent-produced code as unaided manual coding. I remain accountable for product definition, solution decisions, development controls, acceptance and publication; AI agents materially assisted implementation, testing, review and documentation.
-
-### Capability evidence
-
-| Capability | Inspectable evidence |
-|---|---|
-| Solution architecture | Shared geospatial contracts and adapters support two deterministic screening products; Fieldwork adds a separately bounded human-service workflow without replacing the existing stack. |
-| Forward-deployed and full-stack engineering | Business requirements are translated into a live Wix/Render/GitHub journey, while responsive interfaces, FastAPI routes, typed contracts, deterministic logic, tests and recovery utilities form the end-to-end technical chain. |
-| Business-process and AI operating design | Requirements are mapped into intake, validation, review, consent and human-accountability controls; AI assistance is separated from deterministic calculations and consequential approvals. |
-| Business-case improvement | Market pricing, delivery-hour caps and payment-fee modelling turn free diagnostics into productised services; direct hosted checkout avoids an unnecessary Wix commerce dependency; measured pilot costs determine whether prices should rise or scope should shrink. |
-| Enterprise AI adoption leadership | Role-specific agent instructions, independent checking, bilingual user guidance, manual fallbacks and measurable pilot targets support controlled adoption rather than tool-first deployment. |
-
-The [enterprise AI delivery case study](docs/260911_enterprise_ai_delivery_case_study.md) connects each claim to implementation evidence and records the remaining gaps. It treats AIRI Level 4 as a direction for evidence-building—not an achieved assessment or certification.
+I designed and ran the agent harness that implemented, tested and reviewed this code against my specifications. Problem selection, the domain model, architecture, acceptance criteria and every release decision were mine; the commit history shows the AI co-authorship openly.
 
 ## 6. Inspect versioning and recovery
 
-The project has two published releases, each connected to an annotated Git tag and a specific source revision. Both release records were published on 1 July 2026 and rechecked on 9 September 2026.
+The project has two published releases, each connected to an annotated Git tag and a specific source revision. Both releases were published on 1 July 2026.
 
 | Release | Scope | Tagged source |
 |---|---|---|
@@ -154,6 +117,4 @@ I included versioning and rollback/recovery decisions in delivery so changes cou
 
 ## Scope and next work
 
-This is a deployed screening MVP. It provides indicative results and preparation support. The public [hardening roadmap](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/production-roadmap.md) lists further work on observability, abuse controls, staging, rollback and analytics; those items should be assessed separately from the code and CI evidence above.
-
-The source links in this tour are pinned to the reviewed public commit. The live deployment may change independently.
+Next on the public [hardening roadmap](https://github.com/TengKianBoon/180climate-app/blob/b4ac414789659bfbb56f19599a87cbe72a01a2d2/docs/production-roadmap.md): observability, abuse controls, staging, rollback automation and usage analytics. Source links in this tour are pinned to the reviewed commit.
