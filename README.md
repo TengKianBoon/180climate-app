@@ -1,10 +1,10 @@
-# 180Climate — Carbon Screening & EUDR Plot Check
+# 180Climate — Carbon Screening, EUDR Plot Check & Fieldwork
 
-The platform behind 180Climate's free origination tools: carbon pre-feasibility screening, EUDR plot checks against the EU's own forest baseline and satellite loss data, and the invite-only Fieldwork Network. Built for Indonesian landholders, exporters and field practitioners.
+The platform behind 180Climate's free controlled public beta: carbon pre-feasibility screening, EUDR plot checks against the EU's forest baseline and satellite loss data, and the Fieldwork Network. Built for Indonesian landholders, exporters and field practitioners.
 
 **Python · FastAPI · Pydantic · geospatial data · deterministic engines · AI-assisted development**
 
-[Open Carbon Screening](https://carbon.180climate.net) · [Open EUDR Plot Check](https://eudr.180climate.net) · [Open Fieldwork Pilot](https://one80climate-fieldwork-preview.onrender.com/fieldwork) · [Read the code walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) · [Inspect the recorded CI run](https://github.com/TengKianBoon/180climate-app/actions/runs/28553478682)
+[Open Carbon Screening](https://carbon.180climate.net) · [Open EUDR Plot Check](https://eudr.180climate.net) · [Open Fieldwork Network](https://eudr.180climate.net/fieldwork) · [Current beta status](docs/data-control/controlled-beta-status-2026-09-24.md) · [Read the code walkthrough](docs/2609092130_engineering_walkthrough_4ofX.md) · [Inspect CI](https://github.com/TengKianBoon/180climate-app/actions)
 
 ## 1. See the product
 
@@ -16,12 +16,13 @@ The platform behind 180Climate's free origination tools: carbon pre-feasibility 
 |---|---|---|
 | Carbon Screening | Concession location, permit and project information | Indicative quantity range, calculation trace and report |
 | EUDR Plot Check | Plot geometry, commodity and supplier role | Per-plot detection state, findings, preparation checklist and report |
+| Fieldwork Network | Requester outcome or provider capability and contact details | Private review queue and consent-controlled introduction workflow |
 
-### Fieldwork Network (invite-only, free trial)
+### Fieldwork Network (free controlled public beta)
 
-The public **180Climate Fieldwork Network** explains the invitation-only service and routes requesters and providers to a private 180Climate Wix review form. 180Climate reviews scope and fit before every introduction, and new users can start with a free trial.
+The public **180Climate Fieldwork Network** accepts requester and provider registrations through its native private intake. 180Climate reviews scope and fit before any introduction. Registration is free and does not create a booking or a payment obligation.
 
-The repository also contains a more structured native workflow for requester/provider records, private operator review, non-enumerable status access and two-party consent. That native submission path remains fail-closed while the live pilot uses Wix. Tests use generated synthetic records only; no pilot submission or runtime database belongs in this public repository. See the [`Phase 1A boundary`](docs/fieldwork/phase-1a-foundation.md) and the [`stage receipts`](docs/fieldwork/stage-receipts.md).
+The repository implements requester/provider records, private operator review, non-enumerable status access and two-party consent. The current public entry is the native Fieldwork page above; older stage receipts describe the earlier Wix invitation route. Tests use generated synthetic records only; no user submission or runtime database belongs in this public repository. See the [current beta status](docs/data-control/controlled-beta-status-2026-09-24.md).
 
 For a quick look without entering contact details, run the offline example below.
 
