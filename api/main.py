@@ -17,6 +17,7 @@ Run locally:
 """
 from __future__ import annotations
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -209,14 +210,18 @@ def _deliver(
     form_data: dict,
     pdf_bytes: bytes,
     filename_base: str,
-) -> None:
-    """Fire-and-forget: email + Sheet append. Errors are logged, never raised."""
-    send_lead_email(
-        iup_name=form_data.get("iup_name", "Lead"),
-        filename_base=filename_base,
-        form_data=form_data,
-        pdf_bytes=pdf_bytes,
-    )
+) -> dict[str, bool]:
+    """Attempt notification and Sheet append without overstating delivery."""
+    try:
+        email_result = send_lead_email(
+            iup_name=form_data.get("iup_name", "Lead"),
+            filename_base=filename_base,
+            form_data=form_data,
+            pdf_bytes=pdf_bytes,
+        )
+    except Exception:
+        log.exception("Lead notification attempt failed")
+        email_result = False
     row = {k: form_data.get(k, "") for k in [
         "timestamp", "iup_name", "name", "email", "mobile", "company",
         "permit_type", "permit_years_remaining", "project_type",
@@ -224,7 +229,17 @@ def _deliver(
         "verdict", "quantity_low_tco2e", "quantity_high_tco2e",
     ]}
     row["filename_base"] = filename_base
-    append_lead(row)
+    try:
+        sheet_result = append_lead(row)
+    except Exception:
+        log.exception("Lead Sheet append attempt failed")
+        sheet_result = False
+    return {
+        "notification_accepted": bool(
+            email_result and (os.environ.get("BREVO_API_KEY") or os.environ.get("EMAIL_HOST"))
+        ),
+        "sheet_appended": bool(sheet_result and os.environ.get("GOOGLE_SHEETS_ID")),
+    }
 
 
 def _capture_carbon_intake(
@@ -1498,8 +1513,15 @@ def lead(req: LeadRequest) -> dict[str, Any]:
                 "message": "Your information was not saved. Please try again later.",
             },
         ) from exc
-    _deliver(form_data, pdf_bytes or b"", filename_base)
-    response: dict[str, Any] = {"status": "emailed", "timestamp": ts}
+    delivery = _deliver(form_data, pdf_bytes or b"", filename_base)
+    response: dict[str, Any] = {
+        "status": "recorded" if reference else (
+            "accepted_for_delivery" if any(delivery.values()) else "delivery_unconfirmed"
+        ),
+        "notification_accepted": delivery["notification_accepted"],
+        "sheet_appended": delivery["sheet_appended"],
+        "timestamp": ts,
+    }
     if reference:
         response["submission_reference"] = reference
     return response

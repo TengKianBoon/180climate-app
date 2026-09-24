@@ -88,11 +88,13 @@ def _read_jsonl(path: Path) -> list[dict]:
 # ── /api/lead tests ────────────────────────────────────────────────────────────
 
 class TestLeadEndpoint:
-    def test_returns_emailed_status(self, ci_outbox):
+    def test_outbox_does_not_claim_email_delivery(self, ci_outbox):
         res = client.post("/api/lead", json=_GOLDEN_LEAD)
         assert res.status_code == 200
         data = res.json()
-        assert data["status"] == "emailed"
+        assert data["status"] == "delivery_unconfirmed"
+        assert data["notification_accepted"] is False
+        assert data["sheet_appended"] is False
         assert "timestamp" in data
 
     def test_email_outbox_written(self, ci_outbox):

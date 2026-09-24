@@ -213,7 +213,10 @@ def test_unified_backup_accepts_an_intake_only_database(monkeypatch, tmp_path):
 
 def test_carbon_lead_form_is_recorded_before_delivery(monkeypatch, tmp_path):
     path = _configure(monkeypatch, tmp_path, geometry="false")
-    monkeypatch.setattr("api.main._deliver", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "api.main._deliver",
+        lambda *args, **kwargs: {"notification_accepted": False, "sheet_appended": False},
+    )
     response = client.post(
         "/api/lead",
         json={
@@ -229,6 +232,7 @@ def test_carbon_lead_form_is_recorded_before_delivery(monkeypatch, tmp_path):
         },
     )
     assert response.status_code == 200
+    assert response.json()["status"] == "recorded"
     assert response.json()["submission_reference"].startswith("CAR-")
     with sqlite3.connect(path) as conn:
         row = conn.execute(
