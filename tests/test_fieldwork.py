@@ -131,10 +131,10 @@ def test_public_pages_catalogue_and_security_headers() -> None:
     assert "Open public beta" in page.text
     assert "Transparent criteria. Human review. Choice on both sides." in page.text
     assert "without an invitation code" in page.text
-    assert page.text.count('data-wix-intake href="https://www.180climate.net/fieldwork-pilot-draft"') == 3
+    assert page.text.count('data-wix-intake data-native-target=') == 3
     assert 'id="service-banner" data-state="loading" data-intake="wix"' in page.text
     assert "Preview only" not in page.text
-    assert '/fieldwork-assets/fieldwork.js?v=4' in page.text
+    assert '/fieldwork-assets/fieldwork.js?v=5' in page.text
     script = (Path(__file__).parents[1] / "frontend" / "fieldwork.js").read_text(encoding="utf-8")
     assert "real-user intake is closed" not in script
     assert "Check private status" not in page.text
@@ -155,6 +155,26 @@ def test_public_pages_catalogue_and_security_headers() -> None:
     assert services["fieldwork.match_intro.v1"]["intake_url"] == "https://www.180climate.net/fieldwork-pilot-draft"
     assert client.get("/schemas/fieldwork-request-v1.json").status_code == 200
     assert client.get("/schemas/not-allowed.json").status_code == 404
+
+
+def test_service_catalogue_switches_to_native_route_only_when_open(
+    public_beta: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    response = client.get("/services.json")
+    fieldwork = next(
+        service for service in response.json()["services"]
+        if service["service_id"] == "fieldwork.match_intro.v1"
+    )
+    assert fieldwork["intake_mode"] == "native_registration"
+    assert fieldwork["intake_url"] == "https://fieldwork.example.invalid/fieldwork"
+    assert response.headers["cache-control"] == "no-store"
+    monkeypatch.setenv("FIELDWORK_ACCEPTING_SUBMISSIONS", "false")
+    closed = client.get("/services.json").json()
+    fieldwork = next(
+        service for service in closed["services"]
+        if service["service_id"] == "fieldwork.match_intro.v1"
+    )
+    assert fieldwork["intake_mode"] == "external_wix_registration"
 
 
 def test_intake_fails_closed_without_launch_configuration(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

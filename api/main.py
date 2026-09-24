@@ -17,6 +17,7 @@ Run locally:
 """
 from __future__ import annotations
 import logging
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -47,7 +48,7 @@ from engines.carbon.engine import run_carbon_engine, run_mixed_stratification
 from narrative.narrator import generate_narrative
 from api.commercial import commercial_catalogue_payload, router as commercial_router
 from api.email import send_lead_email
-from api.fieldwork import router as fieldwork_router
+from api.fieldwork import public_config as fieldwork_public_config, router as fieldwork_router
 from api.intake import (
     IntakeStorageError,
     capture_submission,
@@ -341,10 +342,18 @@ def services_catalogue() -> Response:
     path = _FRONTEND / "services.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Service catalogue not found")
+    catalogue = json.loads(path.read_text(encoding="utf-8"))
+    if fieldwork_public_config()["accepting_submissions"]:
+        fieldwork = next(
+            item for item in catalogue["services"]
+            if item["service_id"] == "fieldwork.match_intro.v1"
+        )
+        fieldwork["intake_mode"] = "native_registration"
+        fieldwork["intake_url"] = os.environ["FIELDWORK_PUBLIC_ORIGIN"].rstrip("/") + "/fieldwork"
     return Response(
-        content=path.read_bytes(),
+        content=json.dumps(catalogue),
         media_type="application/json",
-        headers={"Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff"},
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
 
 
