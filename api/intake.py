@@ -68,6 +68,18 @@ def _geometry_choice() -> bool | None:
     return None
 
 
+def legal_review_status(prefix: str) -> str:
+    """Distinguish a recorded review from a controller's explicit deferral."""
+    if os.environ.get(f"{prefix}_COUNSEL_APPROVAL_ID", "").strip():
+        return "reviewed"
+    if (
+        os.environ.get(f"{prefix}_LEGAL_REVIEW_STATUS", "").strip() == "deferred_by_controller"
+        and os.environ.get(f"{prefix}_LEGAL_REVIEW_RECORD", "").strip()
+    ):
+        return "deferred_by_controller"
+    return "not_recorded"
+
+
 def configuration_gaps() -> list[str]:
     mode = recording_mode()
     if mode == "off":
@@ -99,7 +111,6 @@ def configuration_gaps() -> list[str]:
         "operator access owner": "INTAKE_OPERATOR_OWNER",
         "authorised deployer": "INTAKE_AUTHORISED_DEPLOYER",
         "Bahasa Indonesia publication pack": "INTAKE_BAHASA_PACK_VERSION",
-        "Indonesian legal review": "INTAKE_COUNSEL_APPROVAL_ID",
         "company publication approval": "INTAKE_COMPANY_APPROVAL_ID",
     }
     gaps.extend(
@@ -107,6 +118,8 @@ def configuration_gaps() -> list[str]:
         for label, env_name in required_governance.items()
         if not os.environ.get(env_name, "").strip()
     )
+    if legal_review_status("INTAKE") == "not_recorded":
+        gaps.append("Indonesian legal review or recorded controller deferral")
     return gaps
 
 
@@ -119,6 +132,7 @@ def public_storage_status() -> dict[str, Any]:
         "configuration_gaps": gaps,
         "geometry_retention": _geometry_choice(),
         "retention_days": _retention_days(),
+        "legal_review_status": legal_review_status("INTAKE"),
         "database_location": "private_runtime_database" if not gaps and mode == "required" else "not_confirmed",
     }
 

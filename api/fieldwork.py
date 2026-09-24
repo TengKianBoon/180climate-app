@@ -21,7 +21,7 @@ from typing import Any, Iterator, Literal
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from api.intake import database_path
+from api.intake import database_path, legal_review_status
 
 
 router = APIRouter(prefix="/api/fieldwork", tags=["fieldwork"])
@@ -84,14 +84,15 @@ def _launch_gaps() -> list[str]:
         "published retention summary": "FIELDWORK_RETENTION_SUMMARY",
         "processor disclosure": "FIELDWORK_PROCESSOR_LIST_VERSION",
         "published processor summary": "FIELDWORK_PROCESSOR_SUMMARY",
-        "approved public-beta terms version": "FIELDWORK_TERMS_VERSION",
-        "approved privacy notice version": "FIELDWORK_PRIVACY_VERSION",
-        "approved prohibited-use version": "FIELDWORK_PROHIBITED_USE_VERSION",
+        "published public-beta terms version": "FIELDWORK_TERMS_VERSION",
+        "published privacy notice version": "FIELDWORK_PRIVACY_VERSION",
+        "published prohibited-use version": "FIELDWORK_PROHIBITED_USE_VERSION",
         "Bahasa publication pack": "FIELDWORK_BAHASA_PACK_VERSION",
-        "Indonesian counsel approval": "FIELDWORK_COUNSEL_APPROVAL_ID",
         "company launch approval": "FIELDWORK_COMPANY_APPROVAL_ID",
     }
     gaps = [label for label, env_name in required.items() if not os.environ.get(env_name, "").strip()]
+    if legal_review_status("FIELDWORK") == "not_recorded":
+        gaps.append("Indonesian legal review or recorded controller deferral")
     if not (
         os.environ.get("INTAKE_DB_PATH", "").strip()
         or os.environ.get("FIELDWORK_DB_PATH", "").strip()
@@ -130,6 +131,7 @@ def public_config() -> dict[str, Any]:
         "processor_list_version": os.environ.get("FIELDWORK_PROCESSOR_LIST_VERSION", "").strip() or "not_confirmed",
         "processor_summary": os.environ.get("FIELDWORK_PROCESSOR_SUMMARY", "").strip() or "not_confirmed",
         "registration_cap": _registration_cap(),
+        "legal_review_status": legal_review_status("FIELDWORK"),
         "status_route": "/fieldwork/status",
         "price_status": "free_open_public_beta",
     }

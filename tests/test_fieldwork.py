@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from api.fieldwork import public_config
 from scripts.fieldwork_db import backup, restore
 
 
@@ -42,6 +43,19 @@ def public_beta(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     for key, value in values.items():
         monkeypatch.setenv(key, value)
     return db_path
+
+
+def test_controller_deferral_is_explicit_not_counsel_approval(public_beta, monkeypatch):
+    monkeypatch.delenv("FIELDWORK_COUNSEL_APPROVAL_ID", raising=False)
+    monkeypatch.setenv("FIELDWORK_LEGAL_REVIEW_STATUS", "deferred_by_controller")
+    config = public_config()
+    assert config["accepting_submissions"] is False
+    assert config["legal_review_status"] == "not_recorded"
+
+    monkeypatch.setenv("FIELDWORK_LEGAL_REVIEW_RECORD", "synthetic-owner-decision-2026-09-24")
+    config = public_config()
+    assert config["accepting_submissions"] is True
+    assert config["legal_review_status"] == "deferred_by_controller"
 
 
 def request_payload(**overrides: object) -> dict[str, object]:
@@ -152,13 +166,13 @@ def test_intake_fails_closed_without_launch_configuration(monkeypatch: pytest.Mo
     assert not (tmp_path / "closed.sqlite3").exists()
 
 
-def test_intake_stays_closed_when_an_approved_notice_version_is_missing(
+def test_intake_stays_closed_when_a_published_notice_version_is_missing(
     public_beta: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("FIELDWORK_PRIVACY_VERSION")
     config = client.get("/api/fieldwork/config").json()
     assert config["accepting_submissions"] is False
-    assert "approved privacy notice version" in config["launch_gaps"]
+    assert "published privacy notice version" in config["launch_gaps"]
     response = client.post("/api/fieldwork/requests", json=request_payload())
     assert response.status_code == 503
     assert not public_beta.exists()

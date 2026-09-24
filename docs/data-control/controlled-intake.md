@@ -43,10 +43,11 @@ Required with `required` mode:
 - `INTAKE_CONTROLLER_NAME`, `INTAKE_PRIVACY_CONTACT` and `INTAKE_HOSTING_REGION`;
 - `INTAKE_RETENTION_VERSION` and `INTAKE_PROCESSOR_LIST_VERSION`;
 - `INTAKE_OPERATOR_OWNER` and `INTAKE_AUTHORISED_DEPLOYER`;
-- `INTAKE_BAHASA_PACK_VERSION`, `INTAKE_COUNSEL_APPROVAL_ID` and `INTAKE_COMPANY_APPROVAL_ID`;
+- `INTAKE_BAHASA_PACK_VERSION` and `INTAKE_COMPANY_APPROVAL_ID`;
+- either `INTAKE_COUNSEL_APPROVAL_ID`, or both `INTAKE_LEGAL_REVIEW_STATUS=deferred_by_controller` and `INTAKE_LEGAL_REVIEW_RECORD=<dated controller decision>`; the latter is reported as a deferral, never as counsel approval;
 - the separate Fieldwork controller, privacy, processor, Bahasa, counsel and company launch controls already documented in `docs/fieldwork/deployment-and-recovery.md`.
 
-The safe public endpoint `/api/intake/config` reports readiness without exposing the database path or token. Operator endpoints require a bearer token and exclude coordinates from normal listing/export unless the operator explicitly requests them.
+The safe public endpoint `/api/intake/config` reports readiness and legal-review status without exposing the database path or token. Operator endpoints require a bearer token and exclude coordinates from normal listing/export unless the operator explicitly requests them.
 
 ## Backup and recovery
 

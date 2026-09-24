@@ -59,6 +59,10 @@ services:
         sync: false
       - key: INTAKE_COUNSEL_APPROVAL_ID
         sync: false
+      - key: INTAKE_LEGAL_REVIEW_STATUS
+        sync: false
+      - key: INTAKE_LEGAL_REVIEW_RECORD
+        sync: false
       - key: INTAKE_COMPANY_APPROVAL_ID
         sync: false
       # Anthropic API — free-text classifier, optional (see docs/deploy-runbook.md §4)

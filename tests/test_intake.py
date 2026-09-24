@@ -143,6 +143,20 @@ def test_public_status_never_exposes_database_path_or_token(monkeypatch, tmp_pat
     assert "synthetic-operator-token" not in encoded
 
 
+def test_controller_deferral_is_recorded_without_claiming_counsel_approval(monkeypatch, tmp_path):
+    _configure(monkeypatch, tmp_path)
+    monkeypatch.delenv("INTAKE_COUNSEL_APPROVAL_ID", raising=False)
+    monkeypatch.setenv("INTAKE_LEGAL_REVIEW_STATUS", "deferred_by_controller")
+    status = public_storage_status()
+    assert status["ready"] is False
+    assert status["legal_review_status"] == "not_recorded"
+
+    monkeypatch.setenv("INTAKE_LEGAL_REVIEW_RECORD", "synthetic-owner-decision-2026-09-24")
+    status = public_storage_status()
+    assert status["ready"] is True
+    assert status["legal_review_status"] == "deferred_by_controller"
+
+
 def test_eudr_route_records_normalised_geometry_without_json_duplication(monkeypatch, tmp_path):
     path = _configure(monkeypatch, tmp_path)
     monkeypatch.setattr("api.main.send_lead_email", lambda **kwargs: True)

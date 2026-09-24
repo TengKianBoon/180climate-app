@@ -4,7 +4,7 @@
 
 ## Runtime configuration
 
-Native real-user intake remains closed unless `FIELDWORK_ACCEPTING_SUBMISSIONS=true` and all required host configuration is present. That includes the HTTPS public origin; private persistent datastore; operator control; public-beta registration cap; controller; public privacy-contact label/link; hosting region; published retention and processor summaries; approved versions for the terms, privacy and prohibited-use notices; Bahasa publication pack; and recorded counsel/company approval identifiers. Open registration does not remove any launch gate. The canonical new datastore setting is `INTAKE_DB_PATH`; `FIELDWORK_DB_PATH` remains a compatibility alias. See `docs/data-control/controlled-intake.md` for the three-application record map.
+Native real-user intake remains closed unless `FIELDWORK_ACCEPTING_SUBMISSIONS=true` and all required host configuration is present. That includes the HTTPS public origin; private persistent datastore; operator control; public-beta registration cap; controller; public privacy-contact label/link; hosting region; published retention and processor summaries; published versions for the terms, privacy and prohibited-use notices; Bahasa publication pack; company approval; and either counsel approval or a recorded controller decision to defer review. A deferral is exposed as such by the public config and must not be described as counsel approval. Open registration does not remove any launch gate. The canonical new datastore setting is `INTAKE_DB_PATH`; `FIELDWORK_DB_PATH` remains a compatibility alias. See `docs/data-control/controlled-intake.md` for the three-application record map.
 
 The database, WAL files, backups and operator exports are protected runtime data. They must never be placed in this public repository or a public build artifact. The selected hosting volume must provide suitable encryption at rest, access control, residency/transfer documentation, durability and backup behaviour. The current Render configuration does not by itself prove those requirements.
 
@@ -17,7 +17,7 @@ Before enabling submissions, record:
 - persistent volume/database product, region, processors and subprocessors;
 - table-by-table retention/deletion rules and backup expiry;
 - operator access owner, MFA where supported and access-review cadence;
-- Indonesian counsel and company approvals for the exact implemented flow and Bahasa Indonesia documents;
+- company approval for the exact implemented flow and Bahasa Indonesia documents, plus either Indonesian counsel approval or an explicit dated controller decision to defer review;
 - passing security, privacy, accessibility, responsive and critical-journey checks.
 
 ## Backup
