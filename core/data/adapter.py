@@ -43,6 +43,8 @@ def get_adapter(name: str | None = None) -> DataAdapter:
     """
     import os
     key = name or os.environ.get("CARBON_DATA_ADAPTER", "auto")
+    if key == "stub" and os.environ.get("SCREENING_USE_TEST_FIXTURES") != "true":
+        key = "auto"
     if key in _registry:
         return _registry[key]()
     # auto — lazy import to avoid circular dependencies at module load time

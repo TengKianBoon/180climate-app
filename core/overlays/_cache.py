@@ -16,6 +16,9 @@ _FIXTURE_DIR = (
 
 def load_fixture(adapter_name: str, lat: float, lon: float) -> Optional[dict]:
     """Return the cached overlay dict, or None if no fixture exists."""
+    import os
+    if os.environ.get('SCREENING_USE_TEST_FIXTURES') != 'true':
+        return None
     fname = f"{adapter_name}_{lat:.3f}_{lon:.3f}.json"
     path = _FIXTURE_DIR / fname
     if path.exists():
