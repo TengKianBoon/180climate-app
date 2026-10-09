@@ -1,6 +1,6 @@
 """core/data/gfw.py — GFW/Hansen HTTP adapter with real pixel-level loss and density reads.
 
-WO-CARBON-001b: Hansen GFC-2022 annual-loss COG pixel read via rasterio/GDAL vsicurl
+WO-CARBON-001b: Hansen GFC-2025 annual-loss COG pixel read via rasterio/GDAL vsicurl
 (public GCS, no auth). Tile-naming fix: tiles labeled by NORTH edge.
 
 WO-CARBON-001c: ESA CCI Biomass v3.0 2018 (CEDA public, no auth) as the default density
@@ -19,9 +19,9 @@ Fallback chain (density):
   2. ESA CCI Biomass v3.0 2018 — CEDA public endpoint (auto, no auth)
   3. IPCC 2006 Table 4.7 SE-Asia Tier-1 default (657.1 tCO2/ha, labeled)
 
-Fallback chain (loss):
-  1. Hansen GFC-2022 COG (real pixel read)
-  2. StubAdapter (Point input, rasterio import error, or any read failure)
+Loss read:
+  1. Hansen GFC-2025 COG (real pixel read)
+  2. Unavailable (Point input, rasterio import error, or any read failure); no invented values
 
 GEE caveat (ADR-0007): uses public HTTP endpoints only — GEE not used.
 """
@@ -34,7 +34,7 @@ from core.data.biomass import biomass_tco2_per_ha, citation as biomass_citation
 
 _HANSEN_BASE = (
     "https://storage.googleapis.com/earthenginepartners-hansen/"
-    "GFC-2022-v1.10"
+    "GFC-2025-v1.13"
 )
 
 # ESA CCI Biomass v3.0 2018 — CEDA public endpoint, no auth
@@ -54,9 +54,9 @@ _GDAL_ENV = {
     "CPL_VSIL_CURL_CACHE_SIZE": "50000000",
 }
 
-# Hansen GFC-2022 covers loss years 1-22 (2001-2022)
+# Hansen GFC-2025 covers loss years 1-25 (2001-2025)
 _HANSEN_FIRST_YEAR = 2001
-_HANSEN_LAST_YEAR = 2022
+_HANSEN_LAST_YEAR = 2025
 
 
 @register("gfw_http")
@@ -107,7 +107,7 @@ class GFWHTTPAdapter:
 
     def _hansen_url(self, lat: float, lon: float) -> str:
         tile = self._hansen_tile_name(lat, lon)
-        return f"{_HANSEN_BASE}/Hansen_GFC-2022-v1.10_lossyear_{tile}.tif"
+        return f"{_HANSEN_BASE}/Hansen_GFC-2025-v1.13_lossyear_{tile}.tif"
 
     def _esa_cci_url(self, lat: float, lon: float) -> str:
         tile = self._esa_cci_tile_name(lat, lon)
@@ -164,7 +164,13 @@ class GFWHTTPAdapter:
             with rasterio.Env(**_GDAL_ENV):
                 with rasterio.open(url) as src:
                     window = _from_bounds(west, south, east, north, src.transform)
-                    arr = src.read(1, window=window).astype("float64")
+                    if window.width * window.height > 12_000_000:
+                        return None
+                    if west < src.bounds.left or east > src.bounds.right or south < src.bounds.bottom or north > src.bounds.top:
+                        return None
+                    arr = src.read(1, window=window, masked=True).astype("float64").filled(float('nan'))
+                    from core.overlays._mask import inside_mask
+                    arr[~inside_mask(boundary.geojson, arr.shape, src.window_transform(window))] = np.nan
                     nodata = src.nodata
                     if nodata is not None:
                         arr[arr == nodata] = np.nan
@@ -181,7 +187,7 @@ class GFWHTTPAdapter:
     def _query_annual_loss(
         self, boundary: Boundary
     ) -> tuple[dict[int, float], list[str], str]:
-        """Real Hansen GFC-2022 pixel read or stub fallback.
+        """Real Hansen GFC-2025 pixel read or an explicit unavailable result.
 
         Returns (annual_loss_ha, source_labels, uncertainty_string).
         """
@@ -201,7 +207,17 @@ class GFWHTTPAdapter:
             with rasterio.Env(**_GDAL_ENV):
                 with rasterio.open(url) as src:
                     window = _from_bounds(west, south, east, north, src.transform)
-                    arr = src.read(1, window=window)
+                    if window.width * window.height > 12_000_000:
+                        raise ValueError('Plot window too large for safe screening; split the plot')
+                    arr = src.read(1, window=window, masked=True)
+                    from core.overlays._mask import inside_mask
+                    inside = inside_mask(boundary.geojson, arr.shape, src.window_transform(window))
+                    if not inside.any() or bool(np.ma.getmaskarray(arr)[inside].any()):
+                        raise ValueError('Plot is below raster resolution or includes unavailable pixels')
+                    # A centroid tile must cover the whole plot; partial reads are not a no-loss result.
+                    if west < src.bounds.left or east > src.bounds.right or south < src.bounds.bottom or north > src.bounds.top:
+                        raise ValueError('Plot crosses a dataset tile; split it for screening')
+                    arr = np.where(inside, arr.filled(255), 255)
                     win_transform = src.window_transform(window)
 
                     x_res = abs(win_transform.a)
@@ -219,11 +235,11 @@ class GFWHTTPAdapter:
                         )
 
             sources = [
-                f"GFW/Hansen GFC-2022-v1.10 lossyear pixel read "
+                f"GFW/Hansen GFC-2025-v1.13 lossyear pixel read "
                 f"(tile {tile}, 30 m, public GCS, no auth)"
             ]
             unc = (
-                f"Tier 1 indicative screening — Hansen GFC-2022-v1.10 pixel loss rate "
+                f"Tier 1 indicative screening — Hansen GFC-2025-v1.13 pixel loss rate "
                 f"(30 m, tile {tile}); baseline harvest rate from IUP permit not yet "
                 f"verified — dominant uncertainty. Not registry-grade."
             )
@@ -237,12 +253,9 @@ class GFWHTTPAdapter:
     def _stub_fallback(
         self, boundary: Boundary, reason: str
     ) -> tuple[dict[int, float], list[str], str]:
-        from core.data.stub import StubAdapter
-        stub = StubAdapter().query(boundary)
-        sources = [
-            f"GFW/Hansen annual loss (stub proxy — real pixel read failed: {reason})"
-        ]
-        return stub.annual_loss_ha, sources, stub.uncertainty_band
+        return {}, [f"Hansen loss data unavailable: {reason}"], (
+            "Satellite loss data unavailable; no carbon quantity can be asserted."
+        )
 
     # ── Density: ESA CCI -> IPCC fallback ────────────────────────────────────
 
@@ -301,9 +314,15 @@ class GFWHTTPAdapter:
         """Query forest data: real Hansen pixel loss + ESA CCI / IPCC density."""
         annual_loss, loss_sources, loss_unc = self._query_annual_loss(boundary)
 
-        # Baseline tree cover from stub (treecover2000 COG read: WO-CARBON-001c)
-        from core.data.stub import StubAdapter
-        baseline_pct = StubAdapter().query(boundary).baseline_cover_pct
+        # Year-2000 canopy is a historical input, not proof of current forest condition.
+        tile = self._hansen_tile_name(boundary.centroid_lat, boundary.centroid_lon)
+        cover_url = f"{_HANSEN_BASE}/Hansen_GFC-2025-v1.13_treecover2000_{tile}.tif"
+        cover = self._read_agb_cog(cover_url, boundary, treat_zero_as_nodata=False)
+        baseline_pct = cover if cover is not None else 0.0
+        loss_sources.append(
+            "Hansen treecover2000: historical canopy pixel mean inside plot"
+            if cover is not None else "Hansen canopy data unavailable"
+        )
 
         loss_after_2020 = sum(v for yr, v in annual_loss.items() if yr >= 2021)
 

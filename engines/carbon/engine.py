@@ -429,6 +429,11 @@ def _evaluate_forest_gate(boundary: Boundary, forest: ForestData) -> ForestPrese
     )
 
 
+def _recent_loss_years(forest: ForestData) -> list[int]:
+    years = sorted(forest.annual_loss_ha)
+    return [year for year in years if year >= max(2016, years[-1] - 7)] if years else []
+
+
 def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) -> CarbonEstimate:
     """Run the full carbon pre-feasibility engine.
 
@@ -443,6 +448,22 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
     """
     eligibility = run_eligibility(inp, boundary)
     methodology = build_methodology_route(inp)
+
+    data_unavailable = (not forest.annual_loss_ha or any(
+        "unavailable" in source.lower() for source in forest.data_sources
+    ))
+    if data_unavailable and inp.project_type != "PEAT":
+        eligibility = EligibilityResult(
+            gates=eligibility.gates,
+            verdict="hard_no" if eligibility.verdict == "hard_no" else "flagged",
+            reasons=eligibility.reasons + ["Satellite data unavailable; review required before a carbon estimate."],
+        )
+        return CarbonEstimate(
+            eligibility=eligibility, methodology=methodology, forest=forest,
+            quantity_low_tco2e=None, quantity_high_tco2e=None,
+            uncertainty="A live loss or canopy read failed. No carbon quantity is asserted. Submit a polygon or retry later.",
+            quality=_quality_factors(inp, methodology),
+        )
 
     # ADR-0013: peat parcels surface as "flagged" — never eligible for a headline number.
     # run_eligibility() is project-type-blind (it checks permit/years/area/location gates);
@@ -460,8 +481,8 @@ def run_carbon_engine(inp: CarbonInput, boundary: Boundary, forest: ForestData) 
     effective_area = boundary.area_ha if boundary.area_ha > 0 else 25_000.0
     project_years = _MAX_CREDITING_YR  # ADR-0017: fixed 30 yr for all methodologies
 
-    # Baseline annual loss rate: 8-year recent average (2016–2023) as proxy.
-    recent_years = [y for y in range(2016, 2024) if y in forest.annual_loss_ha]
+    # Baseline annual loss rate: 8-year recent average (latest eight available years) as proxy.
+    recent_years = [y for y in _recent_loss_years(forest) if y in forest.annual_loss_ha]
     if recent_years:
         avg_annual_loss_ha = sum(forest.annual_loss_ha[y] for y in recent_years) / len(recent_years)
     else:
@@ -802,6 +823,9 @@ def run_mixed_stratification(
         quantity_high_tco2e=None,
     )
 
+    if not forest.annual_loss_ha or any("unavailable" in source.lower() for source in forest.data_sources):
+        return run_carbon_engine(inp, boundary, forest)
+
     # ── Mineral stratum (REDD/IFM) ────────────────────────────────────────────
     eligibility = run_eligibility(inp, boundary)
     methodology = build_methodology_route(inp)
@@ -809,7 +833,7 @@ def run_mixed_stratification(
     quality = _quality_factors(inp, methodology)
 
     project_years = _MAX_CREDITING_YR  # ADR-0017: fixed 30 yr for all methodologies
-    recent_years = [y for y in range(2016, 2024) if y in forest.annual_loss_ha]
+    recent_years = [y for y in _recent_loss_years(forest) if y in forest.annual_loss_ha]
     if recent_years:
         avg_annual_loss_ha = (
             sum(forest.annual_loss_ha[y] for y in recent_years) / len(recent_years)
@@ -1096,7 +1120,7 @@ def _estimate_redd(
 
     sigma_combined = sqrt(CV_density² + CV_loss²)
       CV_density: from biomass_uncertainty_pct (ESA CCI SE) or source-based default
-      CV_loss: std/mean of Hansen annual-loss series 2016–2023
+      CV_loss: std/mean of Hansen annual-loss series latest eight available years
 
     Caller ensures forest.biomass_tco2_per_ha is not None (M2 gate).
     """
@@ -1109,7 +1133,7 @@ def _estimate_redd(
     # SEM = std / (mean × sqrt(n)) — reflects uncertainty in the estimated mean, not raw variability.
     # Using raw CV (std/mean) would penalise a stable series just because its inter-annual spread
     # is wide relative to a small mean; SEM shrinks with more years as expected for an estimator.
-    recent = [forest.annual_loss_ha[y] for y in range(2016, 2024) if y in forest.annual_loss_ha]
+    recent = [forest.annual_loss_ha[y] for y in _recent_loss_years(forest) if y in forest.annual_loss_ha]
     if len(recent) >= 2:
         mean_l = sum(recent) / len(recent)
         std_l = (_math.fsum((x - mean_l) ** 2 for x in recent) / len(recent)) ** 0.5
@@ -1149,12 +1173,12 @@ def _estimate_redd(
             f"relative SE: {cv_density*100:.0f}%"
         )
 
-    n_loss_yrs = len([y for y in range(2016, 2024) if y in forest.annual_loss_ha])
+    n_loss_yrs = len([y for y in _recent_loss_years(forest) if y in forest.annual_loss_ha])
     unc = (
         f"Tier 1 indicative screening — ADR-0016 M1 error budget (in quadrature): "
         f"carbon density [{density_label}]; "
         f"baseline loss-rate SEM {cv_loss*100:.1f}% "
-        f"(Hansen GFC-2022 2016–2023 {n_loss_yrs}-yr std/(mean×√n)); "
+        f"(Hansen annual loss, latest eight available years {n_loss_yrs}-yr std/(mean×√n)); "
         f"combined sigma {sigma*100:.0f}%; "
         f"central {central:,.0f} tCO2e; "
         f"pre-buffer band [{low_before_buf:,.0f}–{high_before_buf:,.0f}] tCO2e. "

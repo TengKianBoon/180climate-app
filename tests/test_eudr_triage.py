@@ -264,7 +264,7 @@ def test_jrc_url_default_is_single_cog(monkeypatch):
     """Default URL is the verified global single-COG (no per-tile guesswork)."""
     monkeypatch.delenv("JRC_GFC2020_URL", raising=False)
     url = _jrc_url(-1.0, 113.0)
-    assert url.endswith("single-cog/JRC_GFC2020_V3_COG.tif")
+    assert url.endswith("single-cog/JRC_GFC2020_V4_COG.tif")
     assert "jeodpp.jrc.ec.europa.eu" in url
 
 

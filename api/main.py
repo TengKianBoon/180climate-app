@@ -55,6 +55,7 @@ from api.intake import (
     router as intake_router,
 )
 from api.sheets import append_lead
+from api.site import router as site_router
 from reports.generator import generate_pdf, generate_docx, generate_eudr_pdf, ReportData, make_filename
 
 app = FastAPI(
@@ -77,6 +78,7 @@ app = FastAPI(
 app.include_router(fieldwork_router)
 app.include_router(commercial_router)
 app.include_router(intake_router)
+app.include_router(site_router)
 
 _FRONTEND = Path(__file__).parent.parent / "frontend"
 _DISCLAIMER_TEXT = (
@@ -754,7 +756,7 @@ _EUDR_TIMBER_NOTE = (
 )
 
 _EUDR_JRC_ATTRIBUTION = (
-    "Forest baseline: JRC GFC2020 V3, European Commission (EC JRC open data, 10 m, "
+    "Forest baseline: JRC GFC2020 V4, European Commission (EC JRC open data, 10 m, "
     "EUDR Art. 10 reference map)."
 )
 
@@ -1044,9 +1046,11 @@ def _eudr_finding_detail(pv, area_ha: float) -> str:
     area_fmt = f"{int(round(area_ha)):,}"
 
     if det == "clear_in_screen":
+        radar_note = "RADD unavailable" if "stub" in pv.datasets_version.lower() else "no RADD alerts found"
         return (
             f"We checked this ~{area_fmt} ha plot against the EU's 2020 forest baseline and found "
-            "no tree-cover loss after 31 December 2020 (Hansen shows zero; no RADD alerts). "
+            f"no tree-cover loss in the covered years 2021–2025 (Hansen shows zero; {radar_note}). "
+            "Annual loss data does not establish absence of clearing in 2026. "
             "A good screening result — but a screen isn't certification: you still file a DDS, "
             "and legality is checked separately."
         )

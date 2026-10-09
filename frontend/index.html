@@ -519,7 +519,7 @@
     <div class="card map-card" style="margin-top:1.25rem">
       <div id="map"></div>
       <div class="loss-wrap" id="loss-wrap" style="display:none">
-        <div class="loss-title">Annual forest loss — Hansen GFC-2022-v1.10</div>
+        <div class="loss-title">Annual forest loss — Hansen GFC-2025-v1.13 (loss through 2025)</div>
         <div class="loss-chart" id="loss-chart"></div>
         <div class="loss-note" id="loss-note"></div>
       </div>
@@ -580,7 +580,7 @@
     <!-- ONE footer disclaimer -->
     <p class="result-foot" id="result-footer" style="display:none">
       Indicative satellite screening, not a verified credit issuance or legal advice.
-      <a href="https://180climate.net/methodology" target="_blank">How this is calculated &amp; legal notes</a>
+      <a href="/methodology" target="_blank">How this is calculated &amp; legal notes</a>
     </p>
 
   </div><!-- /step-result -->
@@ -1081,7 +1081,7 @@ function renderResult() {
         + '<br>Avg: ' + winAvg.toFixed(0) + ' ha/yr'
         + '<br>Total: ' + fmtN(winTotal) + ' ha'
         + (ov.area_ha ? '<br>Concession: ' + fmtN(ov.area_ha) + ' ha' : '')
-        + '<br><span style="color:#aaa;font-size:10px">Hansen GFC-2022-v1.10</span>';
+        + '<br><span style="color:#aaa;font-size:10px">Hansen GFC-2025-v1.13 (loss through 2025)</span>';
       return d;
     };
     legend.addTo(_map);
