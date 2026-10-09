@@ -975,8 +975,9 @@ async function submitCarbon() {
       throw new Error(err.detail || ('Error ' + res.status + ' — please try again.'));
     }
     _result = await res.json();
-    renderResult();
+    // Leaflet must measure a visible result panel before fitting the polygon.
     showStep('step-result');
+    renderResult();
   } catch(e) {
     errEl.textContent = e.message; errEl.style.display = 'block';
   } finally {
@@ -1269,8 +1270,8 @@ async function submitEudr() {
     _eudrResult      = await res.json();
     _eudrContactName = name;
     _eudrCommodity   = commodity;
-    renderEudrResult();
     eudrShowStep('eudr-step-result');
+    renderEudrResult();
     // invalidateSize after the panel is visible so Leaflet measures the container correctly
     setTimeout(function() { if (_eudrMap) _eudrMap.invalidateSize(); }, 0);
   } catch(e) {
