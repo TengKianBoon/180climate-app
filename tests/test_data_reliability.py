@@ -97,3 +97,19 @@ def test_public_methodology_and_safe_crawl_urls():
     assert "30-year illustrative" in client.get("/methodology").text
     assert "evil.example" not in client.get("/sitemap.xml", headers={"host": "evil.example"}).text
     assert "Disallow: /fieldwork/status" in client.get("/robots.txt").text
+
+
+def test_invalid_or_unread_plots_never_get_complete_screening_readiness():
+    from api.main import _build_readiness
+    for invalid, inconclusive in ((1, 0), (0, 1)):
+        readiness = _build_readiness(invalid, 0, inconclusive)
+        assert readiness[1]["status"] == "incomplete"
+        assert readiness[2]["status"] == "incomplete"
+
+
+def test_small_loss_finding_does_not_claim_zero_or_radar_detection():
+    from api.main import _eudr_finding_detail
+    verdict = Mock(detection="loss_detected", loss_after_2020_ha=1.32)
+    finding = _eudr_finding_detail(verdict, 492.3)
+    assert "0.3%" in finding and "2026" in finding
+    assert "RADD radar" not in finding

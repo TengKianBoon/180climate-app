@@ -13,6 +13,21 @@ from reports.generator import ReportData, generate_pdf, generate_docx, make_file
 
 # ── Fixture: HTI eligible input ────────────────────────────────────────────────
 
+def test_current_loss_window_and_review_status_in_downloads(hti_eligible_data):
+    from docx import Document
+    hti_eligible_data.verdict = "flagged"
+    hti_eligible_data.verdict_label = "Flagged - permit and forest review required"
+    hti_eligible_data.forest_annual_loss_ha = {year: (1000 if year < 2018 else 10) for year in range(2001, 2026)}
+    pdf_text = _pdf_text(generate_pdf(hti_eligible_data))
+    doc = Document(io.BytesIO(generate_docx(hti_eligible_data)))
+    docx_text = "\n".join(p.text for p in doc.paragraphs)
+    for text in (pdf_text, docx_text):
+        assert "2018–2025" in text and "10 ha/yr" in text
+        assert "Flagged - permit and forest review required" in text
+        assert "carbon.180climate.net/methodology" in text
+        assert "2016–2022" not in text
+
+
 @pytest.fixture
 def hti_eligible_data() -> ReportData:
     return ReportData(

@@ -1305,9 +1305,9 @@ def _estimate_peat(
 def _quality_factors(inp: CarbonInput, route: MethodologyRoute) -> QualityFactors:
     """Real (non-placeholder) quality assessment for the pre-FS screening."""
     additionality = (
-        f"Legal harvest right exists and is documented (IUP permit type: {inp.permit_type}). "
-        "Project foregoes legally-permitted harvest — satisfies VCS/CCBS additionality test "
-        "(barrier analysis: legal right is the barrier to non-project baseline). "
+        f"Scenario assumes a lawful harvest right under the declared {inp.permit_type} permit. "
+        "Confirm the permit, approved harvest plans and counterfactual before an advisor "
+        "determines whether the VCS/CCBS additionality requirements are met. "
         f"Additionality basis: {route.additionality_basis}."
     )
     permanence = (

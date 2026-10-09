@@ -855,7 +855,8 @@ _EUDR_INDONESIA_CONTEXT: dict = {
     "risk_level": "Standard risk",
     "due_diligence": "Full due diligence required",
     "simplified_route_note": (
-        "The simplified due diligence route (no geolocation required) applies only to low-risk countries. "
+        "Simplified due diligence may apply to low-risk sources under the applicable conditions; "
+        "it does not waive the required information gathering. "
         "Indonesia is standard-risk — full due diligence applies, and your geolocation pack is required."
     ),
     "deadlines": [
@@ -933,7 +934,7 @@ def _build_geolocation_pack(
                 "producer_name": producer_name,
                 "run_date": run_date,
                 "pack_note": (
-                    "Screened against JRC GFC2020 + Hansen + RADD. "
+                    "Screening attempted with JRC GFC2020 and Hansen; optional RADD availability is shown in the result. "
                     "Not a Due Diligence Statement. "
                     "Geolocation pack for DDS preparation."
                 ),
@@ -950,7 +951,8 @@ def _build_geolocation_pack(
 def _build_readiness(inval_count: int, loss_count: int, incon_count: int) -> list[dict]:
     """Categorical readiness checklist (ADR-0018: no numeric score, ✓/incomplete per component)."""
     geo_ok = inval_count == 0
-    screen_ok = (loss_count == 0 and incon_count == 0)
+    screen_ok = (loss_count == 0 and incon_count == 0 and inval_count == 0)
+    sources_read = (inval_count == 0 and incon_count == 0)
     return [
         {
             "component": "Plots have valid geolocation (EUDR Art. 9)",
@@ -963,8 +965,8 @@ def _build_readiness(inval_count: int, loss_count: int, incon_count: int) -> lis
         },
         {
             "component": "Plots screened against the EU's forest maps",
-            "status": "complete",
-            "note": "All submitted plots have been screened (JRC GFC2020 + Hansen + RADD).",
+            "status": "complete" if sources_read else "incomplete",
+            "note": "Screening uses JRC GFC2020 and Hansen. Check each plot's result and dataset versions for coverage and optional RADD availability.",
         },
         {
             "component": "Screening result resolved",
@@ -1064,12 +1066,12 @@ def _eudr_finding_detail(pv, area_ha: float) -> str:
                 ha_str = f"{ha:.1f}"
             else:
                 ha_str = f"{ha:,.0f}"
-            pct_part = f" (~{round(ha / area_ha * 100)}%)" if area_ha > 0 else ""
+            pct_part = f" (~{ha / area_ha * 100:.1f}%)" if area_ha > 0 else ""
             return (
                 f"We found about {ha_str} ha of tree-cover loss on this ~{area_fmt} ha plot"
                 f"{pct_part} after the EU's 31 December 2020 cutoff, on land the EU's 2020 map "
-                "shows as forest. It shows up in the EU's satellite data (Hansen annual loss / "
-                "RADD radar). Satellite sees the loss but not the cause — it could be permitted "
+                "shows as forest. Hansen annual satellite data detects loss through 2025; "
+                "it does not establish absence of clearing in 2026. Satellite sees the loss but not the cause — it could be permitted "
                 "harvest, a road, fire, or replanting — so document what happened and clear it "
                 "before this plot enters a DDS."
             )
