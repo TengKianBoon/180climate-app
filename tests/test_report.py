@@ -192,16 +192,16 @@ class TestPdf:
         assert "Hansen" in text  # "GFW/Hansen GFC-2022-v1.10" is in data_sources
 
     def test_value_first_cta_present(self, hti_eligible_data):
-        # Value-first CTA: "bankable" + CTA contact
+        # A professional-services CTA must preserve the credit issuance gate.
         text = _pdf_text(generate_pdf(hti_eligible_data))
-        assert "bankable" in text
+        assert "Credit issuance requires validation and verification" in text
         assert "site visit" in text
         assert "180climate.net" in text
 
     def test_why_qualifies_adr_0009(self, hti_eligible_data):
-        # APD path should appear in "Why Your Forest Qualifies" section
+        # APD is a potential methodology path, not an eligibility finding.
         text = _pdf_text(generate_pdf(hti_eligible_data))
-        assert "Why Your Forest Qualifies" in text
+        assert "Potential Methodology Path" in text
         assert "APD" in text
         assert "applicable Verra methodology" in text or "APD" in text
 
@@ -301,13 +301,13 @@ class TestDocx:
     def test_value_first_cta_present(self, hti_eligible_data):
         result = generate_docx(hti_eligible_data)
         text = self._extract_text(result)
-        assert "bankable" in text
+        assert "Credit issuance requires validation and verification" in text
         assert "180climate.net" in text
 
     def test_why_qualifies_adr_0009(self, hti_eligible_data):
         result = generate_docx(hti_eligible_data)
         text = self._extract_text(result)
-        assert "Why Your Forest Qualifies" in text
+        assert "Potential Methodology Path" in text
         assert "APD" in text
 
     def test_no_accredited_methodology_trust_risk(self, hti_eligible_data):

@@ -99,9 +99,9 @@ class ReportData:
             return f"US${n:,.0f}"
 
         return (
-            f"At indicative voluntary-carbon prices (~US${p}/tonne), "
+            f"At an assumed sale price of US${p}/tonne, "
             f"roughly {_fmt_m(lo)} – {_fmt_m(hi)} across the project. "
-            f"(Indicative market range, not a quote.)"
+            f"(Scenario only; eligibility, issuance and sale price require review.)"
         )
 
     def methodology_short(self) -> str:
@@ -168,14 +168,14 @@ _FOOTER_LINE = (
 _CTA_BODY = (
     "Your next step — engage 180Climate. "
     "A Pre-Feasibility Study (site visit, field sampling, financial model, "
-    "methodology lock-in, market access) turns this screening into a bankable, "
-    "verified number.\n\n"
+    "methodology review) assesses the scenario against project evidence. "
+    "Credit issuance requires validation and verification under the applicable methodology.\n\n"
     "info@180climate.net   ·   www.180climate.net"
 )
 
 _GROW_TEXT = (
-    "Upload your harvest plan (RKU/RKT) — it tightens this estimate and proves "
-    "the project counts, moving you from 'opportunity' to 'fundable.'"
+    "Review your permit and harvest plan (RKU/RKT) to establish the baseline, "
+    "project rights and additionality before a credit estimate can be validated."
 )
 
 _PEAT_FOUND_TEXT = (
@@ -191,7 +191,7 @@ def _derivation_rows(d: Any) -> list[tuple[str, str]]:
     if d is None:
         return []
     rows: list[tuple[str, str]] = []
-    rows.append(("Eligible forest area", f"{d.eligible_area_ha:,.0f} ha"))
+    rows.append(("Forest area used in scenario", f"{d.eligible_area_ha:,.0f} ha"))
     if d.basis == "redd":
         if d.baseline_loss_rate_yr is not None:
             rows.append(("Observed forest-loss rate", f"{d.baseline_loss_rate_yr*100:.4f}%/yr (satellite baseline)"))
@@ -424,7 +424,7 @@ def generate_pdf(data: ReportData) -> bytes:
 
     # ── 3. Why your forest qualifies ─────────────────────────────────────────
     story.append(sec_hr())
-    story.append(Paragraph("Why Your Forest Qualifies", H2))
+    story.append(Paragraph("Potential Methodology Path", H2))
     story.append(Paragraph(data.why_qualifies(), BODY))
 
     # ── 4. How strong is your project (quality as strengths) ─────────────────
@@ -497,7 +497,7 @@ def generate_pdf(data: ReportData) -> bytes:
         story.append(Paragraph(
             "Grounded in satellite forest-loss data (Hansen/GFW), ESA CCI biomass and "
             "IPCC factors. It's a range because it's a free screening — "
-            "<b>a field study narrows it into a bankable number. That's the upgrade.</b>",
+            "<b>Project documents and field evidence are needed to assess this scenario.</b>",
             SMALL))
     elif data.baseline_class == "peat":
         story.append(sec_hr())
@@ -541,7 +541,7 @@ def generate_pdf(data: ReportData) -> bytes:
 
     # ── 7. How to grow this number ────────────────────────────────────────────
     story.append(sec_hr())
-    story.append(Paragraph("How to Grow This Number", H2))
+    story.append(Paragraph("Evidence to Review Next", H2))
     story.append(Paragraph(_GROW_TEXT, BODY))
 
     # ── 8. CTA ────────────────────────────────────────────────────────────────
@@ -686,7 +686,7 @@ def generate_docx(data: ReportData) -> bytes:
     _hr()
 
     # ── 3. Why your forest qualifies ─────────────────────────────────────────
-    _h2("Why Your Forest Qualifies")
+    _h2("Potential Methodology Path")
     _body(data.why_qualifies())
     _hr()
 
@@ -706,7 +706,7 @@ def generate_docx(data: ReportData) -> bytes:
         _body(
             "Grounded in satellite forest-loss data (Hansen/GFW), ESA CCI biomass and "
             "IPCC factors. It's a range because it's a free screening — "
-            "a field study narrows it into a bankable number. That's the upgrade.",
+            "Project documents and field evidence are needed to assess this scenario.",
             colour=_GREY, size=9,
         )
     elif data.baseline_class == "peat":
@@ -747,7 +747,7 @@ def generate_docx(data: ReportData) -> bytes:
     _hr()
 
     # ── 7. How to grow ────────────────────────────────────────────────────────
-    _h2("How to Grow This Number")
+    _h2("Evidence to Review Next")
     _body(_GROW_TEXT)
     _hr()
 
