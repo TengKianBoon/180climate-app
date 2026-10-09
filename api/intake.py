@@ -26,7 +26,7 @@ from fastapi.responses import Response
 
 router = APIRouter(prefix="/api/intake", tags=["intake"])
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 _DEFAULT_DB = Path(__file__).parent.parent / ".runtime" / "180climate-intake.sqlite3"
 _APPLICATIONS = ("carbon", "eudr")
 
@@ -184,6 +184,19 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             ON intake_submissions(application, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_intake_contact_email
             ON intake_submissions(contact_email);
+        CREATE TABLE IF NOT EXISTS intake_register_jobs (
+            reference TEXT PRIMARY KEY REFERENCES intake_submissions(reference) ON DELETE CASCADE,
+            recipient TEXT NOT NULL,
+            state TEXT NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            next_attempt_at TEXT NOT NULL,
+            claimed_at TEXT,
+            first_attempt_at TEXT,
+            accepted_at TEXT,
+            message_id TEXT,
+            last_error TEXT
+        );
         """
     )
     conn.execute(
@@ -257,6 +270,11 @@ def capture_submission(
                     (created + timedelta(days=retention_days)).isoformat(),
                 ),
             )
+            if os.environ.get("INTAKE_REGISTER_EMAIL_ENABLED", "").strip().lower() == "true":
+                conn.execute(
+                    "INSERT INTO intake_register_jobs(reference,recipient,created_at,next_attempt_at) VALUES (?,?,?,?)",
+                    (reference, os.environ.get("LEAD_RECIPIENT_EMAIL", "").strip(), created.isoformat(), created.isoformat()),
+                )
     except Exception as exc:
         raise IntakeStorageError("Required intake record could not be saved") from exc
     return reference
@@ -351,3 +369,25 @@ def export_submissions(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="180climate-intake.csv"'},
     )
+
+
+@router.get("/register.xlsx")
+def export_register(authorization: str | None = Header(None)) -> Response:
+    """Download the current private register; does not send an email."""
+    _require_operator(authorization)
+    _require_ready_registry()
+    from api.register_notifications import refresh_snapshot
+    data, _ = refresh_snapshot()
+    return Response(
+        data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="180Climate-Submission-Register.xlsx"', "Cache-Control": "no-store"},
+    )
+
+
+@router.get("/register/status")
+def register_status(authorization: str | None = Header(None)) -> dict[str, Any]:
+    _require_operator(authorization)
+    _require_ready_registry()
+    from api.register_notifications import notification_status
+    return notification_status()

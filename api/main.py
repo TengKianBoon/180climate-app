@@ -55,10 +55,12 @@ from api.intake import (
     router as intake_router,
 )
 from api.sheets import append_lead
+from api.register_notifications import register_lifespan
 from api.site import router as site_router
 from reports.generator import generate_pdf, generate_docx, generate_eudr_pdf, ReportData, make_filename
 
 app = FastAPI(
+    lifespan=register_lifespan,
     title="180Climate Screening and Fieldwork API",
     version="0.3.0",
     description=(
