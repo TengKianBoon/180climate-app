@@ -506,10 +506,10 @@
 
     <!-- Value-first hero card -->
     <div id="result-hero" class="result-hero">
-      <div class="rlbl" id="result-lbl">Estimated carbon credits</div>
+      <div class="rlbl" id="result-lbl">Indicative carbon scenario</div>
       <div class="rnum" id="result-num"></div>
       <div class="rsub" id="result-sub"></div>
-      <span class="rchip" id="result-chip">Indicative satellite screening — yours to make bankable</span>
+      <span class="rchip" id="result-chip">Screening status — review required</span>
     </div>
     <div id="worth-box" class="worth-box" style="display:none">
       💰 <b>What that's worth:</b> <span id="worth-text"></span>
@@ -532,14 +532,14 @@
     </div>
 
     <!-- Value-first 3-move section -->
-    <h2 class="moves-h" id="moves-heading" style="display:none">Here's how to lock that number in</h2>
+    <h2 class="moves-h" id="moves-heading" style="display:none">Evidence to review next</h2>
 
     <!-- Move 1: RKU/RKT -->
     <div class="move" id="move-plan" style="display:none">
       <div class="ic">📋</div>
       <div class="bd">
-        <b>Upload your harvest plan (RKU/RKT)</b> — it <span class="hl">tightens your estimate</span>
-        and proves the project counts. This is what moves you from "opportunity" to "fundable."
+        <b>Review your permit and harvest plan (RKU/RKT).</b> These documents help establish
+        the baseline, project rights and additionality before a credit estimate can be validated.
       </div>
     </div>
 
@@ -547,7 +547,7 @@
     <div class="move" id="move-land" style="display:none">
       <div class="ic">🗺️</div>
       <div class="bd" id="move-land-text">
-        <b>We checked your land against the national forest map.</b>
+        <b>Confirm current land conditions and restrictions.</b>
         <span id="move-land-detail"></span>
       </div>
     </div>
@@ -556,8 +556,9 @@
     <div class="move cta-move" id="move-cta" style="display:none">
       <div class="ic">✅</div>
       <div class="bd">
-        <b>Your next step.</b> A <b>180Climate Pre-Feasibility Study</b> turns this into a bankable,
-        verified number — with our team on the ground.
+        <b>Your next step.</b> A <b>180Climate Pre-Feasibility Study</b> reviews the satellite
+        scenario against project documents and field evidence. Credit issuance requires the
+        applicable methodology, validation and verification.
         <div style="margin-top:.75rem">
           <a href="mailto:info@180climate.net" style="color:#fff;font-weight:700;font-size:.95rem">
             Talk to 180Climate → info@180climate.net</a>
@@ -1009,19 +1010,26 @@ function renderResult() {
 
   // ── Normal result ─────────────────────────────────────────────────────────
   document.getElementById('result-title').textContent = _cache.iup_name;
+  document.getElementById('result-chip').style.display = 'inline-block';
+  document.getElementById('result-chip').textContent =
+    'Screening status: ' + (r.verdict || 'Review required');
+  document.getElementById('result-hero').style.background =
+    verdict === 'eligible' && r.verdict && !/flag|review|inconclusive/i.test(r.verdict)
+      ? 'linear-gradient(135deg,#065F46,#059669)'
+      : 'linear-gradient(135deg,#78350f,#92400e)';
 
   var hasRange = (ov.quantity_low_tco2e != null && ov.quantity_high_tco2e != null);
   var isPeat   = (ov.baseline_class === 'peat');
 
   if (hasRange) {
     document.getElementById('result-lbl').textContent =
-      'Estimated carbon credits · ' + (_cache.iup_name || 'your concession');
+      'Indicative carbon scenario · ' + (_cache.iup_name || 'your concession');
     document.getElementById('result-num').textContent =
       fmtN(ov.quantity_low_tco2e) + ' – ' + fmtN(ov.quantity_high_tco2e) + ' tCO₂e';
     var perYrLow  = ov.quantity_low_per_yr_tco2e;
     var perYrHigh = ov.quantity_high_per_yr_tco2e;
     document.getElementById('result-sub').textContent =
-      'over a 30-year project'
+      '30-year illustration — project eligibility requires evidence review'
       + (perYrLow != null ? '  ·  ≈ ' + fmtN(perYrLow) + ' – ' + fmtN(perYrHigh) + ' tonnes per year' : '');
 
     // Worth box
@@ -1030,13 +1038,12 @@ function renderResult() {
     var hiUsd = Math.round(ov.quantity_high_tco2e * price);
     function fmtM(n) { return n >= 1e6 ? 'US$' + Math.round(n/1e6) + 'M' : 'US$' + fmtN(n); }
     document.getElementById('worth-text').textContent =
-      'at indicative voluntary-carbon prices (~US$' + price + '/tonne), roughly '
+      'at an assumed sale price of US$' + price + '/tonne, roughly '
       + fmtM(loUsd) + ' – ' + fmtM(hiUsd) + ' across the project. '
-      + '(Indicative market range, not a quote.)';
+      + '(Scenario only; eligibility, issuance and sale price require review.)';
     document.getElementById('worth-box').style.display = 'block';
   } else if (isPeat) {
-    document.getElementById('result-hero').style.background = 'linear-gradient(135deg,#065F46,#059669)';
-    document.getElementById('result-lbl').textContent = 'Your land has a carbon pathway';
+    document.getElementById('result-lbl').textContent = 'Potential peat restoration pathway';
     document.getElementById('result-num').textContent = 'Restoration project opportunity';
     document.getElementById('result-sub').textContent =
       'Peat rewetting / WRC may qualify — see move cards below';
@@ -1044,7 +1051,6 @@ function renderResult() {
     document.getElementById('result-lbl').textContent = 'Screening flag — review required';
     document.getElementById('result-num').textContent = '';
     document.getElementById('result-sub').textContent = r.summary || '';
-    document.getElementById('result-chip').style.display = 'none';
   }
 
   // ── Map ────────────────────────────────────────────────────────────────────
@@ -1094,14 +1100,14 @@ function renderResult() {
   // Land check move: surface flags as opportunities
   var landDetail = '';
   if (isPeat || ov.baseline_class === 'peat') {
-    landDetail = ' Peat areas on your land qualify for a <span class="hl">restoration project that can also pay</span> — nearly all your land has a credit pathway. You know this before spending a rupiah on a field study.';
+    landDetail = ' A peat restoration scenario may be relevant. Confirm peat extent, drainage, project rights and methodology eligibility with documents and field evidence.';
   } else if (ov.forest_condition === 'cleared') {
     landDetail = ' We found that most of the area appears cleared — the carbon opportunity may depend on residual forest or forest regrowth. A field check is the upgrade.';
   } else if (ov.forest_condition) {
     var fgMap = { intact: 'mostly intact', light_degradation: 'lightly degraded', heavy_degradation: 'heavily degraded', unknown: 'satellite-visible' };
-    landDetail = ' Your forest appears <b>' + (fgMap[ov.forest_condition] || ov.forest_condition) + '</b> — the basis of your number. We caught any protected-zone overlaps for you before any field spend.';
+    landDetail = ' Historical satellite indicators suggest <b>' + (fgMap[ov.forest_condition] || ov.forest_condition) + '</b> forest. Confirm current forest condition, natural-forest classification and protected-zone overlaps before proceeding.';
   } else {
-    landDetail = ' We checked your land against national forest maps. Any protected-zone overlaps have been identified.';
+    landDetail = ' Review current land classification and protected-zone boundaries. This screening does not establish clearance of protected-zone overlaps.';
   }
   document.getElementById('move-land-detail').innerHTML = landDetail;
   document.getElementById('move-land').style.display = 'flex';
