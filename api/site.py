@@ -64,6 +64,8 @@ def dataset_health() -> dict:
         warnings = []
         if not os.environ.get("RADD_API_KEY") or os.environ.get("RADD_DISABLE_LIVE") == "true":
             warnings.append("RADD radar enrichment unavailable; results rely on JRC and Hansen.")
+        else:
+            warnings.append("RADD is configured but not probed here; radar availability is checked per plot.")
         if os.environ.get("SCREENING_USE_TEST_FIXTURES") == "true":
             warnings.append("Test fixtures enabled: unsuitable for production screening.")
         healthy = all(c["available"] for c in checks.values()) and os.environ.get("SCREENING_USE_TEST_FIXTURES") != "true"

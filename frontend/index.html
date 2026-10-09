@@ -1067,9 +1067,7 @@ function renderResult() {
     }
   }
   if (ov.data) {
-    var winYears = Object.keys(ov.data).filter(function(y) {
-      var yr = parseInt(y, 10); return yr >= 2016 && yr <= 2022;
-    });
+    var winYears = carbonLossWindowYears(ov.data);
     var winTotal = winYears.reduce(function(s, y) { return s + (ov.data[y] || 0); }, 0);
     var winAvg   = winYears.length ? winTotal / winYears.length : 0;
     var legend = L.control({ position: 'bottomright' });
@@ -1077,7 +1075,7 @@ function renderResult() {
       var d = L.DomUtil.create('div');
       d.style.cssText = 'background:rgba(255,255,255,.93);padding:8px 12px;border-radius:6px;'
         + 'font-size:11px;line-height:1.6;max-width:185px;box-shadow:0 1px 5px rgba(0,0,0,.18)';
-      d.innerHTML = '<strong>Forest Loss 2016–22</strong>'
+      d.innerHTML = '<strong>Forest Loss ' + winYears[0] + '–' + winYears[winYears.length - 1] + '</strong>'
         + '<br>Avg: ' + winAvg.toFixed(0) + ' ha/yr'
         + '<br>Total: ' + fmtN(winTotal) + ' ha'
         + (ov.area_ha ? '<br>Concession: ' + fmtN(ov.area_ha) + ' ha' : '')
@@ -1116,6 +1114,13 @@ function renderResult() {
 }
 
 // ── Annual loss bar chart ──────────────────────────────────────────────────
+function carbonLossWindowYears(data) {
+  var years = Object.keys(data || {}).map(Number).sort(function(a,b) { return a-b; });
+  if (!years.length) return [];
+  var start = Math.max(2016, years[years.length - 1] - 7);
+  return years.filter(function(y) { return y >= start; });
+}
+
 function renderLossChart(data) {
   var wrap  = document.getElementById('loss-wrap');
   var el    = document.getElementById('loss-chart');
@@ -1129,7 +1134,8 @@ function renderLossChart(data) {
   var vals   = years.map(function(y) { return data[String(y)] || 0; });
   var maxVal = Math.max.apply(null, vals.concat([1]));
   var winSet = {};
-  years.forEach(function(y) { if (y >= 2016 && y <= 2022) winSet[y] = true; });
+  var windowYears = carbonLossWindowYears(data);
+  windowYears.forEach(function(y) { winSet[y] = true; });
   var winVals = years.filter(function(y) { return winSet[y]; })
     .map(function(y) { return data[String(y)] || 0; });
   var winAvg  = winVals.length
@@ -1149,7 +1155,8 @@ function renderLossChart(data) {
   noteEl.innerHTML =
     '<span style="display:inline-block;width:10px;height:7px;background:#e53935;border-radius:1px;'
     + 'margin-right:4px;vertical-align:middle"></span>'
-    + '2016–2022 averaging window (avg ' + winAvg.toFixed(0) + ' ha/yr used in estimate)';
+    + windowYears[0] + '–' + windowYears[windowYears.length - 1]
+    + ' averaging window (avg ' + winAvg.toFixed(0) + ' ha/yr used in estimate)';
 
   wrap.style.display = 'block';
 }

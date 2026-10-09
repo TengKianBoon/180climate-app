@@ -120,19 +120,17 @@ class ReportData:
         pt = self.permit_type
         if bc == "planned_clearfell":
             return (
-                f"Avoided Planned Deforestation (APD). Your {pt} permit is a legal right "
-                "to clear-fell this natural forest. A carbon project earns by foregoing that "
-                "clearance — the forest stays standing and the avoided emissions become credits. "
-                "That is the right Verra pathway for a timber concession holding standing natural "
-                "forest, and it is why this opportunity exists for you specifically."
+                f"Avoided Planned Deforestation (APD) scenario, based on the declared {pt} permit. "
+                "This scenario assumes lawful planned clearing could occur without the project. "
+                "Confirm the permit, approved harvest plans, natural-forest status and additionality "
+                "before selecting an applicable Verra methodology. Satellite data does not verify those rights."
             )
         if bc == "planned_selective":
             return (
-                f"Improved Forest Management (IFM). Your {pt} permit authorises selective "
-                "logging. A carbon project earns by reducing the harvest intensity below the "
-                "permitted baseline — the unharvested trees continue growing and sequestering "
-                "carbon. This is the correct Verra pathway for a selective-logging concession, "
-                "and it is why your concession qualifies."
+                f"Improved Forest Management (IFM) scenario, based on the declared {pt} permit. "
+                "This scenario assumes lawful selective logging and a reduction in harvest intensity. "
+                "Confirm the permit, approved harvest plans and additionality before selecting "
+                "an applicable Verra methodology. Satellite data does not verify those rights."
             )
         if bc == "peat":
             return (
@@ -164,7 +162,7 @@ class ReportData:
 
 _FOOTER_LINE = (
     "Indicative satellite screening — not a verified credit issuance or legal advice. "
-    "IPCC Tier 1 approach. How this is calculated & legal notes: 180climate.net/methodology."
+    "IPCC Tier 1 approach. How this is calculated & legal notes: carbon.180climate.net/methodology."
 )
 
 _CTA_BODY = (
@@ -225,16 +223,18 @@ def _what_we_found(data: "ReportData") -> list[str]:
     items: list[str] = []
     if data.forest_baseline_cover_pct is not None:
         items.append(
-            f"{data.area_ha:,.0f} ha of forest ({data.forest_baseline_cover_pct:.0f}% "
-            "canopy cover) — the basis of your number."
+            f"Submitted area: {data.area_ha:,.0f} ha; historical canopy cover "
+            f"{data.forest_baseline_cover_pct:.0f}% (Hansen treecover2000). "
+            "This is not a current natural-forest classification."
         )
     if data.forest_annual_loss_ha:
-        win = {y: v for y, v in data.forest_annual_loss_ha.items() if 2016 <= y <= 2022}
+        years = _report_loss_years(data.forest_annual_loss_ha)
+        win = {y: data.forest_annual_loss_ha[y] for y in years}
         if win:
             avg = sum(win.values()) / len(win)
             items.append(
-                f"Measurable clearing trend ({avg:,.0f} ha/yr observed, 2016–2022) "
-                "that a project would avoid — a real, bankable baseline."
+                f"Observed tree-cover loss: {avg:,.0f} ha/yr in {years[0]}–{years[-1]}. "
+                "A project counterfactual and the cause of loss require separate evidence."
             )
     if data.forest_peat_present:
         items.append(
@@ -249,6 +249,12 @@ def _what_we_found(data: "ReportData") -> list[str]:
     if data.baseline_class == "peat":
         items.append(_PEAT_FOUND_TEXT)
     return items
+
+
+def _report_loss_years(series: dict) -> list[int]:
+    """Use the same latest-eight-year window as the Carbon engine."""
+    years = sorted(series)
+    return [y for y in years if y >= max(2016, years[-1] - 7)] if years else []
 
 
 # ── PDF ───────────────────────────────────────────────────────────────────────
@@ -336,6 +342,7 @@ def generate_pdf(data: ReportData) -> bytes:
         ("Concession", data.iup_name),
         ("Region", data.iup_address or "—"),
         ("Permit", f"{data.permit_type} · {data.permit_years_remaining} years remaining"),
+        ("Screening status", data.verdict_label),
         ("Prepared for", data.contact_name + (f", {data.contact_company}" if data.contact_company else "")),
         ("Reference", data.filename_base),
         ("Date (UTC)", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
@@ -374,12 +381,16 @@ def generate_pdf(data: ReportData) -> bytes:
             Paragraph(data.range_str(), HERO_NUM),
             Paragraph(f"over a 30-year project  ·  {data.per_yr_str()}", HERO_SUB),
         ]
-    else:
+    elif data.baseline_class == "peat":
         hero_inner = [
             Paragraph("Your land has a carbon pathway", LABEL),
             Paragraph("Restoration project opportunity", HERO_NUM),
             Paragraph("Peat rewetting / WRC may qualify — see 'What we found'", HERO_SUB),
         ]
+    else:
+        hero_inner = [Paragraph("Screening review required", LABEL),
+                      Paragraph("No carbon estimate available", HERO_NUM),
+                      Paragraph("Resolve the data or eligibility issues before estimating a project.", HERO_SUB)]
     # Hero as green table cell
     from reportlab.platypus import Table as RLTable, TableStyle as RLTS
     hero_tbl = RLTable([[hero_inner]], colWidths=["100%"])
@@ -516,11 +527,11 @@ def generate_pdf(data: ReportData) -> bytes:
         story.append(Paragraph(
             f"<b>Annual loss (all years avg):</b> {_avg:,.0f} ha/yr "
             f"({_yrs[0]}–{_yrs[-1]})", SMALL))
-        _win = [y for y in _yrs if 2016 <= y <= 2022]
+        _win = _report_loss_years(data.forest_annual_loss_ha)
         if _win:
             _wa = sum(data.forest_annual_loss_ha[y] for y in _win) / len(_win)
             story.append(Paragraph(
-                f"<b>Loss rate (2016–2022 avg, used in estimate):</b> "
+                f"<b>Loss rate ({_win[0]}–{_win[-1]} avg, used in REDD scenario):</b> "
                 f"{_wa:,.0f} ha/yr", SMALL))
 
     # Data sources credit (always shown if data_sources present)
@@ -644,6 +655,7 @@ def generate_docx(data: ReportData) -> bytes:
         ("Concession", data.iup_name),
         ("Region", data.iup_address or "—"),
         ("Permit", f"{data.permit_type} · {data.permit_years_remaining} years remaining"),
+        ("Screening status", data.verdict_label),
         ("Prepared for", data.contact_name + (f", {data.contact_company}" if data.contact_company else "")),
         ("Reference", data.filename_base),
         ("Date (UTC)", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
@@ -664,10 +676,13 @@ def generate_docx(data: ReportData) -> bytes:
               italic=True, colour=_GREY, size=10)
         if data.worth_str():
             _body(f"What that's worth: {data.worth_str()}", colour=_GDEEP, size=9)
-    else:
+    elif data.baseline_class == "peat":
         _body("Your land has a carbon pathway", colour=_GDEEP, size=9, bold=True)
         _body("Peat rewetting / restoration project may qualify", bold=True,
               colour=_GREEN, size=14)
+    else:
+        _body("No carbon estimate available", colour=_GDEEP, size=14, bold=True)
+        _body("Resolve the data or eligibility issues before estimating a project.")
     _hr()
 
     # ── 3. Why your forest qualifies ─────────────────────────────────────────
@@ -720,10 +735,10 @@ def generate_docx(data: ReportData) -> bytes:
             _avg = _tot / len(_yrs) if _yrs else 0
             _kv("Annual loss (all years avg)",
                 f"{_avg:,.0f} ha/yr ({_yrs[0]}–{_yrs[-1]})")
-            _win = [y for y in _yrs if 2016 <= y <= 2022]
+            _win = _report_loss_years(data.forest_annual_loss_ha)
             if _win:
                 _wa = sum(data.forest_annual_loss_ha[y] for y in _win) / len(_win)
-                _kv("Loss rate (2016–2022 avg, used in estimate)", f"{_wa:,.0f} ha/yr")
+                _kv(f"Loss rate ({_win[0]}–{_win[-1]} avg, used in REDD scenario)", f"{_wa:,.0f} ha/yr")
         _hr()
 
     # Data sources credit
@@ -927,8 +942,9 @@ def generate_eudr_pdf(body: dict) -> bytes:
     ]))
     story.append(intro_tbl)
     story.append(Paragraph(
-        "<i>Maps used: JRC Global Forest Cover 2020, Hansen Global Forest Change, and RADD "
-        "alerts — public satellite data the EU itself references.</i>",
+        "<i>Sources: JRC Global Forest Cover 2020 and Hansen Global Forest Change; "
+        "RADD radar enrichment is optional. Actual dataset versions and availability: "
+        + str(body.get("datasets_version", "Not recorded")) + "</i>",
         ParagraphStyle("FnE", parent=SMALL, fontSize=7.5, spaceAfter=6, spaceBefore=3)))
     story.append(Spacer(1, 4))
 
@@ -1199,7 +1215,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
         "Free indicative triage — not a Due Diligence Statement, not legal advice. "
         "Checks deforestation signals only; EUDR also requires legality "
         "(permits, land tenure, Indonesian law) — a satellite-clear plot can still be blocked on legality. "
-        "Forest baseline: JRC GFC2020 V3, European Commission (EC JRC open data, 10 m, EUDR Art. 10 reference map). "
+        f"{body.get('jrc_attribution', 'Forest baseline provenance: see dataset versions above.')} "
         f"Report ref: {filename_base}."
     )
     story.append(Spacer(1, 12))
