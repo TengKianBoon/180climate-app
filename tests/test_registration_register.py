@@ -81,6 +81,16 @@ def test_unknown_eudr_metrics_are_blank_and_known_zero_is_numeric(configured):
     ]})
     row = register_tables([record])[0][0]
     assert row[20] == 123 and row[22] == 0
+    # Legacy numeric placeholders must not become confirmed zero in emailed registers.
+    record["result_json"] = json.dumps({"plots": [
+        {"area_ha": 123, "loss_after_2020_ha": 0, "hansen_available": False},
+    ]})
+    assert register_tables([record])[0][0][22] is None
+    record["result_json"] = json.dumps({"plots": [
+        {"area_ha": 0, "loss_after_2020_ha": 0, "geometry_ok": False},
+    ]})
+    row = register_tables([record])[0][0]
+    assert row[20] is None and row[22] is None
 
 
 def test_newest_first_ranges_coords_and_formulas_are_literal(configured):

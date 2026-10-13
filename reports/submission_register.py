@@ -87,8 +87,12 @@ def register_tables(records: list[dict[str, Any]]) -> list[list[list[Any]]]:
         if low is None or high is None or low < 0 or high < low:
             low = high = None
         plots = result.get("plots") or []
-        areas = [_number(p.get("area_ha")) for p in plots]
-        losses = [_number(p.get("loss_after_2020_ha")) for p in plots]
+        areas = [value if (value := _number(p.get("area_ha"))) is not None
+                 and value > 0 and p.get("geometry_ok") is not False else None for p in plots]
+        losses = [_number(p.get("loss_after_2020_ha")) if p.get("geometry_ok") is not False
+                  and p.get("hansen_available") is not False
+                  and not (p.get("detection") == "inconclusive" and p.get("hansen_available") is None)
+                  else None for p in plots]
         area = _number(overlay.get("area_ha", result.get("area_ha"))) if carbon else (
             sum(v for v in areas if v is not None)
             if areas and all(v is not None for v in areas) else None
