@@ -960,7 +960,7 @@ def generate_eudr_pdf(body: dict) -> bytes:
         )
     else:
         dds_sub = (
-            "One or more plots are inconclusive — review needed before filing a DDS. "
+            "One or more screening or boundary findings need review before filing a DDS. "
             "See per-plot detail and readiness checklist below."
         )
     hero_inner = [
@@ -1009,11 +1009,12 @@ def generate_eudr_pdf(body: dict) -> bytes:
             det = p.get("detection", "inconclusive")
             bg_cmds.append(("BACKGROUND", (0, i), (-1, i),
                              _row_bg.get(det, colors.HexColor("#F2F3F4"))))
+            from xml.sax.saxutils import escape as xml_escape
             tbl_data.append([
-                Paragraph(p.get("plot_id", "—"), SMALL),
-                Paragraph(_det_label.get(det, det.upper()), BOLD_SMALL),
-                Paragraph(p.get("detail", "—"), SMALL),
-                Paragraph(p.get("action", "—"), SMALL),
+                Paragraph(xml_escape(str(p.get("plot_id", "—"))), SMALL),
+                Paragraph("BOUNDARY REVIEW" if det == "clear_in_screen" and p.get("boundary_warnings") else _det_label.get(det, det.upper()), BOLD_SMALL),
+                Paragraph(xml_escape(str(p.get("detail", "—"))), SMALL),
+                Paragraph(xml_escape(p.get("action", "—") + " " + " ".join(p.get("boundary_warnings", []))), SMALL),
             ])
         col_ws = [doc.width * w for w in (0.18, 0.18, 0.32, 0.32)]
         ptbl = RLTable(tbl_data, colWidths=col_ws)
@@ -1027,6 +1028,10 @@ def generate_eudr_pdf(body: dict) -> bytes:
             ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ] + bg_cmds))
         story.append(ptbl)
+        story.append(Spacer(1, 4))
+
+    if body.get("commodity_identity_note"):
+        story.append(Paragraph(body["commodity_identity_note"], BODY))
         story.append(Spacer(1, 4))
 
     # ── 4. Readiness checklist ────────────────────────────────────────────────

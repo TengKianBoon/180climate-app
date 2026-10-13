@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import date
 from typing import Literal, Optional
-from pydantic import BaseModel, computed_field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 # ---------- Shared ----------
 class ContactInfo(BaseModel):
@@ -252,6 +252,13 @@ class PlotVerdict(BaseModel):
     detection: Literal["clear_in_screen", "loss_detected", "inconclusive", "geometry_invalid"]
     loss_after_2020_ha: float                 # vs 31 Dec 2020 cutoff
     commodity: str
+    # Observation availability is separate from the screening decision. Older saved
+    # results omit these fields; None means not recorded, never a negative read.
+    forest_2020: Optional[bool] = None
+    baseline_forest_pct: Optional[float] = None
+    hansen_available: Optional[bool] = None
+    radar_available: Optional[bool] = None
+    reason_codes: list[str] = Field(default_factory=list)
     # ADR-0018 micro-amendment: geometry_ok and plot_satellite_risk are DERIVED from detection.
     # detection is the single source of truth — no stored booleans or risk strings that can drift.
     @computed_field  # type: ignore[prop-decorator]

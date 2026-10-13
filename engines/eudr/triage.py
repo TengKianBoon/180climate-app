@@ -94,6 +94,19 @@ def _boundary_from_geojson(geojson: dict, area_ha: float = 0.0) -> Boundary:
     )
 
 
+def _unavailable_reason(prefix: str, note: str) -> str:
+    text = note.lower()
+    if "disabled" in text:
+        return prefix + "_disabled"
+    if "too large" in text:
+        return prefix + "_window_too_large"
+    if "crosses a hansen tile" in text:
+        return prefix + "_tile_boundary"
+    if any(term in text for term in ("all-nodata", "below raster resolution", "pixels unavailable")):
+        return prefix + "_no_usable_pixels"
+    return prefix + "_source_read_failed"
+
+
 def triage_plot(
     plot_id: str,
     geojson: dict,
@@ -118,6 +131,19 @@ def triage_plot(
     detection = _decide_detection(
         jrc.forest_2020, hansen.loss_after_2020_ha, radd.alert_after_cutoff
     )
+    reasons = []
+    if geojson.get("type") == "Point":
+        reasons.append("point_without_boundary")
+    if jrc.forest_2020 is None:
+        reasons.extend(["baseline_unavailable", _unavailable_reason("baseline", jrc.note)])
+    elif jrc.forest_2020 is False:
+        reasons.append("baseline_below_forest_threshold")
+    if not hansen.available:
+        reasons.extend(["loss_data_unavailable", _unavailable_reason("loss", hansen.note)])
+    elif hansen.loss_after_2020_ha > 0:
+        reasons.append("tree_cover_loss_signal")
+    if not radd.available:
+        reasons.append("optional_radar_unavailable")
 
     # The verdict carries a concrete loss figure; None (unavailable) surfaces as 0.0 but the
     # detection is already inconclusive in that case (no false "clear").
@@ -132,6 +158,11 @@ def triage_plot(
         detection=detection,
         loss_after_2020_ha=round(float(loss_ha), 2),
         commodity=commodity,
+        forest_2020=jrc.forest_2020,
+        baseline_forest_pct=jrc.forest_pct if jrc.available else None,
+        hansen_available=hansen.available,
+        radar_available=radd.available,
+        reason_codes=reasons,
         datasets_version=datasets_version,
         run_date=run_date,
     )
