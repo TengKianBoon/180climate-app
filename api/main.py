@@ -1023,8 +1023,8 @@ _EUDR_VERBATIM: dict[str, dict[str, str]] = {
     "inconclusive": {
         "label": "Inconclusive — review needed",
         "detail": (
-            "We couldn't get a clear read for this plot — usually cloud cover, a small parcel, "
-            "or radar noise. That means we can't call it clear, not that there's a problem."
+            "This plot needs review. See its recorded baseline, source availability and reason codes; "
+            "an inconclusive result does not establish a cause or a legal finding."
         ),
         "action": (
             "Needs a manual check (recent or higher-resolution imagery) "
@@ -1047,12 +1047,13 @@ _EUDR_VERBATIM: dict[str, dict[str, str]] = {
 def _eudr_finding_detail(pv, area_ha: float) -> str:
     """Build a data-driven finding sentence from the PlotVerdict + validated area."""
     det = pv.detection
-    area_fmt = f"{int(round(area_ha)):,}"
+    from engines.eudr.boundaries import format_area
+    area_fmt = format_area(area_ha)
 
     if det == "clear_in_screen":
-        radar_note = "RADD unavailable" if "stub" in pv.datasets_version.lower() else "no RADD alerts found"
+        radar_note = "no RADD alerts found" if getattr(pv, "radar_available", None) is True else "RADD availability not confirmed"
         return (
-            f"We checked this ~{area_fmt} ha plot against the EU's 2020 forest baseline and found "
+            f"We checked this ~{area_fmt} plot against the EU's 2020 forest baseline and found "
             f"no tree-cover loss in the covered years 2021–2025 (Hansen shows zero; {radar_note}). "
             "Annual loss data does not establish absence of clearing in 2026. "
             "A good screening result — but a screen isn't certification: you still file a DDS, "
@@ -1070,7 +1071,7 @@ def _eudr_finding_detail(pv, area_ha: float) -> str:
                 ha_str = f"{ha:,.0f}"
             pct_part = f" (~{ha / area_ha * 100:.1f}%)" if area_ha > 0 else ""
             return (
-                f"We found about {ha_str} ha of tree-cover loss on this ~{area_fmt} ha plot"
+                f"We found about {ha_str} ha of tree-cover loss on this ~{area_fmt} plot"
                 f"{pct_part} after the EU's 31 December 2020 cutoff, on land the EU's 2020 map "
                 "shows as forest. Hansen annual satellite data detects loss through 2025; "
                 "it does not establish absence of clearing in 2026. Satellite sees the loss but not the cause — it could be permitted "
@@ -1078,7 +1079,7 @@ def _eudr_finding_detail(pv, area_ha: float) -> str:
                 "before this plot enters a DDS."
             )
         return (
-            f"Recent radar alerts (RADD) flagged possible tree-cover loss on this ~{area_fmt} ha "
+            f"Recent radar alerts (RADD) flagged possible tree-cover loss on this ~{area_fmt} "
             "plot after the EU's 31 December 2020 cutoff, on land the EU's 2020 map shows as "
             "forest — the exact area isn't quantified yet. Satellite sees the signal but not "
             "the cause (permitted harvest, road, fire, or replanting). Have it checked and "
@@ -1086,12 +1087,44 @@ def _eudr_finding_detail(pv, area_ha: float) -> str:
         )
 
     if det == "inconclusive":
-        return (
-            f"We couldn't get a reliable read for this ~{area_fmt} ha plot — usually cloud cover, "
-            "a parcel small relative to the satellite's resolution, or an unclear 2020 forest "
-            "baseline. That's a data gap, not evidence of a problem, so we can't call it clear. "
-            "A recent high-resolution image or a field check would resolve it."
-        )
+        reasons = getattr(pv, "reason_codes", [])
+        if "point_without_boundary" in reasons:
+            reason = "Only a location point was supplied; a polygon boundary is needed for this area-based satellite screen."
+        elif getattr(pv, "forest_2020", None) is False:
+            pct = getattr(pv, "baseline_forest_pct", None)
+            share = f" ({pct:.1f}% forest pixels)" if pct is not None else ""
+            reason = (
+                f"The JRC 2020 map read succeeded{share}, but falls below this tool's 10% forest-pixel threshold. "
+                "This is a baseline classification requiring land-use review, not a missing-image diagnosis."
+            )
+        elif "baseline_unavailable" in reasons:
+            reason = "The JRC 2020 baseline could not be read for this boundary; coverage, resolution or a source read failure needs checking."
+        elif "loss_data_unavailable" in reasons:
+            reason = "The baseline was read, but the Hansen loss measurement is unavailable for this boundary."
+        else:
+            reason = "The saved observations do not identify a specific reason; a new dataset check is needed."
+        explanations = {
+            "baseline_disabled": "The JRC baseline connection is disabled on the server.",
+            "baseline_window_too_large": "The boundary exceeds the safe JRC raster window size; split it for screening.",
+            "baseline_no_usable_pixels": "The JRC window contains no usable pixels for this boundary (resolution or nodata).",
+            "baseline_source_read_failed": "The JRC source read failed; the baseline is unavailable for this run.",
+            "loss_disabled": "The Hansen connection is disabled on the server.",
+            "loss_window_too_large": "The boundary exceeds the safe Hansen raster window size; split it for screening.",
+            "loss_tile_boundary": "The boundary crosses a Hansen tile boundary; this reader requires separate polygons per tile.",
+            "loss_no_usable_pixels": "Hansen cannot supply a complete pixel measurement: the plot is below raster resolution or includes unavailable pixels.",
+            "loss_source_read_failed": "The Hansen source read failed; the loss measurement is unavailable for this run.",
+        }
+        if "point_without_boundary" not in reasons:
+            extra = " ".join(explanations[code] for code in reasons if code in explanations)
+            if extra:
+                reason += " " + extra
+        loss_note = ""
+        if getattr(pv, "hansen_available", None) is True:
+            if pv.loss_after_2020_ha > 0:
+                loss_note = f" Hansen separately reports {format_area(pv.loss_after_2020_ha)} of tree-cover loss in 2021–2025; investigate its cause and prior land use."
+            else:
+                loss_note = " Hansen reports zero tree-cover loss in 2021–2025, but that does not resolve the baseline assessment."
+        return f"Review needed for this ~{area_fmt} plot. {reason}{loss_note} We can't call it clear in this screen. This screen does not confirm crop identity or legal status."
 
     # geometry_invalid — area couldn't be computed; don't reference it
     return (
@@ -1166,6 +1199,7 @@ async def eudr_screen(
     from datetime import date as _date
     from engines.eudr.geometry import parse_plots
     from engines.eudr.triage import triage_validated_plots
+    from engines.eudr.boundaries import boundary_overlaps, format_area
 
     # 1. Resolve geometry content + format
     if file is not None and file.filename:
@@ -1173,7 +1207,7 @@ async def eudr_screen(
         fmt = _detect_eudr_fmt(file.filename)
         content: str | bytes = content_bytes if fmt == "shapefile" else content_bytes.decode("utf-8", errors="replace")
     elif geojson_text:
-        content = geojson_text.strip()
+        content = geojson_text
         fmt = "geojson"
     else:
         raise HTTPException(status_code=422, detail="Provide a file upload or geojson_text.")
@@ -1187,6 +1221,9 @@ async def eudr_screen(
     run_date = _date.today()
     plot_verdicts = triage_validated_plots(validations, commodity, run_date=run_date)
 
+    boundary_check = boundary_overlaps(validations)
+    overlap_pairs = boundary_check["pairs"]
+
     # 4. Compute roll-up counts
     loss_count   = sum(1 for p in plot_verdicts if p.detection == "loss_detected")
     clear_count  = sum(1 for p in plot_verdicts if p.detection == "clear_in_screen")
@@ -1195,12 +1232,14 @@ async def eudr_screen(
 
     if loss_count > 0:
         overall = "loss_detected"
-    elif incon_count > 0 or inval_count > 0:
+    elif incon_count > 0 or inval_count > 0 or overlap_pairs:
         overall = "review_needed"
     else:
         overall = "clear_in_screen"
 
     headline = _eudr_overall_headline(plot_verdicts, loss_count, clear_count)
+    if overlap_pairs and not loss_count:
+        headline = "Plot boundary overlaps need review"
 
     # Amber-rate log (WO-013): overall + per-plot detection + reason — for rate monitoring
     log.info(
@@ -1214,16 +1253,29 @@ async def eudr_screen(
 
     # 5. Per-plot response dicts (with data-driven finding detail)
     plots_out = []
-    for pv, val in zip(plot_verdicts, validations):
+    for plot_index, (pv, val) in enumerate(zip(plot_verdicts, validations)):
         det = pv.detection
         wording = _EUDR_VERBATIM[det]
+        warnings = []
+        for pair in overlap_pairs:
+            if plot_index in (pair["index_a"], pair["index_b"]):
+                other = pair["plot_b"] if plot_index == pair["index_a"] else pair["plot_a"]
+                warnings.append(f"Boundary overlaps {other} by {format_area(pair['overlap_ha'])}. Review the boundaries and plot identity.")
+        if val.geometry_ok and val.geometry_type == "point":
+            warnings.append("Boundary overlap cannot be assessed from a point; supply a polygon to check its extent.")
         plots_out.append({
             "plot_id":           pv.plot_id,
             "detection":         det,
-            "label":             wording["label"],
+            "label":             "Satellite screen clear — boundary review needed" if det == "clear_in_screen" and warnings else wording["label"],
             "detail":            _eudr_finding_detail(pv, val.area_ha),
+            "boundary_warnings": warnings,
+            "reason_codes":      pv.reason_codes,
+            "forest_2020":       pv.forest_2020,
+            "baseline_forest_pct": pv.baseline_forest_pct,
+            "hansen_available":  pv.hansen_available,
+            "radar_available":   pv.radar_available,
             "action":            wording["action"],
-            "area_ha":           round(val.area_ha, 1),
+            "area_ha":           round(val.area_ha, 8),
             "plot_satellite_risk": pv.plot_satellite_risk,
             "geometry_ok":       pv.geometry_ok,
             "loss_after_2020_ha": pv.loss_after_2020_ha,
@@ -1243,6 +1295,13 @@ async def eudr_screen(
         "inconclusive_count": incon_count,
         "invalid_count":      inval_count,
         "plots":              plots_out,
+        "boundary_check":     boundary_check,
+        "overlap_count":      len(overlap_pairs),
+        "commodity_identity_note": "Commodity is user-declared. This screen does not independently identify rubber or other crops from imagery.",
+        "plot_map_geojson": {"type": "FeatureCollection", "features": [
+            {"type": "Feature", "properties": {"plot_id": v.plot_id, "detection": pv.detection}, "geometry": v.geojson}
+            for v, pv in zip(validations, plot_verdicts) if v.geometry_ok and v.geojson is not None
+        ]},
         "country_benchmark_risk": "standard",
         "datasets_version":   datasets_version,
         "run_date":           str(run_date),
@@ -1261,6 +1320,15 @@ async def eudr_screen(
             validations, plot_verdicts, commodity, name, str(run_date)
         ),
     }
+
+    body["readiness"].append({
+        "component": "Plot boundary overlap review",
+        "status": "incomplete" if overlap_pairs or boundary_check["unassessed_plot_ids"] else "complete",
+        "note": f"{len(overlap_pairs)} overlapping polygon pairs; {len(boundary_check['unassessed_plot_ids'])} plots cannot be checked for boundary overlap. " + boundary_check["scope"],
+    })
+    if overlap_pairs:
+        body["readiness"][2]["status"] = "incomplete"
+        body["readiness"][2]["note"] = "Satellite results and boundary overlap findings must both be reviewed."
 
     # Banned-string guard (belt-and-suspenders — the contract tests cover this too)
     body_json = JSONResponse(content=body).body.decode()
@@ -1295,6 +1363,16 @@ async def eudr_screen(
     }
     stored_result = dict(body)
     stored_result.pop("geolocation_pack_geojson", None)
+    stored_result.pop("plot_map_geojson", None)
+    # Retain the original upload privately, independently of the simplified DDS pack.
+    # capture_submission applies the existing geometry-retention flag to this entire object.
+    import base64
+    retained_geometry = {
+        "type": "FeatureCollection",
+        "features": body["plot_map_geojson"]["features"],
+        "_source_input": {"format": fmt, "encoding": "base64",
+                          "content": base64.b64encode(content_bytes if file is not None and file.filename else content.encode("utf-8")).decode("ascii")},
+    }
     try:
         reference = capture_submission(
             application="eudr",
@@ -1311,7 +1389,7 @@ async def eudr_screen(
                 "input_format": fmt,
                 "upload_filename": file.filename if file is not None and file.filename else "",
             },
-            geometry_geojson=body["geolocation_pack_geojson"],
+            geometry_geojson=retained_geometry,
             result=stored_result,
         )
     except IntakeStorageError as exc:

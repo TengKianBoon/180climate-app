@@ -1330,6 +1330,7 @@ function renderEudrResult() {
       +   '</div>'
       + '</div>'
       + '<div class="plot-detail">' + escHtml(p.detail) + '</div>'
+      + (p.boundary_warnings || []).map(function(w) { return '<div class="plot-action">Boundary review: ' + escHtml(w) + '</div>'; }).join('')
       + '<div class="plot-action">' + escHtml(p.action) + '</div>'
       + '<div class="plot-meta">'
       +   lossLine
@@ -1342,6 +1343,7 @@ function renderEudrResult() {
   document.getElementById('eudr-legality-note').innerHTML =
     '<strong>Legality is a separate check:</strong> ' + escHtml(r.legality_note);
 
+  if (r.commodity_identity_note) document.getElementById('eudr-legality-note').innerHTML += '<br>' + escHtml(r.commodity_identity_note);
   var timberEl = document.getElementById('eudr-timber-note');
   if (r.timber_note) {
     timberEl.innerHTML = '<strong>For timber:</strong> ' + escHtml(r.timber_note);
@@ -1408,7 +1410,7 @@ function renderEudrResult() {
 function initEudrMap(r) {
   if (_eudrMap) { _eudrMap.remove(); _eudrMap = null; }
 
-  var pack = r && r.geolocation_pack_geojson;
+  var pack = r && (r.plot_map_geojson || r.geolocation_pack_geojson);
   if (!pack || !pack.features || pack.features.length === 0) return;
 
   var _detColour = {
@@ -1460,7 +1462,8 @@ function initEudrMap(r) {
       layer.bindPopup(
         '<strong>' + escHtml(pid) + '</strong>'
         + '<br><em>' + escHtml(label) + '</em>'
-        + (detail ? '<br><span style="font-size:.82rem;color:#444">' + escHtml(detail) + '</span>' : ''),
+        + (detail ? '<br><span style="font-size:.82rem;color:#444">' + escHtml(detail) + '</span>' : '')
+        + (info.boundary_warnings || []).map(function(w) { return '<br><strong>Boundary review:</strong> ' + escHtml(w); }).join(''),
         { maxWidth: 280 }
       );
     },
